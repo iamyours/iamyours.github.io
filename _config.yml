@@ -70,7 +70,7 @@ theme: landscape
 deploy:
   type: git
   repository: https://github.com/iamyours/iamyours.github.io.git
-  branch: pages
+  branch: master
   
 #duoshuo
 duoshuo_shortname: iamroger
