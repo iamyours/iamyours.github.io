@@ -1,0 +1,22 @@
+[
+    {
+        "name":"默认风格",
+        "url":"./json/默认风格.json"
+    },
+    {
+        "name":"光明启迪风格",
+        "url":"./json/光明启迪风格.json"
+    },
+    {
+        "name":"Cinematic风格",
+        "url":"./json/Cinematic风格.json"
+    },
+    {
+        "name":"东方哲思版",
+        "url":"./json/东方哲思版.json"
+    },
+    {
+        "name":"禅意赛博风格",
+        "url":"./json/禅意赛博风格.json"
+    }
+]
