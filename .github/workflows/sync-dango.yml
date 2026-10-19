@@ -32,16 +32,26 @@ jobs:
           short="$(git -C /tmp/dango-travel rev-parse --short=7 HEAD)"
           echo "dango-travel@${short}"
 
-          # Same set as dango-travel .github/workflows/pages.yml copies into _site.
+          # Same set as dango-travel .github/workflows/pages.yml copies into _site,
+          # plus ads.txt when the upstream root has one.
           # README.md stays. screenshots/, .github/, and other non-site files are not copied.
+          # If upstream has no ads.txt, master's copy is left in place.
           rm -rf assets koi
           mkdir -p assets koi
           cp -a /tmp/dango-travel/index.html ./index.html
           cp -a /tmp/dango-travel/.nojekyll ./.nojekyll
           cp -a /tmp/dango-travel/assets/. ./assets/
           cp -a /tmp/dango-travel/koi/. ./koi/
+          if [[ -f /tmp/dango-travel/ads.txt ]]; then
+            cp -a /tmp/dango-travel/ads.txt ./ads.txt
+          else
+            echo "Upstream has no ads.txt; leaving master's ads.txt unchanged."
+          fi
 
           git add -A -- index.html .nojekyll assets koi
+          if [[ -f /tmp/dango-travel/ads.txt ]]; then
+            git add -A -- ads.txt
+          fi
           if git diff --cached --quiet; then
             echo "No changes; skip commit."
             exit 0
