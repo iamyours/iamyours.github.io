@@ -1,0 +1,2138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="icon" href="data:," />
+  <title>北京天坛祈年殿 - 3D 交互式程序化场景</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #7bb5e8;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      color: #2b2b2b;
+    }
+
+    #webgl-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 左上角返回按钮：半透明奶油色圆角小按钮样式 */
+    .back-btn {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: rgba(255, 248, 232, 0.88);
+      color: #2c251d;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-decoration: none;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 252, 244, 0.95);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+      cursor: pointer;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 252, 242, 0.98);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.22);
+    }
+
+    /* 右上角 HUD 建筑简介卡片 */
+    .hud-header {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .hud-title-card {
+      background: rgba(255, 253, 248, 0.92);
+      border: 1px solid rgba(212, 180, 131, 0.45);
+      border-radius: 14px;
+      padding: 12px 18px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      text-align: right;
+      box-shadow: 0 10px 30px rgba(44, 32, 18, 0.12);
+      max-width: 320px;
+    }
+
+    .hud-title-row {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: #eef7ee;
+      color: #2e7d32;
+      border: 1px solid #c8e6c9;
+      transition: all 0.3s ease;
+    }
+
+    .status-badge.exploded {
+      background: #fff3e0;
+      color: #e65100;
+      border-color: #ffe0b2;
+    }
+
+    .status-badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    .hud-main-title {
+      font-size: 18px;
+      font-weight: 800;
+      letter-spacing: 1px;
+      color: #1a202c;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+    }
+
+    .hud-subtitle {
+      font-size: 11.5px;
+      color: #64748b;
+      line-height: 1.4;
+      margin-bottom: 6px;
+    }
+
+    .hud-tags {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 4px;
+    }
+
+    .hud-tag {
+      font-size: 10px;
+      background: rgba(15, 63, 136, 0.08);
+      color: #0f3f88;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 500;
+    }
+
+    /* 底部中央主控制台 */
+    .control-dock {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      pointer-events: auto;
+      max-width: 95vw;
+    }
+
+    .dock-main-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 252, 246, 0.92);
+      border: 1px solid rgba(212, 180, 131, 0.45);
+      border-radius: 40px;
+      padding: 6px 10px;
+      box-shadow: 0 12px 36px rgba(44, 32, 18, 0.16);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 18px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+      font-size: 13.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+      white-space: nowrap;
+      outline: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #134e9e 0%, #0d3873 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(15, 63, 136, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #185eb8 0%, #10438a 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(15, 63, 136, 0.45);
+    }
+
+    .btn-primary.active {
+      background: linear-gradient(135deg, #c43818 0%, #9e270d 100%);
+      box-shadow: 0 4px 14px rgba(196, 56, 24, 0.4);
+    }
+
+    .btn-sub {
+      background: rgba(245, 240, 230, 0.8);
+      color: #3e3223;
+      border: 1px solid rgba(200, 180, 155, 0.4);
+    }
+
+    .btn-sub:hover {
+      background: rgba(255, 255, 255, 0.95);
+      transform: translateY(-1px);
+    }
+
+    .btn-sub.active {
+      background: #e9f2ff;
+      color: #0f3f88;
+      border-color: #adc8ff;
+      font-weight: 700;
+    }
+
+    .view-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(255, 253, 248, 0.88);
+      border: 1px solid rgba(212, 180, 131, 0.35);
+      border-radius: 999px;
+      padding: 4px 8px;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .view-btn {
+      white-space: nowrap;
+      flex-shrink: 0;
+      padding: 5px 12px;
+      font-size: 12px;
+      font-weight: 500;
+      color: #554433;
+      background: transparent;
+      border: none;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .view-btn:hover {
+      background: rgba(0, 0, 0, 0.06);
+      color: #111;
+    }
+
+    .view-btn.active {
+      background: #0f3f88;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* 结构分解层次实时浮标提示 */
+    .explosion-guide {
+      position: fixed;
+      left: 18px;
+      bottom: 24px;
+      z-index: 25;
+      background: rgba(255, 253, 248, 0.94);
+      border: 1px solid rgba(212, 180, 131, 0.45);
+      border-radius: 12px;
+      padding: 12px 16px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 24px rgba(44, 32, 18, 0.1);
+      font-size: 11.5px;
+      line-height: 1.6;
+      max-width: 270px;
+      color: #4b3d2c;
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      opacity: 0;
+      transform: translateY(10px);
+      pointer-events: none;
+    }
+
+    .explosion-guide.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .explosion-guide-title {
+      font-weight: 700;
+      color: #0f3f88;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .layer-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 3px 0;
+    }
+
+    .layer-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+      .hud-title-card {
+        padding: 8px 12px;
+        max-width: 240px;
+      }
+      .hud-main-title {
+        font-size: 15px;
+      }
+      .hud-subtitle {
+        display: none;
+      }
+      .control-dock {
+        bottom: 76px;
+      }
+      .btn {
+        padding: 7px 12px;
+        font-size: 12px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .view-row {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        max-width: 95vw;
+        scrollbar-width: none;
+        -webkit-overflow-scrolling: touch;
+      }
+      .view-row::-webkit-scrollbar {
+        display: none;
+      }
+      .view-btn {
+        padding: 4px 8px;
+        font-size: 11px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+      .explosion-guide {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 左上角返回按钮 -->
+  <a class="back-btn" href="../">← 返回 3D 作品</a>
+
+  <!-- 3D 渲染画布容器 -->
+  <div id="webgl-container"></div>
+
+  <!-- 右上角 HUD 建筑简介卡片 -->
+  <div class="hud-header">
+    <div class="hud-title-card">
+      <div class="hud-title-row">
+        <span class="status-badge" id="statusBadge">
+          <span class="status-badge-dot"></span>
+          <span id="statusText">建筑完整呈现</span>
+        </span>
+        <div class="hud-main-title">北京天坛 · 祈年殿</div>
+      </div>
+      <div class="hud-subtitle">明清两代帝王孟春祈谷大典之圜丘天坛核心 · 纯代码程序化营造</div>
+      <div class="hud-tags">
+        <span class="hud-tag">三重孔雀蓝飞檐</span>
+        <span class="hud-tag">鎏金铜葫芦宝顶</span>
+        <span class="hud-tag">28宿四季时辰柱</span>
+        <span class="hud-tag">三层汉白玉圆坛</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 分解层级浮标向导（分解时显示） -->
+  <div class="explosion-guide" id="explosionGuide">
+    <div class="explosion-guide-title">
+      <span>🏛️ 营造法式层级解构</span>
+    </div>
+    <div class="layer-item"><span class="layer-dot" style="background: #f1c40f;"></span>1. 鎏金宝顶（皇权与天意相通）</div>
+    <div class="layer-item"><span class="layer-dot" style="background: #104285;"></span>2. 三重曲线微翘深蓝琉璃瓦圆顶</div>
+    <div class="layer-item"><span class="layer-dot" style="background: #27ae60;"></span>3. 金龙和玺彩绘额枋与环形斗拱群</div>
+    <div class="layer-item"><span class="layer-dot" style="background: #a92424;"></span>4. 殿身外檐三交六椀菱花隔扇门窗</div>
+    <div class="layer-item"><span class="layer-dot" style="background: #c0392b;"></span>5. 28根内外三圈金丝楠木朱漆柱</div>
+    <div class="layer-item"><span class="layer-dot" style="background: #ecf0f1;"></span>6. 三层汉白玉台基、云龙丹陛与雕栏</div>
+  </div>
+
+  <!-- 底部交互控制坞 -->
+  <div class="control-dock">
+    <div class="dock-main-row">
+      <button class="btn btn-primary" id="btnExplode">
+        <span id="btnExplodeIcon">💥</span>
+        <span id="btnExplodeText">层次分解 / 爆炸透视</span>
+      </button>
+      <button class="btn btn-sub" id="btnOrbit">
+        <span>🔄</span>
+        <span id="btnOrbitText">自动环绕: 关</span>
+      </button>
+    </div>
+    <div class="view-row">
+      <button class="view-btn active" data-view="overview">恢弘全景</button>
+      <button class="view-btn" data-view="heroic">仰视雄姿</button>
+      <button class="view-btn" data-view="eaves">飞檐斗拱</button>
+      <button class="view-btn" data-view="danbi">南向丹陛</button>
+      <button class="view-btn" data-view="topdown">俯瞰圆坛</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    /* ==========================================================================
+       1. 全局配置与渲染器初始化
+       ========================================================================== */
+    const container = document.getElementById('webgl-container');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x6aa6e2);
+    scene.fog = new THREE.FogExp2(0x9bc2e8, 0.005);
+
+    const BASE_FOV = 40;
+    const camera = new THREE.PerspectiveCamera(BASE_FOV, width / height, 0.5, 600);
+    // 初始位置：南偏东经典 3/4 恢弘仰角机位，纵览三层圆台与飞檐宝顶
+    camera.position.set(0, 18, 58);
+
+    function updateCameraFraming() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      if (camera.aspect < 1) {
+        // 竖屏（宽高比 < 1）根据 aspect 动态增大 FOV，保证主体及三层圆台完整可见
+        camera.fov = 2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(BASE_FOV / 2)) / (camera.aspect * 0.92)) * (180 / Math.PI);
+      } else {
+        camera.fov = BASE_FOV;
+      }
+      camera.updateProjectionMatrix();
+    }
+    updateCameraFraming();
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 12.0, 0);
+    controls.maxPolarAngle = Math.PI / 2 - 0.03;
+    controls.minDistance = 6;
+    controls.maxDistance = 150;
+
+    /* ==========================================================================
+       2. 高保真程序化 Canvas 纹理生成器
+       ========================================================================== */
+
+    // 2.1 天坛专属深孔雀宝蓝琉璃瓦与金黄剪边纹理
+    function createRoofTileTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 1024;
+      const ctx = c.getContext('2d');
+
+      // 皇家深沉宝石孔雀蓝底色
+      const grad = ctx.createLinearGradient(0, 0, 1024, 1024);
+      grad.addColorStop(0, '#051838');
+      grad.addColorStop(0.3, '#092552');
+      grad.addColorStop(0.65, '#0e3a78');
+      grad.addColorStop(1, '#071f45');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // 64 垄精致密实瓦垄（阴阳瓦、筒瓦弧光与板瓦深沟）
+      const numTiles = 48;
+      const tileWidth = 1024 / numTiles;
+
+      for (let i = 0; i < numTiles; i++) {
+        const x = i * tileWidth;
+        const tileGrad = ctx.createLinearGradient(x, 0, x + tileWidth, 0);
+        tileGrad.addColorStop(0.0, 'rgba(2, 8, 20, 0.9)');
+        tileGrad.addColorStop(0.25, 'rgba(10, 42, 92, 0.25)');
+        tileGrad.addColorStop(0.5, 'rgba(120, 185, 255, 0.42)'); // 釉彩高光反射
+        tileGrad.addColorStop(0.75, 'rgba(10, 42, 92, 0.25)');
+        tileGrad.addColorStop(1.0, 'rgba(2, 8, 20, 0.9)');
+
+        ctx.fillStyle = tileGrad;
+        ctx.fillRect(x, 0, tileWidth, 1024);
+
+        // 瓦垄接缝深线
+        ctx.fillStyle = 'rgba(1, 4, 12, 0.95)';
+        ctx.fillRect(x, 0, 2.0, 1024);
+      }
+
+      // 横向压瓦叠缝线
+      ctx.strokeStyle = 'rgba(1, 6, 18, 0.5)';
+      ctx.lineWidth = 1.2;
+      for (let y = 0; y < 1024; y += 24) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(1024, y);
+        ctx.stroke();
+
+        ctx.fillStyle = 'rgba(110, 175, 255, 0.10)';
+        ctx.fillRect(0, y + 1, 1024, 1);
+      }
+
+      // 檐口金黄色琉璃剪边与瓦当滴水装饰带 (最下部 140px)
+      const goldY = 884;
+      const goldGrad = ctx.createLinearGradient(0, goldY, 0, 1024);
+      goldGrad.addColorStop(0, '#be8507');
+      goldGrad.addColorStop(0.25, '#ffcf2e');
+      goldGrad.addColorStop(0.7, '#d6970e');
+      goldGrad.addColorStop(1, '#784e02');
+      ctx.fillStyle = goldGrad;
+      ctx.fillRect(0, goldY, 1024, 140);
+
+      // 瓦当圆形团龙金印与倒三角滴水
+      ctx.fillStyle = '#ffea78';
+      ctx.strokeStyle = '#5a3702';
+      ctx.lineWidth = 2.0;
+      for (let i = 0; i < numTiles; i++) {
+        const cx = i * tileWidth + tileWidth / 2;
+        const cy = goldY + 70;
+        ctx.beginPath();
+        ctx.arc(cx, cy, tileWidth * 0.42, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#8a5c05';
+        ctx.beginPath();
+        ctx.arc(cx, cy, tileWidth * 0.18, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#ffea78';
+
+        // 尖角滴水牙
+        ctx.beginPath();
+        ctx.moveTo(cx - 6, 1024);
+        ctx.lineTo(cx + 6, 1024);
+        ctx.lineTo(cx, 1010);
+        ctx.closePath();
+        ctx.fillStyle = '#5a3702';
+        ctx.fill();
+        ctx.fillStyle = '#ffea78';
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    // 2.2 瓦垄法线/凹凸贴图
+    function createRoofBumpMap() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      ctx.fillStyle = '#808080';
+      ctx.fillRect(0, 0, 512, 512);
+
+      const num = 24;
+      const w = 512 / num;
+      for (let i = 0; i < num; i++) {
+        const x = i * w;
+        const g = ctx.createLinearGradient(x, 0, x + w, 0);
+        g.addColorStop(0.0, '#222222');
+        g.addColorStop(0.5, '#ffffff');
+        g.addColorStop(1.0, '#222222');
+        ctx.fillStyle = g;
+        ctx.fillRect(x, 0, w, 512);
+      }
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    // 2.3 清工部最高规制「金龙和玺彩画」额枋贴图
+    function createHexiPaintTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      // 赭红底色
+      ctx.fillStyle = '#7a1414';
+      ctx.fillRect(0, 0, 1024, 256);
+
+      // 上下双重青绿叠晕带
+      const greenGrad = ctx.createLinearGradient(0, 0, 0, 256);
+      greenGrad.addColorStop(0.0, '#0a3820');
+      greenGrad.addColorStop(0.12, '#187042');
+      greenGrad.addColorStop(0.22, '#0c3866');
+      greenGrad.addColorStop(0.78, '#0c3866');
+      greenGrad.addColorStop(0.88, '#187042');
+      greenGrad.addColorStop(1.0, '#0a3820');
+      ctx.fillStyle = greenGrad;
+      ctx.fillRect(0, 16, 1024, 224);
+
+      // 沥粉贴金箍头线条
+      ctx.fillStyle = '#ffcf26';
+      ctx.fillRect(0, 14, 1024, 5);
+      ctx.fillRect(0, 237, 1024, 5);
+      ctx.fillRect(0, 44, 1024, 3);
+      ctx.fillRect(0, 207, 1024, 3);
+
+      // 祥云金龙团花图案
+      ctx.strokeStyle = '#ffe46b';
+      ctx.lineWidth = 3.5;
+      ctx.fillStyle = '#145632';
+
+      for (let x = 0; x < 1024; x += 128) {
+        ctx.beginPath();
+        ctx.arc(x + 64, 128, 44, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffcf10';
+        ctx.beginPath();
+        ctx.arc(x + 64, 128, 24, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#0c3866';
+        ctx.beginPath();
+        ctx.arc(x + 64, 128, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#145632';
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    // 2.4 殿身外檐隔扇门窗（三交六椀菱花格与团龙裙板）
+    function createLatticeDoorTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 1024;
+      const ctx = c.getContext('2d');
+
+      // 朱砂红大漆外框
+      ctx.fillStyle = '#8f1616';
+      ctx.fillRect(0, 0, 512, 1024);
+
+      // 框体金细线
+      ctx.strokeStyle = '#ffc822';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(8, 8, 496, 1008);
+      ctx.strokeRect(18, 18, 476, 988);
+
+      // 上截格心 (菱花花格透光白绢窗纱)
+      const latticeH = 630;
+      ctx.fillStyle = '#fbf8f0';
+      ctx.fillRect(26, 26, 460, latticeH);
+
+      // 三交六椀细红木棱与金线
+      ctx.strokeStyle = '#9c1c1c';
+      ctx.lineWidth = 3.2;
+      const step = 26;
+      for (let x = 26; x <= 486; x += step) {
+        ctx.beginPath();
+        ctx.moveTo(x, 26);
+        ctx.lineTo(x, 26 + latticeH);
+        ctx.stroke();
+      }
+      for (let y = 26; y <= 26 + latticeH; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(26, y);
+        ctx.lineTo(486, y);
+        ctx.stroke();
+      }
+      ctx.strokeStyle = 'rgba(218, 165, 32, 0.72)';
+      ctx.lineWidth = 1.8;
+      for (let d = -latticeH; d <= 486 + latticeH; d += step * 1.5) {
+        ctx.beginPath();
+        ctx.moveTo(26, 26 + d);
+        ctx.lineTo(486, 26 + d + 460);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(486, 26 + d);
+        ctx.lineTo(26, 26 + d + 460);
+        ctx.stroke();
+      }
+
+      // 绦环板 (中段装饰腰线)
+      const midY = 26 + latticeH + 12;
+      ctx.fillStyle = '#721212';
+      ctx.fillRect(26, midY, 460, 72);
+      ctx.strokeStyle = '#ffcf33';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(32, midY + 6, 448, 60);
+
+      ctx.fillStyle = '#ffcf33';
+      ctx.beginPath();
+      ctx.arc(256, midY + 36, 18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 下截裙板 (实木浮雕金彩框与金龙团花)
+      const skirtY = midY + 86;
+      const skirtH = 1024 - skirtY - 26;
+      ctx.fillStyle = '#721212';
+      ctx.fillRect(26, skirtY, 460, skirtH);
+      ctx.strokeStyle = '#ffc822';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(34, skirtY + 8, 444, skirtH - 16);
+
+      // 团龙金纹
+      ctx.fillStyle = '#ffc51a';
+      ctx.beginPath();
+      ctx.arc(256, skirtY + skirtH / 2, 60, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#721212';
+      ctx.beginPath();
+      ctx.arc(256, skirtY + skirtH / 2, 44, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffc51a';
+      ctx.beginPath();
+      ctx.arc(256, skirtY + skirtH / 2, 20, 0, Math.PI * 2);
+      ctx.fill();
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    // 2.5 汉白玉大理石微纹理与柔和凹凸
+    function createMarbleTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 1024;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#f5f3ec';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      ctx.fillStyle = 'rgba(205, 198, 186, 0.22)';
+      for (let i = 0; i < 400; i++) {
+        const x = Math.random() * 1024;
+        const y = Math.random() * 1024;
+        const rx = 35 + Math.random() * 85;
+        const ry = 10 + Math.random() * 35;
+        const rot = Math.random() * Math.PI;
+
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(rot);
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      const imgData = ctx.getImageData(0, 0, 1024, 1024);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const noise = (Math.random() - 0.5) * 8;
+        data[i] = Math.min(255, Math.max(0, data[i] + noise));
+        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + noise));
+        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + noise));
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    // 2.6 祈谷坛艾叶青石庭院铺地
+    function createGroundPavingTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 1024;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#949b9e';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      const rows = 16;
+      const cols = 16;
+      const rw = 1024 / cols;
+      const rh = 1024 / rows;
+
+      for (let r = 0; r < rows; r++) {
+        const offset = (r % 2) * (rw / 2);
+        for (let col = -1; col <= cols + 1; col++) {
+          const x = col * rw + offset;
+          const y = r * rh;
+
+          const stoneLum = 142 + Math.floor((Math.sin(r * 4.3 + col * 7.1) + 1) * 16);
+          ctx.fillStyle = `rgb(${stoneLum - 6}, ${stoneLum + 4}, ${stoneLum - 2})`;
+          ctx.fillRect(x + 1, y + 1, rw - 2, rh - 2);
+
+          ctx.strokeStyle = '#62686b';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x, y, rw, rh);
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(16, 16);
+      return tex;
+    }
+
+    // 2.7 丹陛石御道云龙石雕
+    function createDanbiStoneTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 1024;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#ece8e0';
+      ctx.fillRect(0, 0, 512, 1024);
+
+      ctx.strokeStyle = '#b8a690';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(16, 16, 480, 992);
+
+      // 江崖海水 (海水江崖寿山福海)
+      ctx.fillStyle = '#a4947e';
+      for (let y = 910; y < 990; y += 18) {
+        ctx.beginPath();
+        for (let x = 30; x <= 480; x += 40) {
+          ctx.arc(x, y, 18, 0, Math.PI, true);
+        }
+        ctx.stroke();
+      }
+      ctx.beginPath();
+      ctx.moveTo(256, 830);
+      ctx.lineTo(190, 960);
+      ctx.lineTo(322, 960);
+      ctx.closePath();
+      ctx.fillStyle = '#b8a690';
+      ctx.fill();
+
+      // 云中飞腾升龙与祥云浮雕
+      ctx.strokeStyle = '#8a7863';
+      ctx.lineWidth = 8;
+      ctx.lineCap = 'round';
+
+      const cloudPositions = [
+        [150, 740], [360, 710], [190, 590], [330, 470],
+        [160, 350], [350, 250], [210, 140]
+      ];
+      ctx.fillStyle = '#c5b7a4';
+      cloudPositions.forEach(([cx, cy]) => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 34, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      });
+
+      // 游龙 S 形主龙身
+      ctx.beginPath();
+      ctx.moveTo(256, 170);
+      ctx.bezierCurveTo(110, 270, 410, 420, 240, 560);
+      ctx.bezierCurveTo(110, 680, 390, 750, 256, 830);
+      ctx.stroke();
+
+      // 火焰宝珠
+      ctx.fillStyle = '#d4af37';
+      ctx.beginPath();
+      ctx.arc(256, 250, 26, 0, Math.PI * 2);
+      ctx.fill();
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.ClampToEdgeWrapping;
+      tex.wrapT = THREE.ClampToEdgeWrapping;
+      return tex;
+    }
+
+    // 2.8 祈年殿金字九龙匾额
+    function createPlaqueTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#081e42';
+      ctx.fillRect(0, 0, 512, 256);
+
+      ctx.strokeStyle = '#ffc820';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(10, 10, 492, 236);
+      ctx.strokeStyle = '#df9e10';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(22, 22, 468, 212);
+
+      ctx.fillStyle = '#ffe066';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = 'bold 76px "Songti SC", "SimSun", "Noto Serif CJK SC", serif';
+      ctx.shadowColor = 'rgba(0,0,0,0.7)';
+      ctx.shadowBlur = 12;
+      ctx.fillText('祈 年 殿', 265, 128);
+
+      ctx.strokeStyle = '#ffd740';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(65, 50);
+      ctx.lineTo(65, 206);
+      ctx.stroke();
+
+      const tex = new THREE.CanvasTexture(c);
+      return tex;
+    }
+
+    // 2.9 四季龙井柱贴金盘龙漆纹
+    function createDragonColumnTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 1024;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#9e1818';
+      ctx.fillRect(0, 0, 512, 1024);
+
+      ctx.strokeStyle = '#ffd23d';
+      ctx.lineWidth = 9;
+      for (let y = 60; y < 1000; y += 180) {
+        ctx.beginPath();
+        ctx.moveTo(40, y);
+        ctx.bezierCurveTo(200, y + 45, 320, y - 45, 470, y + 35);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffb300';
+        ctx.beginPath();
+        ctx.arc(256, y + 20, 18, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(1, 2);
+      return tex;
+    }
+
+    /* ==========================================================================
+       3. 核心材质库
+       ========================================================================== */
+    const roofTileTex = createRoofTileTexture();
+    const roofBumpTex = createRoofBumpMap();
+    const hexiPaintTex = createHexiPaintTexture();
+    const latticeDoorTex = createLatticeDoorTexture();
+    const marbleTex = createMarbleTexture();
+    const groundPavingTex = createGroundPavingTexture();
+    const danbiStoneTex = createDanbiStoneTexture();
+    const plaqueTex = createPlaqueTexture();
+    const dragonColumnTex = createDragonColumnTexture();
+
+    // 蓝色琉璃瓦材质（高光光泽与釉质反射）
+    const roofMaterial = new THREE.MeshStandardMaterial({
+      map: roofTileTex,
+      bumpMap: roofBumpTex,
+      bumpScale: 0.08,
+      roughness: 0.20,
+      metalness: 0.22,
+      side: THREE.DoubleSide
+    });
+
+    // 鎏金宝顶材质（璀璨真金质感，带内蕴暖光）
+    const goldFinialMaterial = new THREE.MeshStandardMaterial({
+      color: 0xffd438,
+      metalness: 0.88,
+      roughness: 0.16,
+      emissive: 0x332200,
+      envMapIntensity: 2.5
+    });
+
+    // 汉白玉大理石材质
+    const marbleMaterial = new THREE.MeshStandardMaterial({
+      map: marbleTex,
+      roughness: 0.40,
+      metalness: 0.04,
+      color: 0xf7f5ef
+    });
+
+    // 朱红漆柱材质
+    const redColumnMaterial = new THREE.MeshStandardMaterial({
+      color: 0xb51c1c,
+      roughness: 0.32,
+      metalness: 0.05
+    });
+
+    // 龙井柱材质
+    const dragonColumnMaterial = new THREE.MeshStandardMaterial({
+      map: dragonColumnTex,
+      roughness: 0.30,
+      metalness: 0.12
+    });
+
+    // 和玺彩绘额枋材质
+    const hexiMaterial = new THREE.MeshStandardMaterial({
+      map: hexiPaintTex,
+      roughness: 0.36,
+      metalness: 0.08
+    });
+
+    // 隔扇门窗材质
+    const doorMaterial = new THREE.MeshStandardMaterial({
+      map: latticeDoorTex,
+      roughness: 0.38,
+      metalness: 0.06
+    });
+
+    // 丹陛石雕材质
+    const danbiMaterial = new THREE.MeshStandardMaterial({
+      map: danbiStoneTex,
+      roughness: 0.46,
+      metalness: 0.02
+    });
+
+    // 斗拱木质构件材质 (传统中式青绿彩木)
+    const dougongMat = new THREE.MeshStandardMaterial({
+      color: 0x1d754b,
+      roughness: 0.40,
+      metalness: 0.08
+    });
+
+    /* ==========================================================================
+       4. 场景灯光与北京晴空天幕
+       ========================================================================== */
+    const hemiLight = new THREE.HemisphereLight(0x458fe2, 0xeee3ce, 1.35);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff7e8, 2.6);
+    sunLight.position.set(45, 62, 38);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 180;
+    sunLight.shadow.camera.left = -42;
+    sunLight.shadow.camera.right = 42;
+    sunLight.shadow.camera.top = 42;
+    sunLight.shadow.camera.bottom = -42;
+    sunLight.shadow.bias = -0.0003;
+    scene.add(sunLight);
+
+    const fillLight = new THREE.DirectionalLight(0x75aee5, 0.55);
+    fillLight.position.set(-35, 25, -35);
+    scene.add(fillLight);
+
+    // 天空穹顶网格
+    const skyGeo = new THREE.SphereGeometry(320, 32, 24);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      uniforms: {
+        topColor: { value: new THREE.Color(0x1154ad) },
+        horizonColor: { value: new THREE.Color(0xdcefff) }
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 horizonColor;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition).y;
+          float factor = clamp(pow(max(h, 0.0), 0.52), 0.0, 1.0);
+          gl_FragColor = vec4(mix(horizonColor, topColor, factor), 1.0);
+        }
+      `
+    });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyMesh);
+
+    // 宽阔广场基面 (天坛祈谷坛艾叶青石海墁大平台)
+    const groundGeo = new THREE.PlaneGeometry(300, 300);
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: groundPavingTex,
+      roughness: 0.75,
+      metalness: 0.05
+    });
+    const groundMesh = new THREE.Mesh(groundGeo, groundMat);
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.receiveShadow = true;
+    scene.add(groundMesh);
+
+    // 远景红色天坛内垣红墙黄瓦（营造天圆地方神圣宫廷院落纵深）
+    const perimeterWall = new THREE.Group();
+    const wallSide = 120;
+    const redWallMat = new THREE.MeshStandardMaterial({ color: 0x982020, roughness: 0.6 });
+    const yellowTileMat = new THREE.MeshStandardMaterial({ color: 0xd99814, roughness: 0.35, metalness: 0.1 });
+
+    const wallThickness = 1.2;
+    const wallHeight = 3.6;
+    const wallSides = [
+      { x: 0, z: -wallSide / 2, rotY: 0 },
+      { x: 0, z: wallSide / 2, rotY: 0, isGate: true },
+      { x: -wallSide / 2, z: 0, rotY: Math.PI / 2 },
+      { x: wallSide / 2, z: 0, rotY: Math.PI / 2 }
+    ];
+
+    wallSides.forEach(side => {
+      const g = new THREE.Group();
+      g.position.set(side.x, 0, side.z);
+      g.rotation.y = side.rotY;
+
+      if (!side.isGate) {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(wallSide, wallHeight, wallThickness), redWallMat);
+        body.position.y = wallHeight / 2;
+        body.castShadow = true;
+        body.receiveShadow = true;
+        g.add(body);
+
+        const coping = new THREE.Mesh(new THREE.BoxGeometry(wallSide + 0.4, 0.4, wallThickness + 0.5), yellowTileMat);
+        coping.position.y = wallHeight + 0.2;
+        coping.castShadow = true;
+        g.add(coping);
+      } else {
+        const segW = (wallSide - 24) / 2;
+        [-wallSide / 4 - 6, wallSide / 4 + 6].forEach(xOff => {
+          const body = new THREE.Mesh(new THREE.BoxGeometry(segW, wallHeight, wallThickness), redWallMat);
+          body.position.set(xOff, wallHeight / 2, 0);
+          body.castShadow = true;
+          body.receiveShadow = true;
+          g.add(body);
+
+          const coping = new THREE.Mesh(new THREE.BoxGeometry(segW + 0.4, 0.4, wallThickness + 0.5), yellowTileMat);
+          coping.position.set(xOff, wallHeight + 0.2, 0);
+          coping.castShadow = true;
+          g.add(coping);
+        });
+      }
+      perimeterWall.add(g);
+    });
+    scene.add(perimeterWall);
+
+    /* ==========================================================================
+       5. 建筑主结构分解层级节点体系 (层次平滑错峰爆炸/重组核心)
+       ========================================================================== */
+    const templeRoot = new THREE.Group();
+    scene.add(templeRoot);
+
+    const groupFinial = new THREE.Group();     // 1. 鎏金宝顶
+    const groupTopRoof = new THREE.Group();    // 2. 上层攒尖圆顶与垂脊
+    const groupTopBeams = new THREE.Group();   // 3. 上层和玺彩绘与环形斗拱群
+    const groupMidRoof = new THREE.Group();    // 4. 中层飞檐圆顶与垂脊
+    const groupMidBeams = new THREE.Group();   // 5. 中层彩绘额枋与斗拱群
+    const groupLowRoof = new THREE.Group();    // 6. 下层重檐圆顶与垂脊
+    const groupLowBeams = new THREE.Group();   // 7. 下层外檐额枋与斗拱群
+    const groupWalls = new THREE.Group();      // 8. 祈年殿圆形殿身隔扇门窗与匾额
+    const groupOuterCols = new THREE.Group();  // 9. 外圈12根檐柱（十二时辰）
+    const groupMidCols = new THREE.Group();    // 10. 中圈12根金柱（十二个月）
+    const groupInnerCols = new THREE.Group();  // 11. 内圈4根四季龙井大柱
+    const groupBalustrade = new THREE.Group(); // 12. 汉白玉三层雕花栏杆望柱
+    const groupTerrace = new THREE.Group();    // 13. 汉白玉三层圆形基台与丹陛石阶
+
+    templeRoot.add(groupFinial);
+    templeRoot.add(groupTopRoof);
+    templeRoot.add(groupTopBeams);
+    templeRoot.add(groupMidRoof);
+    templeRoot.add(groupMidBeams);
+    templeRoot.add(groupLowRoof);
+    templeRoot.add(groupLowBeams);
+    templeRoot.add(groupWalls);
+    templeRoot.add(groupOuterCols);
+    templeRoot.add(groupMidCols);
+    templeRoot.add(groupInnerCols);
+    templeRoot.add(groupBalustrade);
+    templeRoot.add(groupTerrace);
+
+    /* ==========================================================================
+       6. 曲线轮廓旋转体屋顶生成器 (LatheGeometry 舒展微翘重檐)
+       ========================================================================== */
+
+    /**
+     * 构建具有真实厚度、中国传统「反宇向阳、生起举折、微翘飞檐」曲线轮廓的实体 LatheGeometry
+     */
+    function createCurvedRoofGeometry(rIn, yIn, rOut, yOut, flareLift, thickness, rInnerUnderside, yInnerUnderside) {
+      const points = [];
+      const steps = 32;
+
+      // 1. 上表面曲线（从上到下，由陡变缓，末端微翘）
+      for (let i = 0; i <= steps; i++) {
+        const u = i / steps;
+        const r = rIn + (rOut - rIn) * Math.pow(u, 0.88);
+        const drop = (yIn - yOut) * Math.pow(u, 1.30);
+        const flare = flareLift * Math.pow(u, 3.6); // 飞檐末梢微翘扬角
+        const y = yIn - drop + flare;
+        points.push(new THREE.Vector2(r, y));
+      }
+
+      // 2. 檐口垂直厚度边
+      const tipR = points[points.length - 1].x;
+      const tipY = points[points.length - 1].y;
+      points.push(new THREE.Vector2(tipR, tipY - thickness));
+
+      // 3. 檐下望板下表面（向内收拢至支承梁）
+      for (let i = steps; i >= 0; i--) {
+        const u = i / steps;
+        const r = rInnerUnderside + (tipR - rInnerUnderside) * u;
+        const y = yInnerUnderside + (tipY - thickness - yInnerUnderside) * Math.pow(u, 1.15);
+        points.push(new THREE.Vector2(r, y));
+      }
+
+      // 4. 闭合
+      points.push(new THREE.Vector2(rIn, yIn));
+
+      const latheGeo = new THREE.LatheGeometry(points, 72);
+      latheGeo.computeVertexNormals();
+      return latheGeo;
+    }
+
+    // 严格按照天坛祈年殿黄金营造比例配置三层屋面尺寸与出檐：
+    // 6.1 下层重檐屋顶 (Lower Roof)
+    const lowRoofGeo = createCurvedRoofGeometry(
+      8.6, 9.6,    // 顶收口 r, y
+      13.5, 7.8,   // 檐口外挑 r, y
+      0.32,        // 飞檐微翘高度
+      0.20,        // 檐口厚度
+      8.5, 7.9     // 檐底内收 r, y
+    );
+    const lowRoofMesh = new THREE.Mesh(lowRoofGeo, roofMaterial);
+    lowRoofMesh.castShadow = true;
+    lowRoofMesh.receiveShadow = true;
+    groupLowRoof.add(lowRoofMesh);
+
+    // 6.2 中层重檐屋顶 (Middle Roof)
+    const midRoofGeo = createCurvedRoofGeometry(
+      6.6, 13.0,
+      11.0, 11.2,
+      0.30,
+      0.20,
+      6.4, 11.3
+    );
+    const midRoofMesh = new THREE.Mesh(midRoofGeo, roofMaterial);
+    midRoofMesh.castShadow = true;
+    midRoofMesh.receiveShadow = true;
+    groupMidRoof.add(midRoofMesh);
+
+    // 6.3 上层攒尖大圆顶 (Top Conical Bell Curved Roof)
+    // 祈年殿上层为极具标志性的双曲钟形攒尖圆顶，高耸雄浑，直达鎏金宝顶
+    const topRoofGeo = createCurvedRoofGeometry(
+      1.1, 21.2,   // 顶收口 r, y
+      8.2, 14.8,   // 檐口外挑 r, y
+      0.36,        // 飞檐微翘高度
+      0.22,        // 檐口厚度
+      4.8, 14.9    // 檐底内收 r, y
+    );
+    const topRoofMesh = new THREE.Mesh(topRoofGeo, roofMaterial);
+    topRoofMesh.castShadow = true;
+    topRoofMesh.receiveShadow = true;
+    groupTopRoof.add(topRoofMesh);
+
+    // 6.4 为三重屋顶增设立体放射状屋脊瓦垄 (垂脊与檐角脊饰)
+    function addRadialRidgeRibs(targetGroup, rIn, yIn, rOut, yOut, flareLift, count) {
+      const ribGeo = new THREE.BoxGeometry(0.10, 0.10, 1.0);
+      const ribMat = new THREE.MeshStandardMaterial({
+        color: 0x092248,
+        roughness: 0.28,
+        metalness: 0.25
+      });
+
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2;
+        const segs = 9;
+        for (let s = 0; s < segs; s++) {
+          const u1 = s / segs;
+          const u2 = (s + 1) / segs;
+
+          const r1 = rIn + (rOut - rIn) * Math.pow(u1, 0.88);
+          const y1 = yIn - (yIn - yOut) * Math.pow(u1, 1.30) + flareLift * Math.pow(u1, 3.6) + 0.06;
+
+          const r2 = rIn + (rOut - rIn) * Math.pow(u2, 0.88);
+          const y2 = yIn - (yIn - yOut) * Math.pow(u2, 1.30) + flareLift * Math.pow(u2, 3.6) + 0.06;
+
+          const p1 = new THREE.Vector3(Math.cos(theta) * r1, y1, Math.sin(theta) * r1);
+          const p2 = new THREE.Vector3(Math.cos(theta) * r2, y2, Math.sin(theta) * r2);
+
+          const mid = new THREE.Vector3().addVectors(p1, p2).multiplyScalar(0.5);
+          const len = p1.distanceTo(p2);
+
+          const ribMesh = new THREE.Mesh(ribGeo, ribMat);
+          ribMesh.position.copy(mid);
+          ribMesh.scale.set(1, 1, len);
+          ribMesh.lookAt(p2);
+          ribMesh.castShadow = true;
+          targetGroup.add(ribMesh);
+        }
+      }
+    }
+
+    addRadialRidgeRibs(groupLowRoof, 8.6, 9.6, 13.5, 7.8, 0.32, 36);
+    addRadialRidgeRibs(groupMidRoof, 6.6, 13.0, 11.0, 11.2, 0.30, 28);
+    addRadialRidgeRibs(groupTopRoof, 1.1, 21.2, 8.2, 14.8, 0.36, 24);
+
+    /* ==========================================================================
+       7. 鎏金宝顶 (Golden Finial - 皇权天意神韵)
+       ========================================================================== */
+    function createFinialGeometry() {
+      const p = [
+        new THREE.Vector2(0.01, 24.6),  // 宝顶尖针
+        new THREE.Vector2(0.22, 24.2),
+        new THREE.Vector2(0.60, 23.8),
+        new THREE.Vector2(0.95, 23.3),  // 上层宝珠肚
+        new THREE.Vector2(1.08, 22.9),
+        new THREE.Vector2(0.82, 22.6),  // 束腰
+        new THREE.Vector2(1.18, 22.4),
+        new THREE.Vector2(1.52, 21.8),  // 中腹大金球
+        new THREE.Vector2(1.42, 21.3),
+        new THREE.Vector2(1.05, 21.0),  // 下敛
+        new THREE.Vector2(1.30, 20.8),  // 仰覆莲瓣基座外展
+        new THREE.Vector2(1.35, 20.6),
+        new THREE.Vector2(1.08, 20.4),  // 承托盘座
+        new THREE.Vector2(0.01, 20.4)
+      ];
+      const geo = new THREE.LatheGeometry(p, 48);
+      geo.computeVertexNormals();
+      return geo;
+    }
+    const finialGeo = createFinialGeometry();
+    const finialMesh = new THREE.Mesh(finialGeo, goldFinialMaterial);
+    finialMesh.position.y = 0.6;
+    finialMesh.castShadow = true;
+    groupFinial.add(finialMesh);
+
+    /* ==========================================================================
+       8. 重复构件 InstancedMesh：斗拱群、柱网、雕花望柱与栏板
+       ========================================================================== */
+
+    // 8.1 斗拱标准构件单元几何体
+    function createDougongUnitGeometry() {
+      const douGeo = new THREE.BoxGeometry(0.28, 0.14, 0.28);
+      douGeo.translate(0, 0.07, 0);
+
+      const gong1Geo = new THREE.BoxGeometry(0.65, 0.10, 0.14);
+      gong1Geo.translate(0, 0.18, 0);
+
+      const gong2Geo = new THREE.BoxGeometry(0.85, 0.10, 0.14);
+      gong2Geo.translate(0, 0.28, 0.08);
+
+      const angGeo = new THREE.BoxGeometry(0.16, 0.12, 0.65);
+      angGeo.rotateX(0.20);
+      angGeo.translate(0, 0.24, 0.28);
+
+      const topPlate = new THREE.BoxGeometry(0.35, 0.07, 0.35);
+      topPlate.translate(0, 0.36, 0.15);
+
+      const mergedGeo = new THREE.BufferGeometry();
+      const pos = [];
+      const norm = [];
+      const uvs = [];
+
+      const geos = [douGeo, gong1Geo, gong2Geo, angGeo, topPlate];
+      geos.forEach(g => {
+        const p = g.attributes.position.array;
+        const n = g.attributes.normal.array;
+        const u = g.attributes.uv.array;
+        for (let i = 0; i < p.length; i++) pos.push(p[i]);
+        for (let i = 0; i < n.length; i++) norm.push(n[i]);
+        for (let i = 0; i < u.length; i++) uvs.push(u[i]);
+      });
+
+      mergedGeo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      mergedGeo.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+      mergedGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      return mergedGeo;
+    }
+
+    const dougongUnitGeo = createDougongUnitGeometry();
+
+    function createDougongRing(radius, yPos, count) {
+      const instMesh = new THREE.InstancedMesh(dougongUnitGeo, dougongMat, count);
+      instMesh.castShadow = true;
+      instMesh.receiveShadow = true;
+
+      const dummy = new THREE.Object3D();
+      for (let i = 0; i < count; i++) {
+        const theta = (i / count) * Math.PI * 2;
+        dummy.position.set(Math.cos(theta) * radius, yPos, Math.sin(theta) * radius);
+        dummy.rotation.set(0, -theta + Math.PI / 2, 0);
+        dummy.updateMatrix();
+        instMesh.setMatrixAt(i, dummy.matrix);
+      }
+      instMesh.instanceMatrix.needsUpdate = true;
+      return instMesh;
+    }
+
+    // 三层斗拱群
+    const lowDougongInst = createDougongRing(8.5, 7.85, 40);
+    groupLowBeams.add(lowDougongInst);
+
+    const midDougongInst = createDougongRing(6.5, 11.25, 32);
+    groupMidBeams.add(midDougongInst);
+
+    const topDougongInst = createDougongRing(4.7, 14.85, 24);
+    groupTopBeams.add(topDougongInst);
+
+    // 8.2 和玺彩绘环形额枋与平板枋（圆环实木结构）
+    function createHexiArchitrave(rOuter, height, yPos) {
+      const geo = new THREE.CylinderGeometry(rOuter, rOuter, height, 72, 1, true);
+      const mesh = new THREE.Mesh(geo, hexiMaterial);
+      mesh.position.y = yPos;
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    groupLowBeams.add(createHexiArchitrave(8.45, 0.55, 7.6));
+    groupMidBeams.add(createHexiArchitrave(6.45, 0.55, 11.0));
+    groupTopBeams.add(createHexiArchitrave(4.65, 0.55, 14.6));
+
+    // 8.3 象征周天星宿与时令的柱网系统 (28 根大柱)
+    // 外圈 12 根檐柱（代表十二时辰，使用 InstancedMesh）
+    const outerColGeo = new THREE.CylinderGeometry(0.26, 0.30, 4.4, 24);
+    const outerColsInst = new THREE.InstancedMesh(outerColGeo, redColumnMaterial, 12);
+    outerColsInst.castShadow = true;
+    outerColsInst.receiveShadow = true;
+
+    // 汉白玉柱础石
+    const baseGeo = new THREE.CylinderGeometry(0.38, 0.42, 0.20, 24);
+    const outerColBasesInst = new THREE.InstancedMesh(baseGeo, marbleMaterial, 12);
+    outerColBasesInst.castShadow = true;
+    outerColBasesInst.receiveShadow = true;
+
+    const dummyCol = new THREE.Object3D();
+    for (let i = 0; i < 12; i++) {
+      const theta = (i / 12) * Math.PI * 2;
+      const r = 8.3;
+      const x = Math.cos(theta) * r;
+      const z = Math.sin(theta) * r;
+
+      dummyCol.position.set(x, 3.6 + 2.2, z);
+      dummyCol.scale.set(1, 1, 1);
+      dummyCol.updateMatrix();
+      outerColsInst.setMatrixAt(i, dummyCol.matrix);
+
+      dummyCol.position.set(x, 3.6 + 0.10, z);
+      dummyCol.updateMatrix();
+      outerColBasesInst.setMatrixAt(i, dummyCol.matrix);
+    }
+    outerColsInst.instanceMatrix.needsUpdate = true;
+    outerColBasesInst.instanceMatrix.needsUpdate = true;
+    groupOuterCols.add(outerColsInst);
+    groupOuterCols.add(outerColBasesInst);
+
+    // 中圈 12 根金柱（代表一年十二个月，贯通二层，使用 InstancedMesh）
+    const midColGeo = new THREE.CylinderGeometry(0.30, 0.35, 7.8, 24);
+    const midColsInst = new THREE.InstancedMesh(midColGeo, redColumnMaterial, 12);
+    midColsInst.castShadow = true;
+    midColsInst.receiveShadow = true;
+
+    const midColBasesInst = new THREE.InstancedMesh(baseGeo, marbleMaterial, 12);
+    midColBasesInst.castShadow = true;
+
+    for (let i = 0; i < 12; i++) {
+      const theta = ((i + 0.5) / 12) * Math.PI * 2;
+      const r = 5.8;
+      const x = Math.cos(theta) * r;
+      const z = Math.sin(theta) * r;
+
+      dummyCol.position.set(x, 3.6 + 3.9, z);
+      dummyCol.scale.set(1, 1, 1);
+      dummyCol.updateMatrix();
+      midColsInst.setMatrixAt(i, dummyCol.matrix);
+
+      dummyCol.position.set(x, 3.6 + 0.10, z);
+      dummyCol.updateMatrix();
+      midColBasesInst.setMatrixAt(i, dummyCol.matrix);
+    }
+    midColsInst.instanceMatrix.needsUpdate = true;
+    midColBasesInst.instanceMatrix.needsUpdate = true;
+    groupMidCols.add(midColsInst);
+    groupMidCols.add(midColBasesInst);
+
+    // 内圈 4 根四季龙井大柱（象征春夏秋冬四季，通天承重金丝楠木，高大雄浑）
+    const innerColGeo = new THREE.CylinderGeometry(0.44, 0.50, 11.4, 32);
+    for (let i = 0; i < 4; i++) {
+      const theta = (i / 4) * Math.PI * 2 + Math.PI / 4;
+      const r = 3.2;
+      const x = Math.cos(theta) * r;
+      const z = Math.sin(theta) * r;
+
+      const dragonColMesh = new THREE.Mesh(innerColGeo, dragonColumnMaterial);
+      dragonColMesh.position.set(x, 3.6 + 5.7, z);
+      dragonColMesh.castShadow = true;
+      dragonColMesh.receiveShadow = true;
+      groupInnerCols.add(dragonColMesh);
+
+      const dragonColBase = new THREE.Mesh(baseGeo, marbleMaterial);
+      dragonColBase.position.set(x, 3.6 + 0.10, z);
+      dragonColBase.scale.set(1.3, 1.2, 1.3);
+      dragonColBase.castShadow = true;
+      groupInnerCols.add(dragonColBase);
+    }
+
+    // 8.4 祈年殿圆形殿身与隔扇门窗 (六抹隔扇门花格，南向正门宏敞开敞)
+    const wallSegmentCount = 12;
+    for (let i = 0; i < wallSegmentCount; i++) {
+      const theta1 = (i / wallSegmentCount) * Math.PI * 2;
+      const theta2 = ((i + 1) / wallSegmentCount) * Math.PI * 2;
+      const midTheta = (theta1 + theta2) / 2;
+
+      // 正南向门洞（Z轴正方向）
+      const isSouthEntrance = (Math.abs(midTheta - Math.PI / 2) < 0.28);
+
+      if (isSouthEntrance) {
+        // 南向正门敞开：两扇朱漆门扇斜向开启，显露殿内金砖宝座与四季神柱
+        const leafW = 1.6;
+        const leafH = 4.0;
+        const leafGeo = new THREE.BoxGeometry(leafW, leafH, 0.12);
+        
+        // 左门扇微开
+        const leftDoor = new THREE.Mesh(leafGeo, doorMaterial);
+        leftDoor.position.set(-1.8, 3.6 + 2.0, 8.2);
+        leftDoor.rotation.y = 0.55;
+        leftDoor.castShadow = true;
+        groupWalls.add(leftDoor);
+
+        // 右门扇微开
+        const rightDoor = new THREE.Mesh(leafGeo, doorMaterial);
+        rightDoor.position.set(1.8, 3.6 + 2.0, 8.2);
+        rightDoor.rotation.y = -0.55;
+        rightDoor.castShadow = true;
+        groupWalls.add(rightDoor);
+
+        // 正门上方彩绘过梁
+        const lintelGeo = new THREE.BoxGeometry(4.0, 0.35, 0.4);
+        const lintelMesh = new THREE.Mesh(lintelGeo, hexiMaterial);
+        lintelMesh.position.set(0, 3.6 + 3.82, 8.25);
+        lintelMesh.castShadow = true;
+        groupWalls.add(lintelMesh);
+      } else {
+        const segAngle = (Math.PI * 2 / wallSegmentCount) * 0.94;
+        const doorWallGeo = new THREE.CylinderGeometry(8.26, 8.26, 4.0, 12, 1, true, -segAngle / 2, segAngle);
+        const doorMesh = new THREE.Mesh(doorWallGeo, doorMaterial);
+        doorMesh.position.set(0, 3.6 + 2.0, 0);
+        doorMesh.rotation.y = -midTheta + Math.PI / 2;
+        doorMesh.castShadow = true;
+        doorMesh.receiveShadow = true;
+        groupWalls.add(doorMesh);
+      }
+    }
+
+    // 殿内金砖海墁地面与中央神圣九龙宝座台
+    const interiorFloorGeo = new THREE.CircleGeometry(8.3, 48);
+    const interiorFloorMat = new THREE.MeshStandardMaterial({
+      color: 0x1c1713,
+      roughness: 0.22,
+      metalness: 0.12
+    });
+    const interiorFloor = new THREE.Mesh(interiorFloorGeo, interiorFloorMat);
+    interiorFloor.rotation.x = -Math.PI / 2;
+    interiorFloor.position.y = 3.61;
+    interiorFloor.receiveShadow = true;
+    groupWalls.add(interiorFloor);
+
+    // 殿内金碧辉煌宫灯神光（照亮内构龙井金柱与宝座神龛）
+    const interiorLight = new THREE.PointLight(0xffb236, 3.2, 18, 1.2);
+    interiorLight.position.set(0, 6.8, 0);
+    groupWalls.add(interiorLight);
+
+    const interiorAmbient = new THREE.PointLight(0xffcc66, 1.5, 12);
+    interiorAmbient.position.set(0, 4.5, 3.0);
+    groupWalls.add(interiorAmbient);
+
+    // 中层与上层外檐环形实木额枋与彩绘环壁（内缩至柱网内侧，形成柱廊层次）
+    const hexiDrumTex = createHexiPaintTexture();
+    hexiDrumTex.repeat.set(6, 1);
+    const hexiDrumMat = new THREE.MeshStandardMaterial({
+      map: hexiDrumTex,
+      roughness: 0.38,
+      metalness: 0.08
+    });
+
+    const midDrumGeo = new THREE.CylinderGeometry(5.4, 5.4, 1.5, 48, 1, true);
+    const midDrumMesh = new THREE.Mesh(midDrumGeo, hexiDrumMat);
+    midDrumMesh.position.y = 9.9;
+    midDrumMesh.castShadow = true;
+    groupWalls.add(midDrumMesh);
+
+    const topDrumTex = createHexiPaintTexture();
+    topDrumTex.repeat.set(4, 1);
+    const topDrumMat = new THREE.MeshStandardMaterial({
+      map: topDrumTex,
+      roughness: 0.38,
+      metalness: 0.08
+    });
+
+    const topDrumGeo = new THREE.CylinderGeometry(3.9, 3.9, 1.4, 48, 1, true);
+    const topDrumMesh = new THREE.Mesh(topDrumGeo, topDrumMat);
+    topDrumMesh.position.y = 13.5;
+    topDrumMesh.castShadow = true;
+    groupWalls.add(topDrumMesh);
+
+    // 殿内神圣皇天上帝金漆神龛宝座
+    const throneGeo = new THREE.BoxGeometry(1.6, 2.2, 1.2);
+    const throneMat = new THREE.MeshStandardMaterial({
+      color: 0xd9a118,
+      metalness: 0.85,
+      roughness: 0.22,
+      emissive: 0x3d2703
+    });
+    const throneMesh = new THREE.Mesh(throneGeo, throneMat);
+    throneMesh.position.set(0, 3.6 + 1.1, 0);
+    throneMesh.castShadow = true;
+    groupWalls.add(throneMesh);
+
+    // 南面二层檐下正中悬挂「祈年殿」九龙蓝底金字匾额
+    const plaqueGeo = new THREE.PlaneGeometry(2.5, 1.25);
+    const plaqueMesh = new THREE.Mesh(plaqueGeo, new THREE.MeshStandardMaterial({
+      map: plaqueTex,
+      roughness: 0.25,
+      metalness: 0.22,
+      side: THREE.DoubleSide
+    }));
+    plaqueMesh.position.set(0, 11.8, 6.75);
+    plaqueMesh.rotation.x = -0.12;
+    plaqueMesh.castShadow = true;
+    groupWalls.add(plaqueMesh);
+
+    /* ==========================================================================
+       9. 汉白玉三层圆形台基与四出陛阶梯、丹陛石雕
+       ========================================================================== */
+    // 9.1 三层汉白玉圆形基台
+    // 祈谷坛三层圆台尺寸比例严谨：下层 r=26, 中层 r=21.5, 上层 r=17
+    const terraceGeo1 = new THREE.CylinderGeometry(26.0, 26.2, 1.2, 72);
+    const terraceMesh1 = new THREE.Mesh(terraceGeo1, marbleMaterial);
+    terraceMesh1.position.y = 0.6;
+    terraceMesh1.receiveShadow = true;
+    terraceMesh1.castShadow = true;
+    groupTerrace.add(terraceMesh1);
+
+    const terraceGeo2 = new THREE.CylinderGeometry(21.5, 21.7, 1.2, 72);
+    const terraceMesh2 = new THREE.Mesh(terraceGeo2, marbleMaterial);
+    terraceMesh2.position.y = 1.8;
+    terraceMesh2.receiveShadow = true;
+    terraceMesh2.castShadow = true;
+    groupTerrace.add(terraceMesh2);
+
+    const terraceGeo3 = new THREE.CylinderGeometry(17.0, 17.2, 1.2, 72);
+    const terraceMesh3 = new THREE.Mesh(terraceGeo3, marbleMaterial);
+    terraceMesh3.position.y = 3.0;
+    terraceMesh3.receiveShadow = true;
+    terraceMesh3.castShadow = true;
+    groupTerrace.add(terraceMesh3);
+
+    function createMoldingRing(radius, y) {
+      const ringGeo = new THREE.TorusGeometry(radius, 0.08, 8, 72);
+      ringGeo.rotateX(Math.PI / 2);
+      const ringMesh = new THREE.Mesh(ringGeo, marbleMaterial);
+      ringMesh.position.y = y;
+      ringMesh.castShadow = true;
+      return ringMesh;
+    }
+    groupTerrace.add(createMoldingRing(26.05, 1.18));
+    groupTerrace.add(createMoldingRing(21.55, 2.38));
+    groupTerrace.add(createMoldingRing(17.05, 3.58));
+
+    // 9.2 四向石阶梯与南向中央御道丹陛石
+    const directions = [
+      { angle: 0, isSouth: true },
+      { angle: Math.PI / 2, isSouth: false },
+      { angle: Math.PI, isSouth: false },
+      { angle: -Math.PI / 2, isSouth: false }
+    ];
+
+    directions.forEach(dir => {
+      const stairGroup = new THREE.Group();
+      stairGroup.rotation.y = dir.angle;
+
+      const tiers = [
+        { rStart: 26.0, rEnd: 28.5, yBottom: 0.0, yTop: 1.2 },
+        { rStart: 21.5, rEnd: 24.0, yBottom: 1.2, yTop: 2.4 },
+        { rStart: 17.0, rEnd: 19.5, yBottom: 2.4, yTop: 3.6 }
+      ];
+
+      tiers.forEach(tier => {
+        const stairWidth = dir.isSouth ? 6.2 : 4.0;
+        const stairDepth = tier.rEnd - tier.rStart;
+        const numSteps = 7;
+        const stepH = (tier.yTop - tier.yBottom) / numSteps;
+        const stepD = stairDepth / numSteps;
+
+        for (let s = 0; s < numSteps; s++) {
+          const sw = stairWidth;
+          const sd = stepD * (numSteps - s);
+          const stepMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(sw, stepH, sd),
+            marbleMaterial
+          );
+          stepMesh.position.set(0, tier.yBottom + stepH * (s + 0.5), tier.rStart + sd / 2);
+          stepMesh.receiveShadow = true;
+          stepMesh.castShadow = true;
+          stairGroup.add(stepMesh);
+        }
+
+        // 南向主通道特设：中央倾斜丹陛御道巨幅云龙石雕
+        if (dir.isSouth) {
+          const danbiW = 2.2;
+          const danbiL = Math.hypot(stairDepth, tier.yTop - tier.yBottom);
+          const danbiMesh = new THREE.Mesh(
+            new THREE.BoxGeometry(danbiW, 0.14, danbiL),
+            danbiMaterial
+          );
+          const slopeAngle = Math.atan2(tier.yTop - tier.yBottom, stairDepth);
+          danbiMesh.rotation.x = slopeAngle;
+          danbiMesh.position.set(
+            0,
+            (tier.yBottom + tier.yTop) / 2 + 0.12,
+            (tier.rStart + tier.rEnd) / 2
+          );
+          danbiMesh.receiveShadow = true;
+          danbiMesh.castShadow = true;
+          stairGroup.add(danbiMesh);
+        }
+      });
+
+      groupTerrace.add(stairGroup);
+    });
+
+    // 9.3 汉白玉雕花栏杆系统 (望柱、连续环形透雕栏板、散水螭首吐水兽)
+    function createBalusterPostGeometry() {
+      const shaft = new THREE.BoxGeometry(0.16, 0.76, 0.16);
+      shaft.translate(0, 0.38, 0);
+
+      const cap = new THREE.SphereGeometry(0.11, 10, 10);
+      cap.scale(1.0, 1.4, 1.0);
+      cap.translate(0, 0.88, 0);
+
+      const merged = new THREE.BufferGeometry();
+      const pos = [];
+      const norm = [];
+      const uvs = [];
+      [shaft, cap].forEach(g => {
+        const p = g.attributes.position.array;
+        const n = g.attributes.normal.array;
+        const u = g.attributes.uv.array;
+        for (let i = 0; i < p.length; i++) pos.push(p[i]);
+        for (let i = 0; i < n.length; i++) norm.push(n[i]);
+        for (let i = 0; i < u.length; i++) uvs.push(u[i]);
+      });
+      merged.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+      merged.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+      merged.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      return merged;
+    }
+
+    const gargoyleGeo = new THREE.BoxGeometry(0.12, 0.10, 0.32);
+    gargoyleGeo.translate(0, -0.04, 0.16);
+
+    const postGeo = createBalusterPostGeometry();
+
+    const balustradeTiers = [
+      { r: 25.85, y: 1.2, count: 120, stairHalfWidthAngle: 0.14 },
+      { r: 21.35, y: 2.4, count: 96,  stairHalfWidthAngle: 0.16 },
+      { r: 16.85, y: 3.6, count: 76,  stairHalfWidthAngle: 0.20 }
+    ];
+
+    let totalPostsCount = 0;
+    balustradeTiers.forEach(t => { totalPostsCount += t.count; });
+
+    const postsInst = new THREE.InstancedMesh(postGeo, marbleMaterial, totalPostsCount);
+    const gargoylesInst = new THREE.InstancedMesh(gargoyleGeo, marbleMaterial, totalPostsCount);
+    postsInst.castShadow = true;
+    gargoylesInst.castShadow = true;
+
+    const dummyObj = new THREE.Object3D();
+    let globalPostIdx = 0;
+
+    balustradeTiers.forEach((tier) => {
+      const stepTheta = (Math.PI * 2) / tier.count;
+      const chordLen = 2 * tier.r * Math.sin(stepTheta / 2);
+      const panelUnitGeo = new THREE.BoxGeometry(chordLen * 0.98, 0.54, 0.08);
+      panelUnitGeo.translate(0, 0.30, 0);
+
+      const tierPanelsInst = new THREE.InstancedMesh(panelUnitGeo, marbleMaterial, tier.count);
+      tierPanelsInst.castShadow = true;
+
+      for (let i = 0; i < tier.count; i++) {
+        const theta = i * stepTheta;
+
+        const angleMod = Math.abs((theta + Math.PI / 4) % (Math.PI / 2) - Math.PI / 4);
+        if (angleMod < tier.stairHalfWidthAngle) {
+          dummyObj.position.set(0, -100, 0);
+          dummyObj.scale.set(0, 0, 0);
+          dummyObj.updateMatrix();
+          postsInst.setMatrixAt(globalPostIdx, dummyObj.matrix);
+          gargoylesInst.setMatrixAt(globalPostIdx, dummyObj.matrix);
+          tierPanelsInst.setMatrixAt(i, dummyObj.matrix);
+          globalPostIdx++;
+          continue;
+        }
+
+        const px = Math.cos(theta) * tier.r;
+        const pz = Math.sin(theta) * tier.r;
+
+        dummyObj.position.set(px, tier.y, pz);
+        dummyObj.rotation.set(0, -theta + Math.PI / 2, 0);
+        dummyObj.scale.set(1, 1, 1);
+        dummyObj.updateMatrix();
+        postsInst.setMatrixAt(globalPostIdx, dummyObj.matrix);
+
+        dummyObj.position.set(px, tier.y, pz);
+        dummyObj.updateMatrix();
+        gargoylesInst.setMatrixAt(globalPostIdx, dummyObj.matrix);
+
+        const midTheta = theta + stepTheta / 2;
+        const mx = Math.cos(midTheta) * tier.r;
+        const mz = Math.sin(midTheta) * tier.r;
+        dummyObj.position.set(mx, tier.y, mz);
+        dummyObj.rotation.set(0, -midTheta + Math.PI / 2, 0);
+        dummyObj.updateMatrix();
+        tierPanelsInst.setMatrixAt(i, dummyObj.matrix);
+
+        globalPostIdx++;
+      }
+
+      tierPanelsInst.instanceMatrix.needsUpdate = true;
+      groupBalustrade.add(tierPanelsInst);
+    });
+
+    postsInst.instanceMatrix.needsUpdate = true;
+    gargoylesInst.instanceMatrix.needsUpdate = true;
+    groupBalustrade.add(postsInst);
+    groupBalustrade.add(gargoylesInst);
+
+    /* ==========================================================================
+       10. 庭院古柏生态 (天坛百年苍劲苍翠古柏)
+       ========================================================================== */
+    function createAncientCypress(x, z, scaleFactor) {
+      const treeGroup = new THREE.Group();
+      treeGroup.position.set(x, 0, z);
+
+      const trunkMat = new THREE.MeshStandardMaterial({
+        color: 0x2e2318,
+        roughness: 0.94,
+        metalness: 0.04
+      });
+      // 苍劲盘虬树干
+      const trunkGeo = new THREE.CylinderGeometry(0.28 * scaleFactor, 0.55 * scaleFactor, 5.2 * scaleFactor, 8);
+      const trunkMesh = new THREE.Mesh(trunkGeo, trunkMat);
+      trunkMesh.position.y = 2.6 * scaleFactor;
+      trunkMesh.rotation.z = (Math.random() - 0.5) * 0.18;
+      trunkMesh.castShadow = true;
+      treeGroup.add(trunkMesh);
+
+      const branchGeo = new THREE.CylinderGeometry(0.14 * scaleFactor, 0.24 * scaleFactor, 2.4 * scaleFactor, 6);
+      const branchMesh = new THREE.Mesh(branchGeo, trunkMat);
+      branchMesh.position.set(0.55 * scaleFactor, 3.6 * scaleFactor, 0);
+      branchMesh.rotation.z = -0.62;
+      branchMesh.castShadow = true;
+      treeGroup.add(branchMesh);
+
+      // 云片状深松柏绿树冠簇（古典园林松柏云朵团簇感）
+      const foliageMat = new THREE.MeshStandardMaterial({
+        color: 0x123d20,
+        roughness: 0.85,
+        metalness: 0.02
+      });
+
+      const foliageClusters = [
+        { y: 5.4, rx: 1.6, ry: 0.8, rz: 1.6, ox: 0, oz: 0 },
+        { y: 4.5, rx: 2.1, ry: 0.9, rz: 2.0, ox: 0.3, oz: 0.2 },
+        { y: 3.6, rx: 2.4, ry: 1.0, rz: 2.2, ox: -0.3, oz: -0.2 },
+        { y: 3.9, rx: 1.5, ry: 0.7, rz: 1.4, ox: 1.1, oz: 0.1 }
+      ];
+
+      foliageClusters.forEach(c => {
+        const sphereGeo = new THREE.SphereGeometry(1, 10, 8);
+        sphereGeo.scale(c.rx * scaleFactor, c.ry * scaleFactor, c.rz * scaleFactor);
+        const fMesh = new THREE.Mesh(sphereGeo, foliageMat);
+        fMesh.position.set(c.ox * scaleFactor, c.y * scaleFactor, c.oz * scaleFactor);
+        fMesh.castShadow = true;
+        fMesh.receiveShadow = true;
+        treeGroup.add(fMesh);
+      });
+
+      return treeGroup;
+    }
+
+    const treePositions = [
+      [-36, -36], [36, -36], [-36, 36], [36, 36],
+      [-42, -10], [42, -10], [-42, 10], [42, 10],
+      [-16, -42], [16, -42], [-18, 42], [18, 42],
+      [-46, -26], [46, -26], [-46, 26], [46, 26]
+    ];
+    treePositions.forEach(([tx, tz]) => {
+      const s = 0.9 + Math.random() * 0.35;
+      scene.add(createAncientCypress(tx, tz, s));
+    });
+
+    /* ==========================================================================
+       11. 结构平滑分解 / 爆炸重组核心动画驱动引擎
+       ========================================================================== */
+    let isExploded = false;
+    let explodeProgress = 0.0;
+
+    function smoothRange(t, start, end) {
+      if (t <= start) return 0;
+      if (t >= end) return 1;
+      const p = (t - start) / (end - start);
+      return p * p * (3 - 2 * p);
+    }
+
+    /**
+     * 根据当前错峰进程参数，计算并更新每个建筑子系统的空间位移与径向绽放
+     */
+    function updateExplosionAnimation(dt) {
+      const target = isExploded ? 1.0 : 0.0;
+      explodeProgress = THREE.MathUtils.damp(explodeProgress, target, 4.0, dt);
+
+      // 1. 鎏金宝顶：垂直拔高升入顶空 (+8.0)
+      const pFinial = smoothRange(explodeProgress, 0.00, 0.44);
+      groupFinial.position.y = THREE.MathUtils.lerp(0, 5.6, pFinial);
+
+      // 2. 上层攒尖圆顶：上升 (+6.2)
+      const pTopRoof = smoothRange(explodeProgress, 0.08, 0.52);
+      groupTopRoof.position.y = THREE.MathUtils.lerp(0, 4.3, pTopRoof);
+
+      // 3. 上层彩绘额枋与斗拱群：上升 (+4.8)
+      const pTopBeams = smoothRange(explodeProgress, 0.16, 0.60);
+      groupTopBeams.position.y = THREE.MathUtils.lerp(0, 3.3, pTopBeams);
+
+      // 4. 中层飞檐微翘圆顶：上升 (+3.5)
+      const pMidRoof = smoothRange(explodeProgress, 0.24, 0.68);
+      groupMidRoof.position.y = THREE.MathUtils.lerp(0, 2.4, pMidRoof);
+
+      // 5. 中层彩绘额枋与斗拱群：上升 (+2.5)
+      const pMidBeams = smoothRange(explodeProgress, 0.32, 0.74);
+      groupMidBeams.position.y = THREE.MathUtils.lerp(0, 1.7, pMidBeams);
+
+      // 6. 下层重檐飞檐：上升 (+1.6)
+      const pLowRoof = smoothRange(explodeProgress, 0.40, 0.80);
+      groupLowRoof.position.y = THREE.MathUtils.lerp(0, 1.1, pLowRoof);
+
+      // 7. 下层外檐额枋与斗拱群：上升 (+0.9)
+      const pLowBeams = smoothRange(explodeProgress, 0.46, 0.84);
+      groupLowBeams.position.y = THREE.MathUtils.lerp(0, 0.6, pLowBeams);
+
+      // 8. 祈年殿殿身隔扇门窗墙体：水平径向向外扩张绽开 (X/Z * 1.25) + 微升 (+0.4)
+      const pWalls = smoothRange(explodeProgress, 0.52, 0.88);
+      const wallScale = THREE.MathUtils.lerp(1.0, 1.25, pWalls);
+      groupWalls.scale.set(wallScale, 1.0, wallScale);
+      groupWalls.position.y = THREE.MathUtils.lerp(0, 0.4, pWalls);
+
+      // 9. 柱网按层次分别展开：
+      // 外圈12檐柱向外散开
+      const pOuterCols = smoothRange(explodeProgress, 0.56, 0.90);
+      const outerScale = THREE.MathUtils.lerp(1.0, 1.18, pOuterCols);
+      groupOuterCols.scale.set(outerScale, 1.0, outerScale);
+      groupOuterCols.position.y = THREE.MathUtils.lerp(0, 0.3, pOuterCols);
+
+      // 中圈12金柱向外散开 + 拔高
+      const pMidCols = smoothRange(explodeProgress, 0.60, 0.92);
+      const midScale = THREE.MathUtils.lerp(1.0, 1.10, pMidCols);
+      groupMidCols.scale.set(midScale, 1.0, midScale);
+      groupMidCols.position.y = THREE.MathUtils.lerp(0, 0.8, pMidCols);
+
+      // 内圈4根四季龙井大柱垂直拔升显露
+      const pInnerCols = smoothRange(explodeProgress, 0.64, 0.94);
+      groupInnerCols.position.y = THREE.MathUtils.lerp(0, 1.4, pInnerCols);
+
+      // 10. 汉白玉栏杆整体径向微扩与分层上浮
+      const pBalustrade = smoothRange(explodeProgress, 0.68, 0.96);
+      const balScale = THREE.MathUtils.lerp(1.0, 1.06, pBalustrade);
+      groupBalustrade.scale.set(balScale, 1.0, balScale);
+      groupBalustrade.position.y = THREE.MathUtils.lerp(0, 0.3, pBalustrade);
+
+      // 11. 汉白玉三层基台微调分层
+      const pTerrace = smoothRange(explodeProgress, 0.72, 1.00);
+      groupTerrace.position.y = THREE.MathUtils.lerp(0, -0.3, pTerrace);
+    }
+
+    /* ==========================================================================
+       12. 交互控制逻辑与视角预设
+       ========================================================================== */
+    let autoOrbit = false;
+
+    const cameraViews = {
+      overview: { pos: new THREE.Vector3(0, 18, 58), target: new THREE.Vector3(0, 12.0, 0) },
+      heroic:   { pos: new THREE.Vector3(0, 4.8, 34), target: new THREE.Vector3(0, 13.5, 0) },
+      eaves:    { pos: new THREE.Vector3(14, 13.5, 14), target: new THREE.Vector3(5, 12.0, 5) },
+      danbi:    { pos: new THREE.Vector3(0, 4.0, 38), target: new THREE.Vector3(0, 3.2, 21) },
+      topdown:  { pos: new THREE.Vector3(0, 60, 44), target: new THREE.Vector3(0, 8.5, 0) }
+    };
+
+    let targetCamPos = cameraViews.overview.pos.clone();
+    let targetCamTarget = cameraViews.overview.target.clone();
+    let isTransitioningCamera = false;
+
+    const btnExplode = document.getElementById('btnExplode');
+    const btnExplodeText = document.getElementById('btnExplodeText');
+    const btnExplodeIcon = document.getElementById('btnExplodeIcon');
+    const statusBadge = document.getElementById('statusBadge');
+    const statusText = document.getElementById('statusText');
+    const explosionGuide = document.getElementById('explosionGuide');
+
+    btnExplode.addEventListener('click', () => {
+      isExploded = !isExploded;
+      if (isExploded) {
+        btnExplode.classList.add('active');
+        btnExplodeText.textContent = '重构原位 / 复原合拢';
+        btnExplodeIcon.textContent = '🔄';
+        statusBadge.classList.add('exploded');
+        statusText.textContent = '结构层级已分解';
+        explosionGuide.classList.add('visible');
+      } else {
+        btnExplode.classList.remove('active');
+        btnExplodeText.textContent = '层次分解 / 爆炸透视';
+        btnExplodeIcon.textContent = '💥';
+        statusBadge.classList.remove('exploded');
+        statusText.textContent = '建筑完整呈现';
+        explosionGuide.classList.remove('visible');
+      }
+    });
+
+    const btnOrbit = document.getElementById('btnOrbit');
+    const btnOrbitText = document.getElementById('btnOrbitText');
+
+    btnOrbit.addEventListener('click', () => {
+      autoOrbit = !autoOrbit;
+      controls.autoRotate = autoOrbit;
+      controls.autoRotateSpeed = 1.0;
+      if (autoOrbit) {
+        btnOrbit.classList.add('active');
+        btnOrbitText.textContent = '自动环绕: 开';
+      } else {
+        btnOrbit.classList.remove('active');
+        btnOrbitText.textContent = '自动环绕: 关';
+      }
+    });
+
+    const viewButtons = document.querySelectorAll('.view-btn');
+    viewButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const viewKey = e.target.getAttribute('data-view');
+        if (cameraViews[viewKey]) {
+          viewButtons.forEach(b => b.classList.remove('active'));
+          e.target.classList.add('active');
+          targetCamPos.copy(cameraViews[viewKey].pos);
+          targetCamTarget.copy(cameraViews[viewKey].target);
+          isTransitioningCamera = true;
+        }
+      });
+    });
+
+    controls.addEventListener('start', () => {
+      isTransitioningCamera = false;
+    });
+
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      updateCameraFraming();
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    /* ==========================================================================
+       13. 动画与渲染主循环 (稳定的 60FPS 渲染管线)
+       ========================================================================== */
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.1);
+
+      if (isTransitioningCamera) {
+        camera.position.lerp(targetCamPos, 0.08);
+        controls.target.lerp(targetCamTarget, 0.08);
+        if (camera.position.distanceTo(targetCamPos) < 0.1) {
+          isTransitioningCamera = false;
+        }
+      }
+
+      updateExplosionAnimation(dt);
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+
+  <!-- 提示词展示组件（原样保留） -->
+  <script src="../prompt-panel.js" data-id="temple"></script>
+</body>
+</html>

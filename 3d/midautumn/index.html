@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="icon" href="data:," />
+  <title>中秋月夜 · 水榭桂花</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #040711;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 左上角固定返回按钮：半透明奶油色圆角小按钮样式 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 248, 235, 0.88);
+      color: #3d2817;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+      text-decoration: none;
+      border: 1px solid rgba(255, 226, 185, 0.85);
+      box-shadow: 0 4px 18px rgba(10, 15, 30, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 252, 245, 0.98);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px rgba(10, 15, 30, 0.5);
+    }
+
+    .back-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 顶部右侧意境标题卡 */
+    .scene-header {
+      position: fixed;
+      top: 18px;
+      right: 20px;
+      z-index: 25;
+      text-align: right;
+      pointer-events: none;
+      padding: 10px 18px;
+      border-radius: 16px;
+      background: rgba(14, 20, 36, 0.58);
+      border: 1px solid rgba(240, 215, 160, 0.35);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(4, 8, 18, 0.5);
+    }
+
+    .scene-header h1 {
+      font-size: 17px;
+      font-weight: 700;
+      letter-spacing: 0.16em;
+      margin-bottom: 3px;
+      color: #ffefa8;
+      text-shadow: 0 2px 12px rgba(255, 215, 110, 0.45);
+    }
+
+    .scene-header p {
+      font-size: 11.5px;
+      color: rgba(255, 235, 205, 0.88);
+      letter-spacing: 0.08em;
+    }
+
+    /* 底部居中镜头预设切换按钮 */
+    .camera-hud {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(12, 18, 32, 0.65);
+      border: 1px solid rgba(255, 220, 160, 0.3);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    }
+
+    .cam-btn {
+      appearance: none;
+      border: 1px solid rgba(255, 230, 180, 0.25);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f7eedc;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 500;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      transition: all 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+
+    .cam-btn:hover {
+      background: rgba(255, 230, 170, 0.22);
+      border-color: rgba(255, 230, 180, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .cam-btn.active {
+      background: linear-gradient(135deg, rgba(235, 170, 60, 0.88) 0%, rgba(200, 120, 40, 0.88) 100%);
+      border-color: #ffe89e;
+      color: #ffffff;
+      font-weight: 600;
+      box-shadow: 0 2px 14px rgba(240, 160, 50, 0.45);
+    }
+
+    @media (max-width: 640px) {
+      .back-btn {
+        top: 12px;
+        left: 12px;
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+      .scene-header {
+        top: 12px;
+        right: 12px;
+        padding: 6px 12px;
+      }
+      .scene-header h1 {
+        font-size: 14px;
+      }
+      .scene-header p {
+        display: none;
+      }
+      .camera-hud {
+        bottom: 76px;
+        gap: 5px;
+        padding: 4px 8px;
+        max-width: calc(100vw - 24px);
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .camera-hud::-webkit-scrollbar {
+        display: none;
+      }
+      .cam-btn {
+        padding: 5px 9px;
+        font-size: 11px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div class="scene-header">
+    <h1>中秋月夜 · 水榭桂花</h1>
+    <p>金风送爽 · 玉兔凭栏 · 桂子月中落</p>
+  </div>
+
+  <div class="camera-hud">
+    <button class="cam-btn active" data-cam="full">🌸 亭榭全景</button>
+    <button class="cam-btn" data-cam="tea">🍵 月饼茶席</button>
+    <button class="cam-btn" data-cam="rabbit">🐇 玉兔伴月</button>
+    <button class="cam-btn" data-cam="lotus">🪷 桂雨清涟</button>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+    import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+    // ============================================================================
+    // 1. 初始化场景、摄像机、渲染器与后期处理
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x040711);
+    scene.fog = new THREE.FogExp2(0x060b18, 0.022);
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    // 视觉视角：近距离平视与微俯瞰视角，优雅构图将水榭、巨月、桂花树、石拱桥、玉兔与水面尽收眼底
+    camera.position.set(0.4, 2.5, 7.8);
+
+    function updateCameraAspect() {
+      const baseFov = 45;
+      if (camera.aspect < 1) {
+        // 竖屏（宽高比 < 1）时增大 FOV，保证主体完整可见
+        camera.fov = 2 * Math.atan(Math.tan((baseFov * Math.PI) / 360) / Math.max(camera.aspect, 0.1)) * (180 / Math.PI);
+      } else {
+        camera.fov = baseFov;
+      }
+      camera.updateProjectionMatrix();
+    }
+    updateCameraAspect();
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(width, height);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.target.set(0.1, 1.25, 0.0);
+    controls.minDistance = 1.8;
+    controls.maxDistance = 16.0;
+    controls.minPolarAngle = Math.PI * 0.12;
+    controls.maxPolarAngle = Math.PI * 0.48; // 杜绝穿入水下
+
+    // 后期处理：UnrealBloomPass 带来柔美中秋月晕与暖红宫灯辉光
+    const composer = new EffectComposer(renderer);
+    const renderPass = new RenderPass(scene, camera);
+    composer.addPass(renderPass);
+
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(width, height),
+      0.46, // strength
+      0.32, // radius
+      0.75  // threshold
+    );
+    composer.addPass(bloomPass);
+
+    const outputPass = new OutputPass();
+    composer.addPass(outputPass);
+
+    // ============================================================================
+    // 2. 程序化 Canvas 纹理生成器（贴图完全代码生成，无外部资源依赖）
+    // ============================================================================
+    // 2.1 古朴老木纹理
+    function createWoodTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      // 底色：温润古木深栗色
+      ctx.fillStyle = '#2b1910';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 顺纹木纤维
+      for (let i = 0; i < 512; i += 2) {
+        const val = Math.sin(i * 0.08) * 14 + Math.sin(i * 0.25) * 8;
+        const alpha = 0.14 + Math.sin(i * 0.15) * 0.08;
+        ctx.fillStyle = `rgba(${52 + val * 0.8}, ${30 + val * 0.5}, ${18 + val * 0.3}, ${alpha})`;
+        ctx.fillRect(0, i, 512, 2);
+      }
+
+      // 木板接缝与倒角阴影
+      for (let y = 0; y < 512; y += 128) {
+        ctx.fillStyle = 'rgba(8, 4, 2, 0.8)';
+        ctx.fillRect(0, y, 512, 3);
+        ctx.fillStyle = 'rgba(85, 55, 35, 0.28)';
+        ctx.fillRect(0, y + 3, 512, 2);
+      }
+
+      // 细微木髓噪点
+      for (let n = 0; n < 1500; n++) {
+        const rx = Math.random() * 512;
+        const ry = Math.random() * 512;
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(75, 45, 25, 0.18)' : 'rgba(12, 6, 3, 0.25)';
+        ctx.fillRect(rx, ry, Math.random() * 25 + 10, 1);
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.2 青石板砖与砌石纹理
+    function createStoneTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#363d44';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 石料细密杂色噪点
+      for (let i = 0; i < 2500; i++) {
+        const x = Math.random() * 512;
+        const y = Math.random() * 512;
+        const w = Math.random() * 5 + 2;
+        const h = Math.random() * 5 + 2;
+        const shade = 40 + Math.random() * 32;
+        ctx.fillStyle = `rgba(${shade}, ${shade + 4}, ${shade + 8}, 0.25)`;
+        ctx.fillRect(x, y, w, h);
+      }
+
+      // 青苔绿斑点
+      for (let m = 0; m < 35; m++) {
+        const mx = Math.random() * 512;
+        const my = Math.random() * 512;
+        const mr = Math.random() * 30 + 10;
+        const grad = ctx.createRadialGradient(mx, my, 2, mx, my, mr);
+        grad.addColorStop(0, 'rgba(40, 60, 32, 0.45)');
+        grad.addColorStop(1, 'rgba(40, 60, 32, 0.0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(mx, my, mr, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // 石砖嵌缝
+      ctx.strokeStyle = 'rgba(18, 22, 26, 0.75)';
+      ctx.lineWidth = 3.5;
+      const step = 64;
+      for (let y = 0; y <= 512; y += step) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(512, y);
+        ctx.stroke();
+
+        const offset = (y / step) % 2 === 0 ? 0 : step;
+        for (let x = offset; x <= 512; x += step * 2) {
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x, y + step);
+          ctx.stroke();
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.3 黛瓦青瓦纹理（真实江南古建小青瓦）
+    function createRoofTileTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#1e2329';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // 筒瓦脊向明暗交替
+      const tileW = 32;
+      for (let x = 0; x < 256; x += tileW) {
+        const g = ctx.createLinearGradient(x, 0, x + tileW, 0);
+        g.addColorStop(0, 'rgba(12, 14, 18, 0.95)');
+        g.addColorStop(0.3, 'rgba(48, 56, 65, 0.85)');
+        g.addColorStop(0.65, 'rgba(68, 78, 88, 0.95)');
+        g.addColorStop(0.9, 'rgba(20, 24, 28, 0.85)');
+        g.addColorStop(1, 'rgba(8, 10, 14, 0.98)');
+        ctx.fillStyle = g;
+        ctx.fillRect(x, 0, tileW, 256);
+      }
+
+      // 横向瓦槽层叠缝
+      for (let y = 0; y < 256; y += 32) {
+        ctx.fillStyle = 'rgba(8, 10, 12, 0.75)';
+        ctx.fillRect(0, y, 256, 3);
+        ctx.fillStyle = 'rgba(75, 88, 100, 0.28)';
+        ctx.fillRect(0, y + 3, 256, 2);
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.4 巨型满月表面纹理（细致月海与环形山放射纹）
+    function createMoonTexture() {
+      const c = document.createElement('canvas');
+      c.width = 1024;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      // 底色：温润明亮的金白光晕月岩
+      const bgGrad = ctx.createLinearGradient(0, 0, 1024, 0);
+      bgGrad.addColorStop(0, '#fffbf0');
+      bgGrad.addColorStop(0.5, '#fff6de');
+      bgGrad.addColorStop(1, '#fffbf0');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      function drawMare(cx, cy, rx, ry, rot, darkness) {
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(rot);
+        const g = ctx.createRadialGradient(0, 0, 5, 0, 0, Math.max(rx, ry));
+        g.addColorStop(0, `rgba(125, 115, 100, ${darkness})`);
+        g.addColorStop(0.6, `rgba(145, 135, 120, ${darkness * 0.75})`);
+        g.addColorStop(0.9, `rgba(175, 165, 150, ${darkness * 0.3})`);
+        g.addColorStop(1, 'rgba(255, 250, 240, 0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // 正面月海群
+      drawMare(380, 200, 110, 140, -0.2, 0.45); // 风暴洋
+      drawMare(490, 170, 75, 75, 0.1, 0.42);   // 雨海
+      drawMare(600, 210, 65, 60, -0.1, 0.40);  // 澄海
+      drawMare(660, 260, 70, 55, 0.2, 0.44);   // 静海
+      drawMare(750, 220, 42, 38, 0.0, 0.46);   // 危海
+      drawMare(550, 320, 80, 50, 0.1, 0.38);   // 云海
+      drawMare(410, 320, 60, 45, -0.3, 0.35);  // 湿海
+
+      // 背面微量阴影
+      drawMare(160, 220, 55, 45, 0.3, 0.25);
+      drawMare(890, 260, 50, 40, -0.2, 0.28);
+
+      // 第谷环形山及放射状明亮亮线 (Tycho Crater Rays)
+      const tychoX = 520, tychoY = 390;
+      for (let a = 0; a < 24; a++) {
+        const angle = (a / 24) * Math.PI * 2 + (Math.random() - 0.5) * 0.2;
+        const len = 120 + Math.random() * 180;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.2 + Math.random() * 2;
+        ctx.beginPath();
+        ctx.moveTo(tychoX, tychoY);
+        ctx.lineTo(tychoX + Math.cos(angle) * len, tychoY + Math.sin(angle) * len);
+        ctx.stroke();
+      }
+
+      // 第谷坑心明亮光点
+      const tychoGrad = ctx.createRadialGradient(tychoX, tychoY, 1, tychoX, tychoY, 18);
+      tychoGrad.addColorStop(0, '#ffffff');
+      tychoGrad.addColorStop(0.3, 'rgba(255, 250, 230, 0.9)');
+      tychoGrad.addColorStop(1, 'rgba(255, 245, 220, 0)');
+      ctx.fillStyle = tychoGrad;
+      ctx.beginPath();
+      ctx.arc(tychoX, tychoY, 18, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 散布微小陨石坑
+      for (let k = 0; k < 150; k++) {
+        const kx = Math.random() * 1024;
+        const ky = Math.random() * 512;
+        const kr = Math.random() * 4.5 + 1.5;
+        ctx.fillStyle = 'rgba(100, 90, 80, 0.25)';
+        ctx.beginPath();
+        ctx.arc(kx, ky, kr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.beginPath();
+        ctx.arc(kx - kr * 0.25, ky - kr * 0.25, kr * 0.65, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.5 柔和金色月晕贴图
+    function createMoonHaloTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      const grad = ctx.createRadialGradient(256, 256, 30, 256, 256, 256);
+      grad.addColorStop(0, 'rgba(255, 252, 230, 0.98)');
+      grad.addColorStop(0.2, 'rgba(255, 232, 160, 0.75)');
+      grad.addColorStop(0.45, 'rgba(245, 210, 120, 0.38)');
+      grad.addColorStop(0.72, 'rgba(140, 190, 235, 0.15)');
+      grad.addColorStop(1, 'rgba(20, 40, 80, 0.0)');
+
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      const tex = new THREE.CanvasTexture(c);
+      return tex;
+    }
+
+    // 2.6 水面微波波动法线贴图
+    function createWaterNormalTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      const imgData = ctx.createImageData(512, 512);
+      const data = imgData.data;
+
+      for (let y = 0; y < 512; y++) {
+        for (let x = 0; x < 512; x++) {
+          const idx = (y * 512 + x) * 4;
+          const nx = Math.sin(x * 0.06 + y * 0.03) * 0.4 + Math.sin(x * 0.12 - y * 0.08) * 0.3 + Math.sin(x * 0.24 + y * 0.22) * 0.3;
+          const ny = Math.cos(y * 0.07 - x * 0.04) * 0.4 + Math.cos(y * 0.13 + x * 0.1) * 0.3 + Math.cos(y * 0.25 - x * 0.24) * 0.3;
+
+          data[idx] = Math.floor((nx * 0.5 + 0.5) * 255);
+          data[idx + 1] = Math.floor((ny * 0.5 + 0.5) * 255);
+          data[idx + 2] = 238;
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(5, 5);
+      return tex;
+    }
+
+    // 2.7 碧绿荷叶放射纹理
+    function createLotusLeafTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+
+      const grad = ctx.createRadialGradient(256, 256, 8, 256, 256, 250);
+      grad.addColorStop(0, '#5fa848');
+      grad.addColorStop(0.35, '#2e6b28');
+      grad.addColorStop(0.85, '#1e521c');
+      grad.addColorStop(1, '#163d15');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 放射状微细叶脉
+      ctx.strokeStyle = 'rgba(150, 225, 120, 0.45)';
+      ctx.lineWidth = 2.4;
+      const veins = 22;
+      for (let i = 0; i < veins; i++) {
+        const ang = (i / veins) * Math.PI * 2;
+        ctx.beginPath();
+        ctx.moveTo(256, 256);
+        const cx1 = 256 + Math.cos(ang) * 120 + (Math.random() - 0.5) * 20;
+        const cy1 = 256 + Math.sin(ang) * 120 + (Math.random() - 0.5) * 20;
+        const ex = 256 + Math.cos(ang) * 250;
+        const ey = 256 + Math.sin(ang) * 250;
+        ctx.quadraticCurveTo(cx1, cy1, ex, ey);
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#9ee67c';
+      ctx.beginPath();
+      ctx.arc(256, 256, 12, 0, Math.PI * 2);
+      ctx.fill();
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.8 红纸灯笼纹理
+    function createLanternTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      ctx.fillStyle = '#b71c1c';
+      ctx.fillRect(0, 0, 256, 256);
+
+      const ribs = 16;
+      for (let i = 0; i < ribs; i++) {
+        const x = (i / ribs) * 256;
+        ctx.fillStyle = 'rgba(70, 8, 8, 0.7)';
+        ctx.fillRect(x, 0, 3, 256);
+        ctx.fillStyle = 'rgba(255, 100, 100, 0.3)';
+        ctx.fillRect(x + 3, 0, 2, 256);
+      }
+
+      ctx.fillStyle = '#d4af37';
+      ctx.fillRect(0, 0, 256, 14);
+      ctx.fillRect(0, 242, 256, 14);
+      ctx.fillStyle = '#fff4a3';
+      ctx.fillRect(0, 14, 256, 3);
+      ctx.fillRect(0, 239, 256, 3);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.9 中秋传统月饼顶面花纹
+    function createMooncakeTexture() {
+      const c = document.createElement('canvas');
+      c.width = 256;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      const g = ctx.createRadialGradient(128, 128, 20, 128, 128, 128);
+      g.addColorStop(0, '#e59d48');
+      g.addColorStop(0.7, '#b86b24');
+      g.addColorStop(1, '#7a3e10');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 256, 256);
+
+      ctx.strokeStyle = '#632f08';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(128, 128, 108, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.strokeStyle = '#ffd885';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(128, 128, 104, 0, Math.PI * 2);
+      ctx.stroke();
+
+      for (let p = 0; p < 12; p++) {
+        const ang = (p / 12) * Math.PI * 2;
+        const px = 128 + Math.cos(ang) * 72;
+        const py = 128 + Math.sin(ang) * 72;
+        ctx.fillStyle = '#e8a85a';
+        ctx.beginPath();
+        ctx.arc(px, py, 14, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#5a2a07';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = '#532204';
+      ctx.font = 'bold 36px "Microsoft YaHei", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('中秋', 128, 128);
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.10 柔和夜雾微粒圆形羽化贴图（杜绝方块噪点）
+    function createMistParticleTexture() {
+      const c = document.createElement('canvas');
+      c.width = 64;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+      const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      g.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      g.addColorStop(0.25, 'rgba(215, 235, 255, 0.6)');
+      g.addColorStop(0.65, 'rgba(160, 200, 240, 0.16)');
+      g.addColorStop(1, 'rgba(120, 160, 220, 0.0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(c);
+    }
+
+    // 2.11 真实桂花树叶形贴图（带叶脉与自然外形透明通道）
+    function createLeafTexture() {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 64;
+      const ctx = c.getContext('2d');
+
+      ctx.clearRect(0, 0, 128, 64);
+      // 绘制柳叶形/桂花椭圆革质叶片
+      ctx.beginPath();
+      ctx.ellipse(64, 32, 56, 22, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#1e5224';
+      ctx.fill();
+
+      // 叶缘明亮微反光
+      ctx.strokeStyle = '#2d6e35';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // 主叶脉
+      ctx.strokeStyle = '#4da359';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(10, 32);
+      ctx.lineTo(118, 32);
+      ctx.stroke();
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 2.12 粉白荷花花瓣渐变贴图（玉白透粉红，晶莹剔透）
+    function createPetalTexture() {
+      const c = document.createElement('canvas');
+      c.width = 128;
+      c.height = 256;
+      const ctx = c.getContext('2d');
+
+      ctx.clearRect(0, 0, 128, 256);
+
+      // 花瓣椭圆轮廓
+      ctx.beginPath();
+      ctx.moveTo(64, 15);
+      ctx.bezierCurveTo(120, 70, 120, 200, 64, 245);
+      ctx.bezierCurveTo(8, 200, 8, 70, 64, 15);
+      ctx.closePath();
+
+      // 从下至上：玉白渐变至娇嫩粉红
+      const grad = ctx.createLinearGradient(64, 250, 64, 20);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.45, '#fff0f5');
+      grad.addColorStop(0.75, '#f8a5c2');
+      grad.addColorStop(1, '#e05688');
+      ctx.fillStyle = grad;
+      ctx.fill();
+
+      const tex = new THREE.CanvasTexture(c);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 准备全局复用贴图与材质
+    const woodTex = createWoodTexture();
+    const stoneTex = createStoneTexture();
+    const roofTex = createRoofTileTexture();
+    const waterNormalTex = createWaterNormalTexture();
+    const lotusLeafTex = createLotusLeafTexture();
+    const lanternTex = createLanternTexture();
+    const mooncakeTex = createMooncakeTexture();
+    const mistParticleTex = createMistParticleTexture();
+    const leafTex = createLeafTexture();
+    const petalTex = createPetalTexture();
+
+    const woodMat = new THREE.MeshStandardMaterial({
+      map: woodTex,
+      roughness: 0.65,
+      metalness: 0.08
+    });
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      map: stoneTex,
+      roughness: 0.85,
+      metalness: 0.05
+    });
+
+    const roofMat = new THREE.MeshStandardMaterial({
+      map: roofTex,
+      roughness: 0.65,
+      metalness: 0.12
+    });
+
+    // ============================================================================
+    // 3. 巨型满月与夜空月晕系统（完美居于水榭与桂花枝干之间的黄金分割处）
+    // ============================================================================
+    const moonGroup = new THREE.Group();
+    // 设于水榭与金桂树之间的夜空核心视界，满月轮廓与月海陨石坑全然显现
+    moonGroup.position.set(1.5, 7.4, -14.5);
+
+    // 3.1 满月主体几何球体
+    const moonGeo = new THREE.SphereGeometry(3.6, 48, 48);
+    const moonMat = new THREE.MeshStandardMaterial({
+      map: createMoonTexture(),
+      roughness: 0.9,
+      metalness: 0.0,
+      emissive: new THREE.Color(0xfff5dc),
+      emissiveIntensity: 0.95
+    });
+    const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+    moonMesh.rotation.y = -Math.PI * 0.42;
+    moonGroup.add(moonMesh);
+
+    // 3.2 柔和金色月晕层（双层半透明发光平面广告牌）
+    const haloTex = createMoonHaloTexture();
+    const haloMatInner = new THREE.MeshBasicMaterial({
+      map: haloTex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.92
+    });
+    const haloGeoInner = new THREE.PlaneGeometry(14.0, 14.0);
+    const haloMeshInner = new THREE.Mesh(haloGeoInner, haloMatInner);
+    moonGroup.add(haloMeshInner);
+
+    const haloMatOuter = new THREE.MeshBasicMaterial({
+      map: haloTex,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      opacity: 0.48
+    });
+    const haloGeoOuter = new THREE.PlaneGeometry(28.0, 28.0);
+    const haloMeshOuter = new THREE.Mesh(haloGeoOuter, haloMatOuter);
+    moonGroup.add(haloMeshOuter);
+
+    scene.add(moonGroup);
+
+    // 3.3 夜空遥远繁星点点
+    const starCount = 320;
+    const starGeo = new THREE.BufferGeometry();
+    const starPos = new Float32Array(starCount * 3);
+    for (let i = 0; i < starCount; i++) {
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI * 0.35 + 0.05;
+      const r = 50 + Math.random() * 20;
+      starPos[i * 3] = r * Math.sin(phi) * Math.sin(theta);
+      starPos[i * 3 + 1] = r * Math.cos(phi) + 4;
+      starPos[i * 3 + 2] = r * Math.sin(phi) * Math.cos(theta);
+    }
+    starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+    const starMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      size: 0.32,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending
+    });
+    const stars = new THREE.Points(starGeo, starMat);
+    scene.add(stars);
+
+    // ============================================================================
+    // 4. 光照系统：清冷金白月光与水榭暖红宫灯冷暖交融
+    // ============================================================================
+    // 4.1 顶部主月光（来自巨型满月方向，清冷皎洁金白色，投射柔和阴影）
+    const moonlight = new THREE.DirectionalLight(0xdbe6ff, 1.85);
+    moonlight.position.set(2.0, 14, -12);
+    moonlight.target.position.set(0, 0, 0);
+    moonlight.castShadow = true;
+    moonlight.shadow.mapSize.width = 1024;
+    moonlight.shadow.mapSize.height = 1024;
+    moonlight.shadow.camera.near = 5;
+    moonlight.shadow.camera.far = 38;
+    moonlight.shadow.camera.left = -8.5;
+    moonlight.shadow.camera.right = 8.5;
+    moonlight.shadow.camera.top = 8.5;
+    moonlight.shadow.camera.bottom = -8.5;
+    moonlight.shadow.bias = -0.0006;
+    scene.add(moonlight);
+    scene.add(moonlight.target);
+
+    // 4.2 环境微光（幽蓝夜色底蕴）
+    const ambientLight = new THREE.AmbientLight(0x0a1426, 0.88);
+    scene.add(ambientLight);
+
+    // 4.3 补光月光漫反射
+    const hemiLight = new THREE.HemisphereLight(0x192842, 0x060d18, 0.62);
+    scene.add(hemiLight);
+
+    // ============================================================================
+    // 5. 静谧微漾水面系统（倒映满月月影、水榭与桂花）
+    // ============================================================================
+    const waterGeo = new THREE.PlaneGeometry(30, 30, 48, 48);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x061526,
+      roughness: 0.07,
+      metalness: 0.9,
+      normalMap: waterNormalTex,
+      normalScale: new THREE.Vector2(0.18, 0.18),
+      envMapIntensity: 1.2
+    });
+    const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+    waterMesh.rotation.x = -Math.PI / 2;
+    waterMesh.position.y = 0.0;
+    waterMesh.receiveShadow = true;
+    scene.add(waterMesh);
+
+    // 水面倒映巨型满月之柔美波光月影 (Shimmering Lunar Reflection on Water)
+    const moonReflectMat = new THREE.MeshBasicMaterial({
+      map: haloTex,
+      transparent: true,
+      opacity: 0.42,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const moonReflectMesh = new THREE.Mesh(new THREE.PlaneGeometry(6.5, 13.0), moonReflectMat);
+    moonReflectMesh.rotation.x = -Math.PI / 2;
+    moonReflectMesh.position.set(2.2, 0.005, -1.0);
+    scene.add(moonReflectMesh);
+
+    // 水下池底（平缓起伏深色鹅卵石泥底）
+    const bedGeo = new THREE.PlaneGeometry(32, 32, 8, 8);
+    const bedMat = new THREE.MeshStandardMaterial({
+      color: 0x03060d,
+      roughness: 0.95,
+      metalness: 0.05
+    });
+    const bedMesh = new THREE.Mesh(bedGeo, bedMat);
+    bedMesh.rotation.x = -Math.PI / 2;
+    bedMesh.position.y = -0.85;
+    scene.add(bedMesh);
+
+    // ============================================================================
+    // 6. 池塘驳岸、水中古石柱础与微型石拱桥
+    // ============================================================================
+    const terrainGroup = new THREE.Group();
+
+    // 6.1 水池后方古石基座与园林岸线（后部与左侧陆地）
+    const bankGeo1 = new THREE.BoxGeometry(7.0, 0.75, 4.2);
+    const bankMesh1 = new THREE.Mesh(bankGeo1, stoneMat);
+    bankMesh1.position.set(-2.8, 0.28, -2.8);
+    bankMesh1.castShadow = true;
+    bankMesh1.receiveShadow = true;
+    terrainGroup.add(bankMesh1);
+
+    const bankGeo2 = new THREE.BoxGeometry(4.8, 0.72, 5.0);
+    const bankMesh2 = new THREE.Mesh(bankGeo2, stoneMat);
+    bankMesh2.position.set(3.4, 0.26, -2.8);
+    bankMesh2.castShadow = true;
+    bankMesh2.receiveShadow = true;
+    terrainGroup.add(bankMesh2);
+
+    // 驳岸边缘散置错落自然怪石（带青苔）
+    const rockCoords = [
+      { x: -1.3, z: 0.3, s: 0.65 },
+      { x: -0.6, z: 0.85, s: 0.82 }, // 玉兔立足石
+      { x: 0.9, z: -0.15, s: 0.52 },
+      { x: 1.55, z: 0.35, s: 0.68 },
+      { x: 3.6, z: 0.85, s: 0.85 },
+      { x: -4.5, z: 0.1, s: 1.05 }
+    ];
+
+    rockCoords.forEach((r) => {
+      // 采用圆润江南园林水石/太湖石质感几何
+      const rGeo = new THREE.SphereGeometry(r.s, 16, 12);
+      const posAttr = rGeo.attributes.position;
+      for (let i = 0; i < posAttr.count; i++) {
+        const x = posAttr.getX(i);
+        const y = posAttr.getY(i);
+        const z = posAttr.getZ(i);
+        const bump = 1.0 + Math.sin(x * 4.0) * 0.08 + Math.cos(z * 3.5) * 0.08;
+        posAttr.setXYZ(i, x * 1.15 * bump, y * 0.72 * bump, z * 0.95 * bump);
+      }
+      rGeo.computeVertexNormals();
+
+      const rMesh = new THREE.Mesh(rGeo, stoneMat);
+      rMesh.position.set(r.x, 0.22, r.z);
+      rMesh.rotation.set(r.x * 0.7, r.z * 1.1, r.s);
+      rMesh.castShadow = true;
+      rMesh.receiveShadow = true;
+      terrainGroup.add(rMesh);
+    });
+
+    // 6.2 横跨水面的微型石拱桥 (Stone Arch Bridge)
+    const bridgeGroup = new THREE.Group();
+    bridgeGroup.position.set(2.4, 0.08, 0.75);
+    bridgeGroup.rotation.y = -Math.PI * 0.28;
+
+    // 桥下微弱月影与暖光漫反射
+    const bridgeLight = new THREE.PointLight(0xffb266, 0.85, 4.2);
+    bridgeLight.position.set(0, 0.45, 0);
+    bridgeGroup.add(bridgeLight);
+
+    // 拱形券洞与桥面
+    const archRadius = 1.35;
+    const archThickness = 0.22;
+    const archWidth = 1.05;
+    const archShape = new THREE.Shape();
+    archShape.absarc(0, -0.3, archRadius, 0.15 * Math.PI, 0.85 * Math.PI, false);
+    archShape.absarc(0, -0.3, archRadius + archThickness, 0.85 * Math.PI, 0.15 * Math.PI, true);
+    archShape.closePath();
+
+    const extrudeSettings = {
+      depth: archWidth,
+      bevelEnabled: true,
+      bevelSegments: 2,
+      steps: 16,
+      bevelSize: 0.035,
+      bevelThickness: 0.035
+    };
+    const archGeo = new THREE.ExtrudeGeometry(archShape, extrudeSettings);
+    archGeo.center();
+    const bridgeMesh = new THREE.Mesh(archGeo, stoneMat);
+    bridgeMesh.rotation.y = Math.PI / 2;
+    bridgeMesh.position.y = 0.65;
+    bridgeMesh.castShadow = true;
+    bridgeMesh.receiveShadow = true;
+    bridgeGroup.add(bridgeMesh);
+
+    // 桥面石阶步道微台阶
+    for (let s = -5; s <= 5; s++) {
+      const stepAngle = (s / 6) * 0.55;
+      const stepR = archRadius + archThickness + 0.02;
+      const stepX = Math.sin(stepAngle) * stepR;
+      const stepY = Math.cos(stepAngle) * stepR - 0.3;
+      const stepGeo = new THREE.BoxGeometry(0.12, 0.035, archWidth + 0.05);
+      const stepMesh = new THREE.Mesh(stepGeo, stoneMat);
+      stepMesh.position.set(0, stepY, stepX);
+      stepMesh.rotation.x = stepAngle;
+      stepMesh.castShadow = true;
+      stepMesh.receiveShadow = true;
+      bridgeGroup.add(stepMesh);
+    }
+
+    // 桥面两侧弧形石栏杆与望柱
+    [-archWidth / 2 - 0.03, archWidth / 2 + 0.03].forEach(sideZ => {
+      for (let p = -3; p <= 3; p++) {
+        const pAng = (p / 4) * 0.52;
+        const pR = archRadius + archThickness + 0.06;
+        const px = Math.sin(pAng) * pR;
+        const py = Math.cos(pAng) * pR - 0.3;
+
+        const postGeo = new THREE.BoxGeometry(0.075, 0.35, 0.075);
+        const postMesh = new THREE.Mesh(postGeo, stoneMat);
+        postMesh.position.set(sideZ, py + 0.16, px);
+        postMesh.castShadow = true;
+        bridgeGroup.add(postMesh);
+
+        const capGeo = new THREE.SphereGeometry(0.05, 8, 8);
+        const capMesh = new THREE.Mesh(capGeo, stoneMat);
+        capMesh.position.set(sideZ, py + 0.35, px);
+        bridgeGroup.add(capMesh);
+      }
+    });
+
+    terrainGroup.add(bridgeGroup);
+    scene.add(terrainGroup);
+
+    // ============================================================================
+    // 7. 古朴木质水榭亭台（翘角飞檐、雕花木柱、观景美人靠台、水中立柱）
+    // ============================================================================
+    const pavilionGroup = new THREE.Group();
+    pavilionGroup.position.set(-1.8, 0.0, -1.1);
+
+    // 7.1 水中立柱柱础石（4根沉入水底青石基）
+    const pillarPositions = [
+      [-1.4, -1.2],
+      [1.4, -1.2],
+      [-1.4, 1.3],
+      [1.4, 1.3]
+    ];
+
+    pillarPositions.forEach(pos => {
+      // 水下圆柱础石
+      const baseGeo = new THREE.CylinderGeometry(0.18, 0.22, 0.55, 16);
+      const baseMesh = new THREE.Mesh(baseGeo, stoneMat);
+      baseMesh.position.set(pos[0], 0.1, pos[1]);
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      pavilionGroup.add(baseMesh);
+
+      // 上立古木主柱
+      const colGeo = new THREE.CylinderGeometry(0.09, 0.095, 2.5, 16);
+      const colMesh = new THREE.Mesh(colGeo, woodMat);
+      colMesh.position.set(pos[0], 1.55, pos[1]);
+      colMesh.castShadow = true;
+      colMesh.receiveShadow = true;
+      pavilionGroup.add(colMesh);
+    });
+
+    // 7.2 水榭亲水木质地板台面（真正凌空架于水面之上，水波在下方微漾）
+    const deckGeo = new THREE.BoxGeometry(3.2, 0.12, 2.9);
+    const deckMesh = new THREE.Mesh(deckGeo, woodMat);
+    deckMesh.position.set(0, 0.42, 0.05);
+    deckMesh.castShadow = true;
+    deckMesh.receiveShadow = true;
+    pavilionGroup.add(deckMesh);
+
+    // 临水侧挑台延长木栈道（向前延伸）
+    const extDeckGeo = new THREE.BoxGeometry(1.9, 0.11, 0.95);
+    const extDeckMesh = new THREE.Mesh(extDeckGeo, woodMat);
+    extDeckMesh.position.set(0.1, 0.40, 1.8);
+    extDeckMesh.castShadow = true;
+    extDeckMesh.receiveShadow = true;
+    pavilionGroup.add(extDeckMesh);
+
+    // 7.3 水榭围栏与临水“美人靠”木椅
+    function createRail(w, d, x, y, z) {
+      const rG = new THREE.BoxGeometry(w, 0.055, d);
+      const topR = new THREE.Mesh(rG, woodMat);
+      topR.position.set(x, y + 0.45, z);
+      topR.castShadow = true;
+      pavilionGroup.add(topR);
+
+      const botR = new THREE.Mesh(rG, woodMat);
+      botR.position.set(x, y + 0.06, z);
+      botR.castShadow = true;
+      pavilionGroup.add(botR);
+
+      const count = Math.floor(Math.max(w, d) * 6);
+      for (let i = 0; i <= count; i++) {
+        const factor = count > 0 ? (i / count) - 0.5 : 0;
+        const px = w > d ? x + factor * w : x;
+        const pz = d >= w ? z + factor * d : z;
+        const pG = new THREE.CylinderGeometry(0.018, 0.018, 0.4, 8);
+        const pM = new THREE.Mesh(pG, woodMat);
+        pM.position.set(px, y + 0.25, pz);
+        pM.castShadow = true;
+        pavilionGroup.add(pM);
+      }
+    }
+    createRail(0.08, 2.5, -1.4, 0.42, 0.05);  // 左护栏
+    createRail(2.8, 0.08, 0, 0.42, -1.2);    // 后护栏
+
+    // 右前“美人靠”（临水弧形靠背木座）
+    const benchGeo = new THREE.BoxGeometry(0.32, 0.06, 1.8);
+    const benchMesh = new THREE.Mesh(benchGeo, woodMat);
+    benchMesh.position.set(1.4, 0.63, 0.05);
+    benchMesh.castShadow = true;
+    pavilionGroup.add(benchMesh);
+
+    const backGeo = new THREE.BoxGeometry(0.06, 0.4, 1.8);
+    const backMesh = new THREE.Mesh(backGeo, woodMat);
+    backMesh.position.set(1.54, 0.88, 0.05);
+    backMesh.rotation.z = -0.22;
+    backMesh.castShadow = true;
+    pavilionGroup.add(backMesh);
+
+    // 7.4 檐下横梁与枋木支撑系统
+    const beam1 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.1, 0.1), woodMat);
+    beam1.position.set(0, 2.72, -1.2);
+    beam1.castShadow = true;
+    pavilionGroup.add(beam1);
+
+    const beam2 = new THREE.Mesh(new THREE.BoxGeometry(3.0, 0.1, 0.1), woodMat);
+    beam2.position.set(0, 2.72, 1.3);
+    beam2.castShadow = true;
+    pavilionGroup.add(beam2);
+
+    const beam3 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.6), woodMat);
+    beam3.position.set(-1.4, 2.72, 0.05);
+    beam3.castShadow = true;
+    pavilionGroup.add(beam3);
+
+    const beam4 = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 2.6), woodMat);
+    beam4.position.set(1.4, 2.72, 0.05);
+    beam4.castShadow = true;
+    pavilionGroup.add(beam4);
+
+    // 7.5 带翘角飞檐的古建筑传统歇山/攒尖大屋顶 (Curved Flying Eaves Roof)
+    const roofNx = 32;
+    const roofNz = 32;
+    const roofHalfW = 2.25;
+    const roofHalfD = 2.15;
+    const roofApexH = 4.15;
+    const roofEaveH = 2.82;
+
+    const roofPositions = [];
+    const roofUvs = [];
+    const roofIndices = [];
+
+    for (let iz = 0; iz <= roofNz; iz++) {
+      const v = iz / roofNz;
+      const z = (v - 0.5) * 2 * roofHalfD;
+      const absZ = Math.abs(z) / roofHalfD;
+
+      for (let ix = 0; ix <= roofNx; ix++) {
+        const u = ix / roofNx;
+        const x = (u - 0.5) * 2 * roofHalfW;
+        const absX = Math.abs(x) / roofHalfW;
+
+        const distFromCenter = Math.max(absX, absZ);
+        let y = roofApexH - Math.pow(distFromCenter, 1.25) * (roofApexH - roofEaveH);
+
+        const cornerFactor = Math.pow(absX * absZ, 2.2);
+        const cornerLift = cornerFactor * 0.58;
+        y += cornerLift;
+
+        const pushOut = cornerFactor * 0.32;
+        const finalX = x * (1.0 + pushOut * 0.2);
+        const finalZ = z * (1.0 + pushOut * 0.2);
+
+        roofPositions.push(finalX, y, finalZ);
+        roofUvs.push(u * 5.0, v * 5.0);
+      }
+    }
+
+    for (let iz = 0; iz < roofNz; iz++) {
+      for (let ix = 0; ix < roofNx; ix++) {
+        const a = iz * (roofNx + 1) + ix;
+        const b = a + 1;
+        const c = a + (roofNx + 1);
+        const d = c + 1;
+        roofIndices.push(a, c, b);
+        roofIndices.push(b, c, d);
+      }
+    }
+
+    const roofGeo = new THREE.BufferGeometry();
+    roofGeo.setAttribute('position', new THREE.Float32BufferAttribute(roofPositions, 3));
+    roofGeo.setAttribute('uv', new THREE.Float32BufferAttribute(roofUvs, 2));
+    roofGeo.setIndex(roofIndices);
+    roofGeo.computeVertexNormals();
+
+    const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+    roofMesh.position.set(0, 0, 0.05);
+    roofMesh.castShadow = true;
+    roofMesh.receiveShadow = true;
+    pavilionGroup.add(roofMesh);
+
+    // 四角飞檐起翘端头脊兽饰物 (Ornamental Flying Eave Horns)
+    const hornMat = new THREE.MeshStandardMaterial({ color: 0xdeb843, metalness: 0.8, roughness: 0.3 });
+    [
+      [-roofHalfW * 1.05, roofHalfD * 1.05],
+      [roofHalfW * 1.05, roofHalfD * 1.05],
+      [-roofHalfW * 1.05, -roofHalfD * 1.05],
+      [roofHalfW * 1.05, -roofHalfD * 1.05]
+    ].forEach(c => {
+      const hornCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(c[0] * 0.94, roofEaveH + 0.35, c[1] * 0.94),
+        new THREE.Vector3(c[0] * 1.01, roofEaveH + 0.48, c[1] * 1.01),
+        new THREE.Vector3(c[0] * 1.06, roofEaveH + 0.68, c[1] * 1.06)
+      ]);
+      const hornGeo = new THREE.TubeGeometry(hornCurve, 8, 0.035, 6, false);
+      const hornMesh = new THREE.Mesh(hornGeo, hornMat);
+      hornMesh.castShadow = true;
+      pavilionGroup.add(hornMesh);
+    });
+
+    // 屋顶内木质天花吊顶板
+    const ceilingGeo = new THREE.BoxGeometry(2.8, 0.05, 2.5);
+    const ceilingMesh = new THREE.Mesh(ceilingGeo, woodMat);
+    ceilingMesh.position.set(0, 2.76, 0.05);
+    pavilionGroup.add(ceilingMesh);
+
+    // 顶心宝顶脊饰（金色葫芦宝顶）
+    const finialGroup = new THREE.Group();
+    finialGroup.position.set(0, roofApexH + 0.02, 0.05);
+    const finialMat = new THREE.MeshStandardMaterial({
+      color: 0xdeb843,
+      metalness: 0.85,
+      roughness: 0.25
+    });
+    const fBase = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.24, 0.12, 16), finialMat);
+    const fBall1 = new THREE.Mesh(new THREE.SphereGeometry(0.16, 16, 16), finialMat);
+    fBall1.position.y = 0.18;
+    const fBall2 = new THREE.Mesh(new THREE.SphereGeometry(0.1, 16, 16), finialMat);
+    fBall2.position.y = 0.36;
+    const fSpire = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.22, 12), finialMat);
+    fSpire.position.y = 0.52;
+    finialGroup.add(fBase, fBall1, fBall2, fSpire);
+    finialGroup.castShadow = true;
+    pavilionGroup.add(finialGroup);
+
+    // 7.6 翘角飞檐悬挂的精巧红纸灯笼（暖光核心，与冷白月光形成浪漫冷暖对比）
+    const lanternGroup = new THREE.Group();
+    const lanternPositions = [
+      [-1.95, 2.95, -1.8],
+      [1.95, 2.95, -1.8],
+      [-1.95, 3.0, 1.95],
+      [1.95, 3.0, 1.95]
+    ];
+
+    const lanternLightList = [];
+
+    lanternPositions.forEach((pos, idx) => {
+      const lSub = new THREE.Group();
+      lSub.position.set(pos[0], pos[1], pos[2]);
+
+      const cord = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.008, 0.008, 0.35),
+        new THREE.MeshBasicMaterial({ color: 0x221100 })
+      );
+      cord.position.y = -0.175;
+      lSub.add(cord);
+
+      const capMat = new THREE.MeshStandardMaterial({ color: 0x1f140e, roughness: 0.5 });
+      const topCap = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.14, 0.04, 8), capMat);
+      topCap.position.y = -0.36;
+      const botCap = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.12, 0.04, 8), capMat);
+      botCap.position.y = -0.72;
+      lSub.add(topCap, botCap);
+
+      const bodyGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.34, 8);
+      const bodyMat = new THREE.MeshStandardMaterial({
+        map: lanternTex,
+        roughness: 0.45,
+        emissive: new THREE.Color(0xff4411),
+        emissiveIntensity: 0.88
+      });
+      const bodyMesh = new THREE.Mesh(bodyGeo, bodyMat);
+      bodyMesh.position.y = -0.54;
+      lSub.add(bodyMesh);
+
+      const tasselMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, roughness: 0.6 });
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.28, 8), tasselMat);
+      tassel.position.y = -0.88;
+      tassel.rotation.x = Math.PI;
+      lSub.add(tassel);
+
+      // 暖色点光源
+      const lanternLight = new THREE.PointLight(0xff6822, 1.85, 7.5, 1.4);
+      lanternLight.position.set(0, -0.54, 0);
+      lSub.add(lanternLight);
+      lanternLightList.push(lanternLight);
+
+      lanternGroup.add(lSub);
+    });
+    pavilionGroup.add(lanternGroup);
+
+    // ============================================================================
+    // 8. 水榭茶席：石桌、微型月饼、白瓷茶具与袅袅茶香热气
+    // ============================================================================
+    const teaGroup = new THREE.Group();
+    teaGroup.position.set(0.1, 0.42, 0.25);
+
+    // 8.1 青石雕花圆桌
+    const tableTopGeo = new THREE.CylinderGeometry(0.48, 0.48, 0.05, 32);
+    const tableMesh = new THREE.Mesh(tableTopGeo, stoneMat);
+    tableMesh.position.y = 0.52;
+    tableMesh.castShadow = true;
+    tableMesh.receiveShadow = true;
+    teaGroup.add(tableMesh);
+
+    const tableBaseGeo = new THREE.CylinderGeometry(0.12, 0.18, 0.5, 16);
+    const tableBase = new THREE.Mesh(tableBaseGeo, stoneMat);
+    tableBase.position.y = 0.25;
+    tableBase.castShadow = true;
+    teaGroup.add(tableBase);
+
+    // 8.2 石鼓凳（绣墩）2个
+    [[-0.6, 0.28, -0.2], [0.6, 0.28, 0.25]].forEach(stPos => {
+      const stoolGeo = new THREE.CylinderGeometry(0.17, 0.17, 0.32, 16);
+      const stoolMesh = new THREE.Mesh(stoolGeo, stoneMat);
+      stoolMesh.position.set(stPos[0], stPos[1], stPos[2]);
+      stoolMesh.castShadow = true;
+      stoolMesh.receiveShadow = true;
+      teaGroup.add(stoolMesh);
+    });
+
+    // 8.3 酸枝木茶盘
+    const trayGeo = new THREE.CylinderGeometry(0.34, 0.33, 0.02, 24);
+    const trayMat = new THREE.MeshStandardMaterial({
+      color: 0x3d1c0c,
+      roughness: 0.35,
+      metalness: 0.1
+    });
+    const trayMesh = new THREE.Mesh(trayGeo, trayMat);
+    trayMesh.position.y = 0.55;
+    trayMesh.castShadow = true;
+    teaGroup.add(trayMesh);
+
+    // 8.4 微型传统月饼
+    const mooncakeMat = new THREE.MeshStandardMaterial({
+      map: mooncakeTex,
+      roughness: 0.4,
+      metalness: 0.05
+    });
+
+    const cakeGeo1 = new THREE.CylinderGeometry(0.062, 0.062, 0.038, 24);
+    const cakeMesh1 = new THREE.Mesh(cakeGeo1, mooncakeMat);
+    cakeMesh1.position.set(-0.08, 0.578, -0.06);
+    cakeMesh1.castShadow = true;
+    teaGroup.add(cakeMesh1);
+
+    const cakeMesh2 = new THREE.Mesh(cakeGeo1, mooncakeMat);
+    cakeMesh2.position.set(-0.16, 0.578, 0.04);
+    cakeMesh2.rotation.y = 0.7;
+    cakeMesh2.castShadow = true;
+    teaGroup.add(cakeMesh2);
+
+    // 切开的月饼（半圆块）
+    const halfCakeGeo = new THREE.CylinderGeometry(0.062, 0.062, 0.038, 24, 1, false, 0, Math.PI);
+    const halfCakeMesh = new THREE.Mesh(halfCakeGeo, mooncakeMat);
+    halfCakeMesh.position.set(-0.07, 0.578, 0.1);
+    halfCakeMesh.rotation.y = -1.1;
+    halfCakeMesh.castShadow = true;
+    teaGroup.add(halfCakeMesh);
+
+    const yolkGeo = new THREE.SphereGeometry(0.018, 12, 12);
+    const yolkMat = new THREE.MeshStandardMaterial({
+      color: 0xffa500,
+      roughness: 0.25,
+      emissive: new THREE.Color(0xff8800),
+      emissiveIntensity: 0.15
+    });
+    const yolkMesh = new THREE.Mesh(yolkGeo, yolkMat);
+    yolkMesh.position.set(-0.07, 0.578, 0.1);
+    teaGroup.add(yolkMesh);
+
+    // 8.5 润如羊脂玉的德化白瓷茶具（MeshPhysicalMaterial）
+    const porcelainMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.1,
+      metalness: 0.05,
+      clearcoat: 0.9,
+      clearcoatRoughness: 0.05
+    });
+
+    const teaLiquidMat = new THREE.MeshStandardMaterial({
+      color: 0x98aa45,
+      roughness: 0.05,
+      metalness: 0.6
+    });
+
+    const cupCoords = [[0.1, 0.576, -0.05], [0.12, 0.576, 0.08]];
+    cupCoords.forEach(cPos => {
+      const cupGroup = new THREE.Group();
+      cupGroup.position.set(cPos[0], cPos[1], cPos[2]);
+
+      const cupOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.02, 0.034, 16), porcelainMat);
+      cupOuter.castShadow = true;
+      cupGroup.add(cupOuter);
+
+      const teaLiquid = new THREE.Mesh(new THREE.CircleGeometry(0.026, 16), teaLiquidMat);
+      teaLiquid.rotation.x = -Math.PI / 2;
+      teaLiquid.position.y = 0.012;
+      cupGroup.add(teaLiquid);
+
+      teaGroup.add(cupGroup);
+    });
+
+    const potGroup = new THREE.Group();
+    potGroup.position.set(0.02, 0.605, -0.15);
+
+    const potBody = new THREE.Mesh(new THREE.SphereGeometry(0.058, 16, 16), porcelainMat);
+    potBody.scale.set(1.0, 0.85, 1.0);
+    potBody.castShadow = true;
+    potGroup.add(potBody);
+
+    const potLid = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.038, 0.015, 16), porcelainMat);
+    potLid.position.y = 0.055;
+    const potKnob = new THREE.Mesh(new THREE.SphereGeometry(0.01, 8, 8), porcelainMat);
+    potKnob.position.y = 0.07;
+    potGroup.add(potLid, potKnob);
+
+    const spout = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.016, 0.065, 8), porcelainMat);
+    spout.position.set(0.058, 0.018, 0.02);
+    spout.rotation.z = -Math.PI * 0.35;
+    spout.rotation.y = 0.3;
+    potGroup.add(spout);
+
+    const handle = new THREE.Mesh(new THREE.TorusGeometry(0.032, 0.007, 8, 16, Math.PI), porcelainMat);
+    handle.position.set(-0.055, 0.01, 0.0);
+    handle.rotation.z = Math.PI * 0.5;
+    potGroup.add(handle);
+
+    teaGroup.add(potGroup);
+
+    // 8.6 茶杯上升腾的丝丝袅袅热气粒子 (Hot Tea Steam)
+    const steamCount = 18;
+    const steamGeo = new THREE.BufferGeometry();
+    const steamPos = new Float32Array(steamCount * 3);
+    const steamSeeds = [];
+    for (let s = 0; s < steamCount; s++) {
+      steamPos[s * 3] = cupCoords[0][0] + (Math.random() - 0.5) * 0.04;
+      steamPos[s * 3 + 1] = 0.6 + Math.random() * 0.25;
+      steamPos[s * 3 + 2] = cupCoords[0][2] + (Math.random() - 0.5) * 0.04;
+      steamSeeds.push({
+        baseX: (s % 2 === 0 ? cupCoords[0][0] : cupCoords[1][0]),
+        baseZ: (s % 2 === 0 ? cupCoords[0][2] : cupCoords[1][2]),
+        speed: 0.08 + Math.random() * 0.06
+      });
+    }
+    steamGeo.setAttribute('position', new THREE.BufferAttribute(steamPos, 3));
+    const steamMat = new THREE.PointsMaterial({
+      color: 0xffffff,
+      map: mistParticleTex,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const steamPoints = new THREE.Points(steamGeo, steamMat);
+    teaGroup.add(steamPoints);
+
+    pavilionGroup.add(teaGroup);
+    scene.add(pavilionGroup);
+
+    // ============================================================================
+    // 9. 盛开的金桂树与金黄花瓣飘落（粒子系统）
+    // ============================================================================
+    const treeGroup = new THREE.Group();
+    treeGroup.position.set(1.9, 0.32, -2.0);
+
+    // 9.1 苍劲古朴树干与主分枝（采用平滑三维样条曲线构建）
+    const trunkSpline = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(0, -0.4, 0),
+      new THREE.Vector3(-0.15, 0.7, 0.1),
+      new THREE.Vector3(-0.4, 1.6, 0.3),
+      new THREE.Vector3(-0.75, 2.5, 0.55),
+      new THREE.Vector3(-1.1, 3.3, 0.8)
+    ]);
+    const trunkGeo = new THREE.TubeGeometry(trunkSpline, 24, 0.22, 12, false);
+    const trunkMesh = new THREE.Mesh(trunkGeo, woodMat);
+    trunkMesh.castShadow = true;
+    trunkMesh.receiveShadow = true;
+    treeGroup.add(trunkMesh);
+
+    // 树根盘结入地
+    const root1 = new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 0.1, 0),
+        new THREE.Vector3(0.4, -0.15, 0.2),
+        new THREE.Vector3(0.7, -0.4, 0.35)
+      ]), 8, 0.1, 8, false),
+      woodMat
+    );
+    treeGroup.add(root1);
+
+    // 4根弯向水榭与水面的伸展大主枝
+    const branchCurves = [
+      [new THREE.Vector3(-0.75, 2.5, 0.55), new THREE.Vector3(-1.5, 3.0, 0.9), new THREE.Vector3(-2.2, 3.4, 1.1)],
+      [new THREE.Vector3(-0.4, 1.6, 0.3), new THREE.Vector3(-0.2, 2.3, 1.2), new THREE.Vector3(-0.4, 2.8, 2.1)],
+      [new THREE.Vector3(-1.1, 3.3, 0.8), new THREE.Vector3(-0.8, 4.1, 0.6), new THREE.Vector3(-0.6, 4.7, 0.3)],
+      [new THREE.Vector3(-0.4, 1.6, 0.3), new THREE.Vector3(0.5, 2.2, 0.2), new THREE.Vector3(1.1, 2.7, 0.5)]
+    ];
+
+    branchCurves.forEach(pts => {
+      const bCurve = new THREE.CatmullRomCurve3(pts);
+      const bGeo = new THREE.TubeGeometry(bCurve, 14, 0.11, 8, false);
+      const bMesh = new THREE.Mesh(bGeo, woodMat);
+      bMesh.castShadow = true;
+      treeGroup.add(bMesh);
+    });
+
+    // 9.2 桂花树深绿繁密枝叶群（InstancedMesh 高性能渲染）
+    const leafCount = 800;
+    const leafGeo = new THREE.PlaneGeometry(0.24, 0.11);
+    const leafMat = new THREE.MeshStandardMaterial({
+      map: leafTex,
+      transparent: true,
+      alphaTest: 0.15,
+      roughness: 0.45,
+      metalness: 0.08,
+      side: THREE.DoubleSide
+    });
+    const leafInstanced = new THREE.InstancedMesh(leafGeo, leafMat, leafCount);
+    leafInstanced.castShadow = true;
+
+    // 9.3 满树盛开金黄桂花小花球（InstancedMesh 密集绽放，金桂璀璨）
+    const flowerCount = 1100;
+    const flowerGeo = new THREE.CircleGeometry(0.04, 4);
+    const flowerMat = new THREE.MeshStandardMaterial({
+      color: 0xffba08,
+      emissive: new THREE.Color(0xffa000),
+      emissiveIntensity: 0.88,
+      roughness: 0.4,
+      metalness: 0.05,
+      side: THREE.DoubleSide
+    });
+    const flowerInstanced = new THREE.InstancedMesh(flowerGeo, flowerMat, flowerCount);
+
+    const dummy = new THREE.Object3D();
+    const canopyCenters = [
+      new THREE.Vector3(-2.1, 3.4, 1.1),
+      new THREE.Vector3(-0.5, 2.8, 1.9),
+      new THREE.Vector3(-0.6, 4.6, 0.3),
+      new THREE.Vector3(1.1, 2.7, 0.5),
+      new THREE.Vector3(-1.2, 3.2, 0.6)
+    ];
+
+    for (let i = 0; i < leafCount; i++) {
+      const center = canopyCenters[i % canopyCenters.length];
+      const r = 0.3 + Math.random() * 0.95;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = (Math.random() - 0.5) * Math.PI;
+
+      dummy.position.set(
+        center.x + r * Math.cos(theta) * Math.cos(phi),
+        center.y + r * Math.sin(phi) * 0.75,
+        center.z + r * Math.sin(theta) * Math.cos(phi)
+      );
+      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      dummy.scale.setScalar(0.7 + Math.random() * 0.6);
+      dummy.updateMatrix();
+      leafInstanced.setMatrixAt(i, dummy.matrix);
+    }
+    leafInstanced.instanceMatrix.needsUpdate = true;
+    treeGroup.add(leafInstanced);
+
+    for (let j = 0; j < flowerCount; j++) {
+      const center = canopyCenters[j % canopyCenters.length];
+      const r = 0.2 + Math.random() * 0.98;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = (Math.random() - 0.5) * Math.PI;
+
+      dummy.position.set(
+        center.x + r * Math.cos(theta) * Math.cos(phi),
+        center.y + r * Math.sin(phi) * 0.75,
+        center.z + r * Math.sin(theta) * Math.cos(phi)
+      );
+      dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+      dummy.scale.setScalar(0.8 + Math.random() * 0.7);
+      dummy.updateMatrix();
+      flowerInstanced.setMatrixAt(j, dummy.matrix);
+    }
+    flowerInstanced.instanceMatrix.needsUpdate = true;
+    treeGroup.add(flowerInstanced);
+
+    scene.add(treeGroup);
+
+    // 9.4 桂花飘落与水面漂浮粒子系统 (Falling & Floating Osmanthus Petals)
+    const petalParticleCount = 260;
+    const petalGeo = new THREE.CircleGeometry(0.024, 4);
+    const petalMat = new THREE.MeshBasicMaterial({
+      color: 0xffd215,
+      side: THREE.DoubleSide
+    });
+    const fallingPetalsMesh = new THREE.InstancedMesh(petalGeo, petalMat, petalParticleCount);
+    scene.add(fallingPetalsMesh);
+
+    const petalData = [];
+    for (let p = 0; p < petalParticleCount; p++) {
+      petalData.push({
+        x: treeGroup.position.x - 1.2 + (Math.random() - 0.5) * 3.2,
+        y: 1.0 + Math.random() * 3.8,
+        z: treeGroup.position.z + 0.8 + (Math.random() - 0.5) * 3.2,
+        vx: -0.015 - Math.random() * 0.02,
+        vy: -0.012 - Math.random() * 0.016,
+        vz: 0.008 + Math.random() * 0.012,
+        rotX: Math.random() * Math.PI,
+        rotY: Math.random() * Math.PI,
+        rotZ: Math.random() * Math.PI,
+        vRotX: (Math.random() - 0.5) * 0.08,
+        vRotY: (Math.random() - 0.5) * 0.08,
+        vRotZ: (Math.random() - 0.5) * 0.08,
+        state: 'falling',
+        floatTimer: 0
+      });
+    }
+
+    // ============================================================================
+    // 10. 水榭旁石头上静立的白色玉兔（耳朵偶尔灵动转动，栩栩如生）
+    // ============================================================================
+    const rabbitGroup = new THREE.Group();
+    // 稳立于天然青石之上，望向水面满月倒影与荷叶
+    rabbitGroup.position.set(-0.6, 0.62, 0.82);
+    rabbitGroup.rotation.y = Math.PI * 0.38;
+
+    const rabbitMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.38,
+      metalness: 0.02,
+      emissive: new THREE.Color(0xf5f8ff),
+      emissiveIntensity: 0.18
+    });
+
+    // 兔身（饱满圆润）
+    const rBody = new THREE.Mesh(new THREE.SphereGeometry(0.18, 20, 20), rabbitMat);
+    rBody.scale.set(1.0, 0.9, 1.25);
+    rBody.position.y = 0.16;
+    rBody.castShadow = true;
+    rabbitGroup.add(rBody);
+
+    // 兔头
+    const rHead = new THREE.Mesh(new THREE.SphereGeometry(0.12, 16, 16), rabbitMat);
+    rHead.scale.set(0.95, 1.05, 1.1);
+    rHead.position.set(0, 0.29, 0.16);
+    rHead.castShadow = true;
+    rabbitGroup.add(rHead);
+
+    // 兔眼（晶莹红宝石色）
+    const eyeGeo = new THREE.SphereGeometry(0.018, 8, 8);
+    const eyeMat = new THREE.MeshStandardMaterial({
+      color: 0x990011,
+      roughness: 0.1,
+      metalness: 0.3,
+      emissive: new THREE.Color(0xee1133),
+      emissiveIntensity: 0.45
+    });
+    const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+    leftEye.position.set(0.09, 0.31, 0.22);
+    const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+    rightEye.position.set(-0.09, 0.31, 0.22);
+    rabbitGroup.add(leftEye, rightEye);
+
+    // 粉嫩小鼻子
+    const nose = new THREE.Mesh(
+      new THREE.SphereGeometry(0.01, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffafbd })
+    );
+    nose.position.set(0, 0.27, 0.28);
+    rabbitGroup.add(nose);
+
+    // 毛茸茸小尾巴
+    const tail = new THREE.Mesh(new THREE.SphereGeometry(0.065, 12, 12), rabbitMat);
+    tail.position.set(0, 0.15, -0.22);
+    rabbitGroup.add(tail);
+
+    // 灵动的长长兔耳朵
+    const earGeo = new THREE.CylinderGeometry(0.024, 0.042, 0.26, 12);
+    earGeo.translate(0, 0.13, 0);
+
+    const leftEarPivot = new THREE.Group();
+    leftEarPivot.position.set(0.05, 0.38, 0.12);
+    const leftEarMesh = new THREE.Mesh(earGeo, rabbitMat);
+    leftEarMesh.scale.set(0.7, 1.0, 0.4);
+    leftEarMesh.castShadow = true;
+    leftEarPivot.add(leftEarMesh);
+    leftEarPivot.rotation.z = -0.15;
+    leftEarPivot.rotation.x = -0.18;
+    rabbitGroup.add(leftEarPivot);
+
+    const rightEarPivot = new THREE.Group();
+    rightEarPivot.position.set(-0.05, 0.38, 0.12);
+    const rightEarMesh = new THREE.Mesh(earGeo, rabbitMat);
+    rightEarMesh.scale.set(0.7, 1.0, 0.4);
+    rightEarMesh.castShadow = true;
+    rightEarPivot.add(rightEarMesh);
+    rightEarPivot.rotation.z = 0.15;
+    rightEarPivot.rotation.x = -0.12;
+    rabbitGroup.add(rightEarPivot);
+
+    scene.add(rabbitGroup);
+
+    // ============================================================================
+    // 11. 荷花、荷苞与翠绿荷叶水景区
+    // ============================================================================
+    const lotusGroup = new THREE.Group();
+    lotusGroup.position.set(0.8, 0.0, 1.6);
+
+    // 11.1 大小错落的平展荷叶
+    const lotusLeafCoords = [
+      { x: 0.0, z: 0.0, r: 0.58, h: 0.02, tiltX: 0.05, tiltZ: -0.04 },
+      { x: -0.7, z: 0.5, r: 0.45, h: 0.08, tiltX: -0.08, tiltZ: 0.06 },
+      { x: 0.65, z: -0.4, r: 0.52, h: 0.03, tiltX: 0.06, tiltZ: 0.08 },
+      { x: -0.5, z: -0.7, r: 0.38, h: 0.15, tiltX: 0.12, tiltZ: -0.05 },
+      { x: 0.9, z: 0.6, r: 0.48, h: 0.02, tiltX: -0.05, tiltZ: -0.06 },
+      { x: -1.3, z: 0.1, r: 0.35, h: 0.02, tiltX: 0.04, tiltZ: 0.04 }
+    ];
+
+    lotusLeafCoords.forEach(c => {
+      const leafG = new THREE.CylinderGeometry(c.r, c.r, 0.015, 32);
+      const leafM = new THREE.MeshStandardMaterial({
+        map: lotusLeafTex,
+        roughness: 0.35,
+        metalness: 0.05,
+        side: THREE.DoubleSide
+      });
+      const lMesh = new THREE.Mesh(leafG, leafM);
+      lMesh.position.set(c.x, c.h, c.z);
+      lMesh.rotation.set(c.tiltX, Math.random() * Math.PI, c.tiltZ);
+      lMesh.castShadow = true;
+      lMesh.receiveShadow = true;
+      lotusGroup.add(lMesh);
+
+      if (c.h > 0.05) {
+        const stemG = new THREE.CylinderGeometry(0.018, 0.018, c.h + 0.4, 8);
+        const stemM = new THREE.MeshStandardMaterial({ color: 0x1f4a1c, roughness: 0.7 });
+        const stem = new THREE.Mesh(stemG, stemM);
+        stem.position.set(c.x, (c.h - 0.4) / 2, c.z);
+        lotusGroup.add(stem);
+      }
+
+      // 晶莹水珠
+      const dropG = new THREE.SphereGeometry(0.022, 12, 12);
+      const dropM = new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        roughness: 0.02,
+        metalness: 0.9,
+        transparent: true,
+        opacity: 0.85
+      });
+      const drop = new THREE.Mesh(dropG, dropM);
+      drop.position.set(c.x + 0.06, c.h + 0.015, c.z - 0.04);
+      lotusGroup.add(drop);
+    });
+
+    // 11.2 粉白相间的盛开荷花
+    function createLotusFlower(fx, fz, fh, scale, isBud = false) {
+      const fGroup = new THREE.Group();
+      fGroup.position.set(fx, fh, fz);
+
+      if (!isBud) {
+        const petalMat = new THREE.MeshStandardMaterial({
+          map: petalTex,
+          roughness: 0.28,
+          metalness: 0.05,
+          transparent: true,
+          side: THREE.DoubleSide
+        });
+
+        const podGeo = new THREE.CylinderGeometry(0.045 * scale, 0.03 * scale, 0.035 * scale, 12);
+        const podMat = new THREE.MeshStandardMaterial({ color: 0xc8dd45, roughness: 0.4 });
+        const pod = new THREE.Mesh(podGeo, podMat);
+        pod.position.y = 0.04 * scale;
+        fGroup.add(pod);
+
+        const stamenGeo = new THREE.TorusGeometry(0.052 * scale, 0.008 * scale, 8, 16);
+        const stamenMat = new THREE.MeshBasicMaterial({ color: 0xffc107 });
+        const stamen = new THREE.Mesh(stamenGeo, stamenMat);
+        stamen.rotation.x = Math.PI / 2;
+        stamen.position.y = 0.042 * scale;
+        fGroup.add(stamen);
+
+        const layers = [
+          { count: 6, rad: 0.12 * scale, lift: 0.03 * scale, slant: 0.75, pScale: 0.08 * scale },
+          { count: 8, rad: 0.18 * scale, lift: 0.02 * scale, slant: 0.52, pScale: 0.11 * scale },
+          { count: 8, rad: 0.24 * scale, lift: 0.01 * scale, slant: 0.32, pScale: 0.13 * scale }
+        ];
+
+        layers.forEach(l => {
+          for (let p = 0; p < l.count; p++) {
+            const pAng = (p / l.count) * Math.PI * 2;
+            const pMesh = new THREE.Mesh(new THREE.PlaneGeometry(l.pScale * 0.9, l.pScale * 1.6), petalMat);
+            pMesh.position.set(Math.cos(pAng) * l.rad, l.lift + l.pScale * 0.45, Math.sin(pAng) * l.rad);
+            pMesh.rotation.y = -pAng - Math.PI / 2;
+            pMesh.rotation.x = l.slant;
+            fGroup.add(pMesh);
+          }
+        });
+      } else {
+        const budGeo = new THREE.ConeGeometry(0.05 * scale, 0.18 * scale, 8);
+        const budMat = new THREE.MeshStandardMaterial({ color: 0xf48fb1, roughness: 0.35 });
+        const bud = new THREE.Mesh(budGeo, budMat);
+        bud.position.y = 0.09 * scale;
+        fGroup.add(bud);
+      }
+
+      const stemG = new THREE.CylinderGeometry(0.015 * scale, 0.018 * scale, fh + 0.3, 8);
+      const stemM = new THREE.MeshStandardMaterial({ color: 0x275924, roughness: 0.7 });
+      const stem = new THREE.Mesh(stemG, stemM);
+      stem.position.y = -(fh + 0.3) / 2 + 0.02;
+      fGroup.add(stem);
+
+      return fGroup;
+    }
+
+    lotusGroup.add(createLotusFlower(-0.15, 0.28, 0.18, 1.15, false));
+    lotusGroup.add(createLotusFlower(0.45, 0.15, 0.26, 0.95, false));
+    lotusGroup.add(createLotusFlower(-0.85, -0.2, 0.22, 0.85, true));
+    scene.add(lotusGroup);
+
+    // ============================================================================
+    // 12. 池水中小金鱼/锦鲤游弋系统
+    // ============================================================================
+    const fishGroup = new THREE.Group();
+    const fishCount = 5;
+    const fishList = [];
+
+    for (let f = 0; f < fishCount; f++) {
+      const fSub = new THREE.Group();
+
+      const fishColor = (f % 2 === 0) ? 0xf44336 : 0xff9800;
+      const fishMat = new THREE.MeshStandardMaterial({
+        color: fishColor,
+        roughness: 0.2,
+        metalness: 0.1,
+        emissive: new THREE.Color(fishColor),
+        emissiveIntensity: 0.2
+      });
+
+      const fBody = new THREE.Mesh(new THREE.ConeGeometry(0.045, 0.24, 12), fishMat);
+      fBody.rotation.x = Math.PI / 2;
+      fBody.scale.set(0.65, 1.0, 1.0);
+      fSub.add(fBody);
+
+      const tailJoint = new THREE.Group();
+      tailJoint.position.set(0, 0, -0.12);
+
+      const tailFinGeo = new THREE.PlaneGeometry(0.08, 0.14);
+      const tailFinMat = new THREE.MeshStandardMaterial({
+        color: 0xffccaa,
+        transparent: true,
+        opacity: 0.8,
+        roughness: 0.3,
+        side: THREE.DoubleSide
+      });
+      const tailFin = new THREE.Mesh(tailFinGeo, tailFinMat);
+      tailFin.position.set(0, 0, -0.07);
+      tailFin.rotation.y = Math.PI / 2;
+      tailJoint.add(tailFin);
+      fSub.add(tailJoint);
+
+      const finGeo = new THREE.PlaneGeometry(0.04, 0.07);
+      const leftFin = new THREE.Mesh(finGeo, tailFinMat);
+      leftFin.position.set(0.035, -0.01, 0.04);
+      leftFin.rotation.set(0.4, 0.6, -0.5);
+      const rightFin = new THREE.Mesh(finGeo, tailFinMat);
+      rightFin.position.set(-0.035, -0.01, 0.04);
+      rightFin.rotation.set(0.4, -0.6, 0.5);
+      fSub.add(leftFin, rightFin);
+
+      const swimRadius = 1.1 + f * 0.45;
+      const swimSpeed = 0.5 + Math.random() * 0.4;
+      const swimPhase = (f / fishCount) * Math.PI * 2;
+      const swimDepth = -0.08 - (f % 3) * 0.07;
+
+      fishList.push({
+        group: fSub,
+        tail: tailJoint,
+        radius: swimRadius,
+        speed: swimSpeed,
+        phase: swimPhase,
+        depth: swimDepth,
+        centerX: 0.4 + (f % 2) * 0.4,
+        centerZ: 1.2 - (f % 3) * 0.4
+      });
+
+      fishGroup.add(fSub);
+    }
+    scene.add(fishGroup);
+
+    // ============================================================================
+    // 13. 水面缭绕薄薄微光夜雾粒子 (Gentle Shimmering Night Mist)
+    // ============================================================================
+    const mistCount = 45;
+    const mistGeo = new THREE.BufferGeometry();
+    const mistPositions = new Float32Array(mistCount * 3);
+    const mistData = [];
+
+    for (let m = 0; m < mistCount; m++) {
+      const mx = (Math.random() - 0.5) * 12;
+      const my = 0.12 + Math.random() * 0.4;
+      const mz = (Math.random() - 0.5) * 12;
+      mistPositions[m * 3] = mx;
+      mistPositions[m * 3 + 1] = my;
+      mistPositions[m * 3 + 2] = mz;
+      mistData.push({
+        baseX: mx,
+        baseZ: mz,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+    mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPositions, 3));
+    const mistMat = new THREE.PointsMaterial({
+      color: 0xa8c5e2,
+      map: mistParticleTex,
+      size: 1.6,
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const mistPoints = new THREE.Points(mistGeo, mistMat);
+    scene.add(mistPoints);
+
+    // ============================================================================
+    // 14. 交互式多视角平滑运镜系统
+    // ============================================================================
+    const cameraPresets = {
+      full: {
+        pos: new THREE.Vector3(0.6, 3.2, 8.4),
+        target: new THREE.Vector3(0.1, 1.25, 0.0)
+      },
+      tea: {
+        pos: new THREE.Vector3(-1.35, 1.55, 0.45),
+        target: new THREE.Vector3(-1.7, 0.95, -0.85)
+      },
+      rabbit: {
+        pos: new THREE.Vector3(-0.15, 1.35, 2.35),
+        target: new THREE.Vector3(-0.6, 0.78, 0.82)
+      },
+      lotus: {
+        pos: new THREE.Vector3(2.4, 1.95, 3.7),
+        target: new THREE.Vector3(0.8, 0.38, 1.4)
+      }
+    };
+
+    let targetCamPos = cameraPresets.full.pos.clone();
+    let targetCamLook = cameraPresets.full.target.clone();
+    let isTransitioningCam = false;
+
+    const camButtons = document.querySelectorAll('.cam-btn');
+    camButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        camButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const key = btn.dataset.cam;
+        if (cameraPresets[key]) {
+          targetCamPos.copy(cameraPresets[key].pos);
+          targetCamLook.copy(cameraPresets[key].target);
+          isTransitioningCam = true;
+        }
+      });
+    });
+
+    controls.addEventListener('start', () => {
+      isTransitioningCam = false;
+    });
+
+    // ============================================================================
+    // 15. 主动画循环 (Animation Loop - 稳健 60FPS)
+    // ============================================================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsedTime = clock.getElapsedTime();
+
+      // 15.1 镜头平滑插值过渡
+      if (isTransitioningCam) {
+        camera.position.lerp(targetCamPos, 0.06);
+        controls.target.lerp(targetCamLook, 0.06);
+        if (camera.position.distanceTo(targetCamPos) < 0.02) {
+          isTransitioningCam = false;
+        }
+      }
+      controls.update();
+
+      // 15.2 水面微波流动法线贴图偏移
+      if (waterMat.normalMap) {
+        waterMat.normalMap.offset.x = (elapsedTime * 0.016) % 1;
+        waterMat.normalMap.offset.y = (elapsedTime * 0.011) % 1;
+      }
+      moonReflectMesh.material.opacity = 0.38 + Math.sin(elapsedTime * 1.8) * 0.06;
+
+      // 15.3 桂花树枝在夜风中轻微优雅摇曳
+      treeGroup.rotation.z = Math.sin(elapsedTime * 0.85) * 0.016;
+      treeGroup.rotation.x = Math.cos(elapsedTime * 0.65) * 0.012;
+
+      // 15.4 桂花花瓣飘落与水面涟漪漂浮计算
+      const dummyP = new THREE.Object3D();
+      for (let p = 0; p < petalParticleCount; p++) {
+        const pd = petalData[p];
+
+        if (pd.state === 'falling') {
+          pd.x += pd.vx + Math.sin(elapsedTime * 1.5 + p) * 0.003;
+          pd.y += pd.vy;
+          pd.z += pd.vz + Math.cos(elapsedTime * 1.2 + p) * 0.003;
+          pd.rotX += pd.vRotX;
+          pd.rotY += pd.vRotY;
+          pd.rotZ += pd.vRotZ;
+
+          if (pd.y <= 0.015) {
+            pd.y = 0.012;
+            pd.state = 'floating';
+            pd.floatTimer = 0;
+            pd.rotX = Math.PI / 2;
+            pd.rotZ = Math.random() * Math.PI * 2;
+          }
+        } else {
+          pd.floatTimer += 0.016;
+          pd.x -= 0.0022;
+          pd.z += Math.sin(elapsedTime * 2.0 + p) * 0.0014;
+
+          if (pd.floatTimer > 6.5) {
+            pd.x = treeGroup.position.x - 1.2 + (Math.random() - 0.5) * 2.8;
+            pd.y = 2.4 + Math.random() * 2.2;
+            pd.z = treeGroup.position.z + 0.6 + (Math.random() - 0.5) * 2.8;
+            pd.state = 'falling';
+          }
+        }
+
+        dummyP.position.set(pd.x, pd.y, pd.z);
+        dummyP.rotation.set(pd.rotX, pd.rotY, pd.rotZ);
+        dummyP.scale.setScalar(pd.state === 'floating' ? 0.95 : 1.0);
+        dummyP.updateMatrix();
+        fallingPetalsMesh.setMatrixAt(p, dummyP.matrix);
+      }
+      fallingPetalsMesh.instanceMatrix.needsUpdate = true;
+
+      // 15.5 玉兔灵动行为：耳朵偶尔转动扇动、微弱呼吸起伏
+      const earTwitchCycle = Math.sin(elapsedTime * 0.7);
+      if (earTwitchCycle > 0.88) {
+        const twitch = Math.sin(elapsedTime * 22) * 0.18;
+        leftEarPivot.rotation.z = -0.15 + twitch;
+        rightEarPivot.rotation.z = 0.15 - twitch * 0.8;
+        rightEarPivot.rotation.x = -0.12 + Math.cos(elapsedTime * 18) * 0.12;
+      } else {
+        leftEarPivot.rotation.z = -0.15 + Math.sin(elapsedTime * 1.2) * 0.03;
+        rightEarPivot.rotation.z = 0.15 + Math.cos(elapsedTime * 1.5) * 0.03;
+      }
+      rBody.scale.y = 0.9 + Math.sin(elapsedTime * 2.2) * 0.02;
+
+      // 15.6 小金鱼池中摆尾环游
+      fishList.forEach(fish => {
+        fish.phase += fish.speed * 0.018;
+        const fx = fish.centerX + Math.cos(fish.phase) * fish.radius;
+        const fz = fish.centerZ + Math.sin(fish.phase) * (fish.radius * 0.85);
+
+        fish.group.position.set(fx, fish.depth + Math.sin(elapsedTime * 2.0 + fish.phase) * 0.015, fz);
+
+        const nextX = fish.centerX + Math.cos(fish.phase + 0.02) * fish.radius;
+        const nextZ = fish.centerZ + Math.sin(fish.phase + 0.02) * (fish.radius * 0.85);
+        fish.group.rotation.y = Math.atan2(nextX - fx, nextZ - fz);
+
+        fish.tail.rotation.y = Math.sin(elapsedTime * 7.5 + fish.phase * 3) * 0.45;
+      });
+
+      // 15.7 水面薄雾缓步漂浮与热茶蒸汽升腾
+      const mPos = mistGeo.attributes.position;
+      for (let m = 0; m < mistCount; m++) {
+        const md = mistData[m];
+        const newX = md.baseX + Math.sin(elapsedTime * 0.22 + md.phase) * 1.2;
+        const newZ = md.baseZ + Math.cos(elapsedTime * 0.18 + md.phase) * 1.2;
+        mPos.setX(m, newX);
+        mPos.setZ(m, newZ);
+      }
+      mistGeo.attributes.position.needsUpdate = true;
+
+      const sPos = steamGeo.attributes.position;
+      for (let s = 0; s < steamCount; s++) {
+        let sy = sPos.getY(s) + steamSeeds[s].speed * 0.016;
+        if (sy > 0.88) {
+          sy = 0.58;
+          sPos.setX(s, steamSeeds[s].baseX + (Math.random() - 0.5) * 0.03);
+          sPos.setZ(s, steamSeeds[s].baseZ + (Math.random() - 0.5) * 0.03);
+        }
+        sPos.setY(s, sy);
+        sPos.setX(s, sPos.getX(s) + Math.sin(elapsedTime * 3.0 + s) * 0.0008);
+      }
+      steamGeo.attributes.position.needsUpdate = true;
+
+      // 15.8 红纸灯笼微弱烛光呼吸明暗
+      const flicker = Math.sin(elapsedTime * 4.5) * 0.08 + Math.cos(elapsedTime * 9.2) * 0.05;
+      lanternLightList.forEach(l => {
+        l.intensity = 1.85 + flicker;
+      });
+
+      // 15.9 后期辉光合成渲染
+      composer.render();
+    }
+
+    // ============================================================================
+    // 16. 窗口自适应缩放响应
+    // ============================================================================
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      updateCameraAspect();
+
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      composer.setSize(w, h);
+      bloomPass.resolution.set(w, h);
+    });
+
+    animate();
+  </script>
+
+  <script src="../prompt-panel.js" data-id="midautumn"></script>
+</body>
+</html>

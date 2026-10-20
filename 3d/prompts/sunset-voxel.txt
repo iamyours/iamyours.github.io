@@ -1,0 +1,14 @@
+用 three.js 做一个简化版 Minecraft 风格的体素世界「永恒日落」（单文件，适合网页展示）。
+世界是程序生成的体素地形（用自写的简单噪声函数，约 96×96 范围，用 InstancedMesh 或合并几何体保证性能），要有大海、沙滩海岸线、草地山丘和方块树林。
+画面是重点：永恒的日落——太阳是一颗清晰的橙色圆日，低悬在海面上；天空用 Shader 做完整的晚霞渐变（朝阳一侧金色、背阳一侧粉紫）；海面有一条通向地平线的金色日光路反射；薄雾（Fog）、长长的阴影和 UnrealBloomPass 辉光。打开第一眼就要被落日震住。
+交互：默认是 OrbitControls 的缓慢自动环绕俯瞰视角（autoRotate），可以拖动和缩放；另外提供一个按钮「滑翔模式」，切换为摄像机沿着海岸线自动平滑飞行的电影镜头，再按一次回到环绕视角。不需要破坏/放置方块和物品栏。
+
+【通用技术要求】
+- 输出一个可直接在现代浏览器打开的完整单文件 HTML，写入当前目录的 index.html。页面语言 zh-CN，标题用中文。
+- 使用 Three.js r160，通过 importmap 从 CDN 固定版本加载："three": "https://unpkg.com/three@0.160.0/build/three.module.js"，"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"。除此之外不引用任何外部资源。
+- 所有几何体、材质、贴图都用代码程序化生成（可用 Canvas/Shader 生成贴图），不要加载 glb/gltf/obj/fbx、图片或 SVG。
+- 使用 OrbitControls 支持拖动旋转、滚轮/双指缩放（第一人称玩法的场景除外，按场景说明）。
+- 画布全屏、响应式适配窗口大小变化和手机屏幕，devicePixelRatio 最多取 2，目标稳定 60FPS。
+- 页面左上角放一个固定的链接「← 返回 3D 作品」，href="../"，半透明奶油色圆角小按钮样式。
+- 在 </body> 前加上这一行（原样保留，用于展示提示词）：<script src="../prompt-panel.js" data-id="sunset-voxel"></script>
+- 控制台不能有报错。不要问我任何问题，直接构建。
