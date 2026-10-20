@@ -299,6 +299,60 @@
       border-radius: 12px;
     }
 
+    /* 每个场景一组：CLI 版 与 Gemini 网页版并排 */
+    .scene-groups {
+      display: flex;
+      flex-direction: column;
+      gap: 26px;
+    }
+
+    .scene-group-head {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 4px 12px;
+      margin: 0 0 12px;
+      padding-bottom: 8px;
+      border-bottom: 2px dashed rgba(58, 46, 36, 0.35);
+    }
+
+    .scene-group-title {
+      margin: 0;
+      font-size: 21px;
+      font-weight: 800;
+    }
+
+    .scene-group-desc {
+      margin: 0;
+      font-size: 14px;
+      opacity: 0.85;
+    }
+
+    .variant-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 2;
+      font-size: 12.5px;
+      font-weight: 800;
+      padding: 3px 10px;
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+      box-shadow: 0 2px 0 var(--ink);
+      background-color: var(--highlight);
+      color: var(--ink);
+    }
+
+    .variant-badge.is-web {
+      background-color: #bcd9f5;
+    }
+
+    .chat-link {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
     @media (max-width: 720px) {
       body {
         padding: 12px 10px 32px;
@@ -336,10 +390,10 @@
 
     <main class="gallery-main">
       <p class="intro-banner">
-        这些 3D 场景都由 Gemini 通过 Antigravity CLI 根据提示词生成，纯代码程序化建模，可以拖动旋转、缩放。
+        这些 3D 场景都由 Gemini 根据提示词生成，纯代码程序化建模，可以拖动旋转、缩放。每个场景两个版本并排：<b>CLI 版</b>（Antigravity CLI 生成）和 <b>Gemini 网页版（4 Argon）</b>，需求相同，方便对比。
       </p>
 
-      <div id="scene-grid" class="scene-grid"></div>
+      <div id="scene-groups" class="scene-groups"></div>
     </main>
   </div>
 
@@ -348,33 +402,54 @@
     const SCENES = [
       {
         id: 'pelican',
+        geminiChat: 'https://gemini.google.com/app/2bdb9ed47de306b3',
         title: '鹈鹕骑自行车',
         description: '社区经典基准题：鹈鹕踩着脚踏沿环形小路骑行，腿、曲柄、车轮联动。',
         gradient: 'linear-gradient(135deg, #d8efc2 0%, #f7e3a1 55%, #f5c396 100%)'
       },
       {
         id: 'midautumn',
+        geminiChat: 'https://gemini.google.com/app/35d65d970fa10510',
         title: '中秋月夜水榭',
         description: '满月、金桂花雨、水榭倒影与灯笼暖光，一个静谧的中秋角落。',
         gradient: 'linear-gradient(135deg, #c7d4ec 0%, #e4d5ec 50%, #f6dca6 100%)'
       },
       {
         id: 'jet-engine',
+        geminiChat: 'https://gemini.google.com/app/f1ba4d863a744b23',
         title: '交互式喷气发动机',
         description: '风扇与轴旋转，点「分解」看各级部件沿轴线展开，悬停查看作用。',
         gradient: 'linear-gradient(135deg, #cde4ec 0%, #dfeaf2 50%, #f5d9a8 100%)'
       },
       {
         id: 'temple',
+        geminiChat: 'https://gemini.google.com/app/56fe4c1689886f30',
         title: '天坛祈年殿',
         description: '三重蓝色琉璃圆顶与汉白玉台基，可一键爆炸 / 重组。',
         gradient: 'linear-gradient(135deg, #bfd8ee 0%, #e5ecf4 52%, #f4d599 100%)'
       },
       {
         id: 'sunset-voxel',
+        geminiChat: 'https://gemini.google.com/app/dad27eee792fcd35',
         title: '永恒日落 · 体素世界',
         description: '程序生成的方块海岸，一颗低悬海面的橙色落日。',
         gradient: 'linear-gradient(135deg, #f7c59f 0%, #f7dca8 50%, #bfe1d9 100%)'
+      }
+    ];
+
+    // 每个场景两个版本：CLI 版（目录 <id>/）与 Gemini 网页版（目录 <id>-web/）
+    const VARIANTS = [
+      {
+        suffix: '',
+        badge: 'CLI 版',
+        badgeClass: '',
+        note: 'Gemini 通过 Antigravity CLI 生成。'
+      },
+      {
+        suffix: '-web',
+        badge: 'Gemini 网页版（4 Argon）',
+        badgeClass: 'is-web',
+        note: '同样的需求，在 Gemini 网页上用 4 Argon（思考：高）生成。'
       }
     ];
 
@@ -444,7 +519,12 @@
       return p;
     }
 
-    function createSceneCard(scene) {
+    function createSceneCard(base, variant) {
+      const scene = Object.assign({}, base, {
+        id: base.id + variant.suffix,
+        title: base.title + ' · ' + variant.badge,
+        description: variant.note
+      });
       const card = document.createElement('article');
       card.className = 'scene-card';
       card.dataset.sceneId = scene.id;
@@ -478,13 +558,18 @@
       thumbWrap.appendChild(fallbackLabel);
       thumbWrap.appendChild(img);
 
+      const badgeEl = document.createElement('span');
+      badgeEl.className = 'variant-badge ' + variant.badgeClass;
+      badgeEl.textContent = variant.badge;
+      thumbWrap.appendChild(badgeEl);
+
       // 卡片内容区域
       const body = document.createElement('div');
       body.className = 'card-body';
 
-      const titleEl = document.createElement('h2');
+      const titleEl = document.createElement('h3');
       titleEl.className = 'scene-title';
-      titleEl.textContent = scene.title;
+      titleEl.textContent = variant.badge;
 
       const descEl = document.createElement('p');
       descEl.className = 'scene-desc';
@@ -506,6 +591,16 @@
 
       actionsEl.appendChild(enterLink);
       actionsEl.appendChild(togglePromptBtn);
+
+      if (variant.suffix === '-web' && base.geminiChat) {
+        const chatLink = document.createElement('a');
+        chatLink.className = 'chat-link';
+        chatLink.href = base.geminiChat;
+        chatLink.target = '_blank';
+        chatLink.rel = 'noopener';
+        chatLink.textContent = '💬 Gemini 对话记录';
+        actionsEl.appendChild(chatLink);
+      }
 
       // 提示词展开区域
       const promptSection = document.createElement('div');
@@ -575,13 +670,36 @@
     }
 
     function renderGallery() {
-      const grid = document.getElementById('scene-grid');
-      if (!grid) return;
+      const groups = document.getElementById('scene-groups');
+      if (!groups) return;
       const frag = document.createDocumentFragment();
       SCENES.forEach((scene) => {
-        frag.appendChild(createSceneCard(scene));
+        const section = document.createElement('section');
+        section.className = 'scene-group';
+        section.dataset.group = scene.id;
+
+        const head = document.createElement('div');
+        head.className = 'scene-group-head';
+        const h = document.createElement('h2');
+        h.className = 'scene-group-title';
+        h.textContent = scene.title;
+        const d = document.createElement('p');
+        d.className = 'scene-group-desc';
+        d.textContent = scene.description;
+        head.appendChild(h);
+        head.appendChild(d);
+
+        const grid = document.createElement('div');
+        grid.className = 'scene-grid';
+        VARIANTS.forEach((variant) => {
+          grid.appendChild(createSceneCard(scene, variant));
+        });
+
+        section.appendChild(head);
+        section.appendChild(grid);
+        frag.appendChild(section);
       });
-      grid.appendChild(frag);
+      groups.appendChild(frag);
     }
 
     renderGallery();

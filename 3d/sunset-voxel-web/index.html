@@ -1,0 +1,1168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>永恒日落 - Minecraft 体素世界</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #14091c;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    /* 左上角固定返回按钮 */
+    .back-btn {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 100;
+      padding: 9px 18px;
+      background: rgba(255, 248, 235, 0.85);
+      color: #4a2a18;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 999px;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25), inset 0 1px 1px rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(255, 225, 190, 0.6);
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+      letter-spacing: 0.5px;
+    }
+    .back-btn:hover {
+      background: rgba(255, 252, 245, 0.98);
+      transform: translateY(-2px);
+      box-shadow: 0 6px 22px rgba(255, 130, 50, 0.38);
+    }
+    .back-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 右上角氛围标题区 */
+    .title-badge {
+      position: fixed;
+      top: 20px;
+      right: 24px;
+      z-index: 90;
+      text-align: right;
+      color: #fff5e8;
+      pointer-events: none;
+      text-shadow: 0 2px 14px rgba(35, 5, 20, 0.75);
+    }
+    .title-badge h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      margin-bottom: 3px;
+      background: linear-gradient(90deg, #ffe8b8, #ff9e68);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .title-badge p {
+      font-size: 12px;
+      opacity: 0.82;
+      letter-spacing: 1px;
+    }
+
+    /* 底部交互控制栏 */
+    .ui-bottom {
+      position: fixed;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+    .mode-btn {
+      cursor: pointer;
+      padding: 12px 30px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff8f0;
+      background: linear-gradient(135deg, rgba(255, 118, 45, 0.86), rgba(185, 48, 88, 0.86));
+      border: 1px solid rgba(255, 215, 165, 0.55);
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 8px 26px rgba(235, 75, 40, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+      transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: 1px;
+    }
+    .mode-btn:hover {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 10px 32px rgba(255, 110, 50, 0.62), inset 0 1px 2px rgba(255, 255, 255, 0.6);
+      border-color: rgba(255, 235, 195, 0.85);
+    }
+    .mode-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+    .mode-btn.active {
+      background: linear-gradient(135deg, rgba(60, 175, 215, 0.88), rgba(95, 65, 185, 0.88));
+      box-shadow: 0 8px 28px rgba(70, 155, 235, 0.48), inset 0 1px 1px rgba(255, 255, 255, 0.45);
+      border-color: rgba(180, 235, 255, 0.75);
+    }
+    .hint-text {
+      font-size: 12px;
+      color: rgba(255, 236, 215, 0.78);
+      text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+      letter-spacing: 0.6px;
+      pointer-events: none;
+      text-align: center;
+    }
+
+    /* 电影模式上下柔和遮幅渐变 */
+    .cinematic-bar {
+      position: fixed;
+      left: 0;
+      width: 100%;
+      height: 0;
+      background: rgba(10, 4, 15, 0.82);
+      z-index: 80;
+      transition: height 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+      pointer-events: none;
+    }
+    .cinematic-bar.top { top: 0; }
+    .cinematic-bar.bottom { bottom: 0; }
+    body.gliding .cinematic-bar {
+      height: 5.5vh;
+    }
+
+    @media (max-width: 600px) {
+      .back-btn {
+        top: 14px;
+        left: 14px;
+        padding: 7px 14px;
+        font-size: 13px;
+      }
+      .title-badge {
+        top: 16px;
+        right: 16px;
+      }
+      .title-badge h1 {
+        font-size: 16px;
+      }
+      .title-badge p {
+        font-size: 11px;
+      }
+      .ui-bottom {
+        bottom: 22px;
+      }
+      .mode-btn {
+        padding: 10px 24px;
+        font-size: 14px;
+      }
+    }
+  </style>
+
+  <!-- Three.js r160 Import Map -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div class="title-badge">
+    <h1>永恒日落</h1>
+    <p>ETERNAL SUNSET · 96×96 体素群岛</p>
+  </div>
+
+  <div class="cinematic-bar top"></div>
+  <div class="cinematic-bar bottom"></div>
+
+  <div class="ui-bottom">
+    <button id="glideBtn" class="mode-btn">
+      <span id="btnIcon">🕊️</span>
+      <span id="btnText">滑翔模式</span>
+    </button>
+    <div id="hintText" class="hint-text">拖拽旋转视角 · 滚轮/双指缩放 · 感受落日余晖</div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+    // ==========================================
+    // 1. 场景、相机、渲染器与后期处理初始化
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    // 远处暖紫橙薄雾，与地平线霞光自然融合
+    const FOG_COLOR = new THREE.Color(0xd96846);
+    scene.fog = new THREE.FogExp2(FOG_COLOR, 0.0046);
+
+    const camera = new THREE.PerspectiveCamera(
+      48,
+      window.innerWidth / window.innerHeight,
+      0.5,
+      1000
+    );
+    // 开屏第一眼：从海岸山林上方望向落日与金色海面光路
+    camera.position.set(16, 22, 62);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    // UnrealBloomPass 辉光
+    const renderScene = new RenderPass(scene, camera);
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.58, // 辉光强度
+      0.72, // 辉光半径
+      0.66  // 辉光阈值（仅让夕阳、晚霞亮部和金色水路发光）
+    );
+    const composer = new EffectComposer(renderer);
+    composer.addPass(renderScene);
+    composer.addPass(bloomPass);
+
+    // 轨道控制器
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 3.5, -12);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.045;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.38;
+    controls.maxPolarAngle = Math.PI * 0.485; // 防止穿入海底
+    controls.minDistance = 12;
+    controls.maxDistance = 135;
+    controls.update();
+
+    // ==========================================
+    // 2. 落日方位与长阴影立体光照系统
+    // ==========================================
+    // 太阳低悬在正北偏西（-Z 方向）的海平线上
+    const sunAzimuth = 0.0;
+    const sunElevation = 0.072; // 约 4.1 度仰角，贴近海平线
+    const sunDir = new THREE.Vector3(
+      Math.sin(sunAzimuth) * Math.cos(sunElevation),
+      Math.sin(sunElevation),
+      -Math.cos(sunAzimuth) * Math.cos(sunElevation)
+    ).normalize();
+
+    const sunDistance = 380;
+    const sunPosition = sunDir.clone().multiplyScalar(sunDistance);
+
+    // 主夕阳平行光（投射修长树影与山丘阴影）
+    const sunLight = new THREE.DirectionalLight(0xff8c3b, 3.6);
+    sunLight.position.set(sunDir.x * 95, 22, sunDir.z * 95); // 略微抬高阴影投射角以兼顾超长树影与精度
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 240;
+    const shadowBound = 68;
+    sunLight.shadow.camera.left = -shadowBound;
+    sunLight.shadow.camera.right = shadowBound;
+    sunLight.shadow.camera.top = shadowBound;
+    sunLight.shadow.camera.bottom = -shadowBound;
+    sunLight.shadow.bias = -0.0006;
+    sunLight.shadow.normalBias = 0.03;
+    scene.add(sunLight);
+
+    // 天空半球光（天顶暮色紫蓝 + 地面暖橙反光）
+    const hemiLight = new THREE.HemisphereLight(0x8e569c, 0xd96b43, 1.15);
+    scene.add(hemiLight);
+
+    // 背光侧柔光补光，让阴影呈现通透的暮色紫而非死黑
+    const fillLight = new THREE.DirectionalLight(0x7c4d8b, 0.7);
+    fillLight.position.set(-sunDir.x * 60, 35, -sunDir.z * 60);
+    scene.add(fillLight);
+
+    // ==========================================
+    // 3. 永恒日落天空球 Shader + 清晰橙色圆日
+    // ==========================================
+    const skyGeo = new THREE.SphereGeometry(460, 48, 32);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        uSunDir: { value: sunDir },
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorldPos;
+        uniform vec3 uSunDir;
+        uniform float uTime;
+
+        // 简易二维哈希与平滑噪声（用于柔和高空暮云）
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = hash(i);
+          float b = hash(i + vec2(1.0, 0.0));
+          float c = hash(i + vec2(0.0, 1.0));
+          float d = hash(i + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+
+        void main() {
+          vec3 dir = normalize(vWorldPos);
+          float y = clamp(dir.y, 0.0, 1.0);
+
+          // 朝阳度：1.0 为正对太阳一侧，0.0 为背阳一侧
+          float sunSide = clamp(dot(normalize(dir.xz), normalize(uSunDir.xz)) * 0.5 + 0.5, 0.0, 1.0);
+          float sunDot = max(dot(dir, uSunDir), 0.0);
+
+          // 朝阳一侧（炽热金黄 -> 晚霞琥珀橙 -> 暮紫）
+          vec3 sunHorizon = vec3(1.0, 0.64, 0.22);
+          vec3 sunMid     = vec3(0.95, 0.35, 0.30);
+          vec3 sunZenith  = vec3(0.24, 0.14, 0.36);
+
+          // 背阳一侧（粉紫霞光 -> 玫瑰品红 -> 深邃夜空紫蓝）
+          vec3 antiHorizon = vec3(0.76, 0.36, 0.56);
+          vec3 antiMid     = vec3(0.46, 0.20, 0.45);
+          vec3 antiZenith  = vec3(0.11, 0.08, 0.22);
+
+          vec3 horizonCol = mix(antiHorizon, sunHorizon, pow(sunSide, 1.25));
+          vec3 midCol     = mix(antiMid, sunMid, sunSide);
+          vec3 zenithCol  = mix(antiZenith, sunZenith, sunSide);
+
+          // 垂直高度平滑过渡
+          vec3 skyCol = mix(horizonCol, midCol, smoothstep(0.0, 0.26, y));
+          skyCol = mix(skyCol, zenithCol, smoothstep(0.20, 0.78, y));
+
+          // 太阳周围的大气散射金芒
+          float mieGlow = pow(sunDot, 7.0) * 0.65 + pow(sunDot, 36.0) * 0.75;
+          skyCol += vec3(1.0, 0.52, 0.16) * mieGlow;
+
+          // 地平线金色霞光带
+          float horizonBand = exp(-abs(dir.y) * 14.0) * (0.28 + 0.52 * pow(sunSide, 2.0));
+          skyCol += vec3(1.0, 0.48, 0.20) * horizonBand;
+
+          // 高空轻柔层云染上金紫余晖
+          if (dir.y > 0.02) {
+            vec2 cloudUV = dir.xz / (dir.y + 0.16) * 1.4 + vec2(uTime * 0.012, 0.0);
+            float c = noise(cloudUV * 2.2) * 0.65 + noise(cloudUV * 5.0) * 0.35;
+            float cloudMask = smoothstep(0.54, 0.78, c) * smoothstep(0.02, 0.18, y) * smoothstep(0.65, 0.2, y);
+            vec3 cloudColor = mix(vec3(0.75, 0.32, 0.52), vec3(1.0, 0.68, 0.32), pow(sunSide, 1.5));
+            skyCol = mix(skyCol, cloudColor, cloudMask * 0.35);
+          }
+
+          gl_FragColor = vec4(skyCol, 1.0);
+        }
+      `
+    });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyMesh);
+
+    // 清晰的橙色圆日（低悬在海面上，带柔和边缘与复古分层感）
+    const sunRadius = 38;
+    const sunGeo = new THREE.CircleGeometry(sunRadius, 64);
+    const sunMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      fog: false,
+      uniforms: {
+        uTime: { value: 0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv * 2.0 - 1.0;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec2 vUv;
+        uniform float uTime;
+        void main() {
+          float r = length(vUv);
+          if (r > 1.0) discard;
+
+          // 边缘清晰但抗锯齿的圆盘
+          float edge = 1.0 - smoothstep(0.955, 1.0, r);
+
+          // 从上到下由亮金黄渐变为赤红橙
+          float grad = clamp(vUv.y * 0.5 + 0.5, 0.0, 1.0);
+          vec3 topColor = vec3(1.45, 0.96, 0.42);    // HDR 高亮暖金，触发适度 Bloom
+          vec3 bottomColor = vec3(1.25, 0.36, 0.12); // 贴近海平面的深橙红
+          vec3 col = mix(bottomColor, topColor, pow(grad, 0.85));
+
+          // 太阳下半部分轻微大气折射微波纹
+          if (vUv.y < -0.15) {
+            float wave = sin(vUv.y * 42.0 - uTime * 2.2) * 0.5 + 0.5;
+            float cut = smoothstep(0.15, 0.0, abs(vUv.y + 0.55) * (1.0 - wave * 0.25));
+            col *= (1.0 - cut * 0.08);
+          }
+
+          gl_FragColor = vec4(col, edge);
+        }
+      `
+    });
+    const sunDisc = new THREE.Mesh(sunGeo, sunMat);
+    sunDisc.position.copy(sunPosition);
+    sunDisc.lookAt(0, 0, 0);
+    scene.add(sunDisc);
+
+    // ==========================================
+    // 4. 程序化像素方块纹理生成器（Minecraft 风格）
+    // ==========================================
+    function createNoiseTexture(drawFn) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext('2d');
+      drawFn(ctx);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.magFilter = THREE.NearestFilter;
+      tex.minFilter = THREE.NearestFilter;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.needsUpdate = true;
+      return tex;
+    }
+
+    // 确定性伪随机函数，保证纹理干净统一
+    let texSeed = 1337;
+    function nextRand() {
+      texSeed = (texSeed * 16807) % 2147483647;
+      return (texSeed - 1) / 2147483646;
+    }
+
+    function fillPixelNoise(ctx, baseHex, paletteOffsets, borderShade = 0.06) {
+      const base = new THREE.Color(baseHex);
+      for (let y = 0; y < 16; y++) {
+        for (let x = 0; x < 16; x++) {
+          const offset = paletteOffsets[Math.floor(nextRand() * paletteOffsets.length)];
+          const c = base.clone();
+          c.offsetHSL(offset.h || 0, offset.s || 0, offset.l || 0);
+          // 轻微体素边框暗角，凸显 Minecraft 方块颗粒感
+          if (x === 0 || y === 0 || x === 15 || y === 15) {
+            c.multiplyScalar(1 - borderShade);
+          }
+          ctx.fillStyle = `#${c.getHexString()}`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    }
+
+    // 1) 沙滩方块纹理
+    const sandTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#e6c57a', [
+        { l: 0.03 }, { l: 0.0 }, { l: -0.03 }, { h: -0.01, l: -0.05 }
+      ], 0.05);
+    });
+
+    // 2) 草地方块纹理（顶面翠绿带暖意、侧面草皮垂落泥土、底面泥土）
+    const grassTopTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#689f38', [
+        { l: 0.04 }, { l: 0.0 }, { l: -0.03 }, { h: 0.02, l: 0.02 }
+      ], 0.06);
+    });
+
+    const dirtTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#79553a', [
+        { l: 0.03 }, { l: 0.0 }, { l: -0.04 }, { l: -0.07 }
+      ], 0.06);
+    });
+
+    const grassSideTex = createNoiseTexture((ctx) => {
+      // 先画泥土底层
+      fillPixelNoise(ctx, '#79553a', [
+        { l: 0.03 }, { l: 0.0 }, { l: -0.04 }, { l: -0.06 }
+      ], 0.06);
+      // 顶部草皮锯齿边缘
+      const grassBase = new THREE.Color('#689f38');
+      for (let x = 0; x < 16; x++) {
+        const grassDepth = 3 + Math.floor(nextRand() * 4);
+        for (let y = 0; y < grassDepth; y++) {
+          const c = grassBase.clone().offsetHSL(0, 0, (nextRand() - 0.5) * 0.06);
+          if (x === 0 || x === 15 || y === 0) c.multiplyScalar(0.94);
+          ctx.fillStyle = `#${c.getHexString()}`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    });
+
+    // 3) 岩石方块纹理（山腰裸露岩层）
+    const stoneTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#7b767c', [
+        { l: 0.04 }, { l: 0.0 }, { l: -0.04 }, { l: -0.07 }
+      ], 0.07);
+    });
+
+    // 4) 橡木树干纹理（竖向树皮纹理 + 年轮顶面）
+    const woodSideTex = createNoiseTexture((ctx) => {
+      const base = new THREE.Color('#5c3d28');
+      for (let x = 0; x < 16; x++) {
+        const colOffset = ((x % 4 === 0) ? -0.05 : 0.01) + (nextRand() - 0.5) * 0.03;
+        for (let y = 0; y < 16; y++) {
+          const c = base.clone().offsetHSL(0, 0, colOffset + (nextRand() - 0.5) * 0.03);
+          ctx.fillStyle = `#${c.getHexString()}`;
+          ctx.fillRect(x, y, 1, 1);
+        }
+      }
+    });
+
+    const woodTopTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#9c7853', [{ l: 0.02 }, { l: -0.02 }], 0.08);
+      ctx.strokeStyle = '#5c3d28';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(1, 1, 14, 14);
+    });
+
+    // 5) 树叶纹理（略带秋日暖金绿，迎合落日氛围）
+    const leavesTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#477a32', [
+        { h: -0.03, l: 0.05 },
+        { l: 0.01 },
+        { l: -0.04 },
+        { h: -0.05, l: 0.07 } // 点缀落日金叶
+      ], 0.08);
+    });
+
+    // 6) 海岸灯塔/遗迹发光萤石纹理
+    const lanternTex = createNoiseTexture((ctx) => {
+      fillPixelNoise(ctx, '#ffca62', [
+        { l: 0.1 }, { l: 0.0 }, { l: -0.08 }
+      ], 0.12);
+    });
+
+    // 构建立方体材质
+    const sandMat = new THREE.MeshStandardMaterial({ map: sandTex, roughness: 0.9, metalness: 0.05 });
+    const dirtMat = new THREE.MeshStandardMaterial({ map: dirtTex, roughness: 0.92 });
+    const stoneMat = new THREE.MeshStandardMaterial({ map: stoneTex, roughness: 0.85 });
+    const grassTopMat = new THREE.MeshStandardMaterial({ map: grassTopTex, roughness: 0.88 });
+    const grassSideMat = new THREE.MeshStandardMaterial({ map: grassSideTex, roughness: 0.88 });
+    const grassMaterials = [
+      grassSideMat, grassSideMat,
+      grassTopMat, dirtMat,
+      grassSideMat, grassSideMat
+    ];
+
+    const woodSideMat = new THREE.MeshStandardMaterial({ map: woodSideTex, roughness: 0.9 });
+    const woodTopMat = new THREE.MeshStandardMaterial({ map: woodTopTex, roughness: 0.9 });
+    const woodMaterials = [
+      woodSideMat, woodSideMat,
+      woodTopMat, woodTopMat,
+      woodSideMat, woodSideMat
+    ];
+
+    const leavesMat = new THREE.MeshStandardMaterial({
+      map: leavesTex,
+      roughness: 0.82
+    });
+
+    const lanternMat = new THREE.MeshStandardMaterial({
+      map: lanternTex,
+      emissive: new THREE.Color(0xff9d3b),
+      emissiveIntensity: 1.8,
+      roughness: 0.4
+    });
+
+    // ==========================================
+    // 5. 自写 2D 平滑噪声与 96×96 体素群岛生成
+    // ==========================================
+    const WORLD_SIZE = 96;
+    const HALF_WORLD = WORLD_SIZE / 2;
+
+    // 自写二维 Value Noise + FBM 分形布朗运动
+    function hash2D(ix, iz) {
+      let n = ix * 374761393 + iz * 668265263;
+      n = (n ^ (n >> 13)) * 1274126177;
+      return ((n ^ (n >> 16)) >>> 0) / 4294967295;
+    }
+
+    function valueNoise2D(x, z) {
+      const ix = Math.floor(x);
+      const iz = Math.floor(z);
+      const fx = x - ix;
+      const fz = z - iz;
+      const ux = fx * fx * (3.0 - 2.0 * fx);
+      const uz = fz * fz * (3.0 - 2.0 * fz);
+
+      const a = hash2D(ix, iz);
+      const b = hash2D(ix + 1, iz);
+      const c = hash2D(ix, iz + 1);
+      const d = hash2D(ix + 1, iz + 1);
+
+      return a + (b - a) * ux + (c - a) * uz + (a - b - c + d) * ux * uz;
+    }
+
+    function fbm(x, z, octaves = 4) {
+      let value = 0;
+      let amp = 0.5;
+      let freq = 1.0;
+      for (let i = 0; i < octaves; i++) {
+        value += amp * valueNoise2D(x * freq, z * freq);
+        freq *= 2.02;
+        amp *= 0.5;
+      }
+      return value;
+    }
+
+    // 地形高度计算：设计一条开放的中央海湾（正对北侧夕阳），两侧环抱沙滩、草地山丘与森林
+    function getTerrainHeight(x, z) {
+      const nx = x / HALF_WORLD; // -1 ~ 1
+      const nz = z / HALF_WORLD; // -1 ~ 1
+
+      // 基础分形起伏
+      const n1 = fbm((x + 120) * 0.036, (z + 120) * 0.036, 4);
+      const n2 = valueNoise2D((x - 50) * 0.08, (z + 80) * 0.08);
+      let rawElevation = n1 * 17.5 + n2 * 3.5;
+
+      // 群岛轮廓塑造：
+      // 1) 世界四周边缘渐入大海
+      const edgeDist = Math.max(Math.abs(nx), Math.abs(nz));
+      const edgeFalloff = Math.pow(Math.max(0, 1.0 - Math.pow(edgeDist, 2.4)), 1.3);
+
+      // 2) 中央至正北（z < 12，x 居中）开辟开阔的日落海湾水道，保证海面金色日光路直通地平线并贯通岛屿间
+      const channelWidth = 13 + Math.max(0, -z) * 0.38;
+      const channelFactor = 1.0 - 0.85 * Math.exp(-Math.pow(x / channelWidth, 2.0)) * smoothstep(-48, 22, -z);
+
+      // 3) 东西两侧各隆起一座主山丘群，南侧连成新月形海岸
+      const leftIsland = Math.exp(-(Math.pow((x + 24) / 22, 2) + Math.pow((z - 4) / 28, 2))) * 6.8;
+      const rightIsland = Math.exp(-(Math.pow((x - 25) / 21, 2) + Math.pow((z - 2) / 27, 2))) * 6.5;
+      const southArch = Math.exp(-(Math.pow(x / 32, 2) + Math.pow((z - 25) / 16, 2))) * 5.2;
+
+      const combined = (rawElevation * channelFactor + leftIsland + rightIsland + southArch) * edgeFalloff - 4.8;
+      return Math.floor(combined);
+    }
+
+    function smoothstep(edge0, edge1, x) {
+      const t = Math.max(0, Math.min(1, (x - edge0) / (edge1 - edge0)));
+      return t * t * (3 - 2 * t);
+    }
+
+    // 收集所有方块实例坐标
+    const sandPositions = [];
+    const grassPositions = [];
+    const dirtPositions = [];
+    const stonePositions = [];
+    const woodPositions = [];
+    const leavesPositions = [];
+    const lanternPositions = [];
+
+    // 高度缓存，用于判断边缘裸露度以减少不可见内部方块
+    const heightMap = new Int16Array(WORLD_SIZE * WORLD_SIZE);
+    for (let gz = 0; gz < WORLD_SIZE; gz++) {
+      for (let gx = 0; gx < WORLD_SIZE; gx++) {
+        const wx = gx - HALF_WORLD;
+        const wz = gz - HALF_WORLD;
+        heightMap[gz * WORLD_SIZE + gx] = getTerrainHeight(wx, wz);
+      }
+    }
+
+    function getCachedHeight(gx, gz) {
+      if (gx < 0 || gx >= WORLD_SIZE || gz < 0 || gz >= WORLD_SIZE) return -4;
+      return heightMap[gz * WORLD_SIZE + gx];
+    }
+
+    // 记录已种树位置，防止树冠过度重叠
+    const treeLocations = [];
+
+    function addTree(wx, wy, wz, variant = 0) {
+      const trunkHeight = 4 + (variant % 2);
+      for (let ty = 1; ty <= trunkHeight; ty++) {
+        woodPositions.push(wx, wy + ty, wz);
+      }
+
+      // 经典 Minecraft 风格层叠方块树冠
+      const crownBase = wy + trunkHeight - 1;
+      for (let ly = 0; ly <= 3; ly++) {
+        const y = crownBase + ly;
+        const radius = ly < 2 ? 2 : 1;
+        for (let lx = -radius; lx <= radius; lx++) {
+          for (let lz = -radius; lz <= radius; lz++) {
+            // 削去四角让树冠更有立体感
+            if (Math.abs(lx) === radius && Math.abs(lz) === radius) {
+              if (ly === 3 || (ly === 1 && ((lx + lz + variant) % 2 === 0)) || ly === 0) {
+                continue;
+              }
+            }
+            // 避免覆盖树干中心
+            if (lx === 0 && lz === 0 && ly < 2) continue;
+            leavesPositions.push(wx + lx, y, wz + lz);
+          }
+        }
+      }
+    }
+
+    // 遍历 96×96 网格生成地形与树林
+    for (let gz = 0; gz < WORLD_SIZE; gz++) {
+      for (let gx = 0; gx < WORLD_SIZE; gx++) {
+        const wx = gx - HALF_WORLD;
+        const wz = gz - HALF_WORLD;
+        const h = getCachedHeight(gx, gz);
+
+        // 水面高度为 -0.2，仅生成浅滩(-2)及以上的方块，深海由半透明海水面直接表现
+        if (h < -2) continue;
+
+        const hLeft = getCachedHeight(gx - 1, gz);
+        const hRight = getCachedHeight(gx + 1, gz);
+        const hFront = getCachedHeight(gx, gz + 1);
+        const hBack = getCachedHeight(gx, gz - 1);
+        const minNeighbor = Math.min(hLeft, hRight, hFront, hBack, -2);
+
+        // 填充顶层方块
+        if (h <= 0) {
+          // 浅滩与黄金海岸沙滩线
+          sandPositions.push(wx, h, wz);
+        } else if (h === 1 && (hLeft < 0 || hRight < 0 || hFront < 0 || hBack < 0)) {
+          // 紧邻海水的 1 层高岸也设为沙滩过渡
+          sandPositions.push(wx, h, wz);
+        } else {
+          // 草地山丘
+          grassPositions.push(wx, h, wz);
+        }
+
+        // 填充侧面裸露的下层泥土/岩石或沙层（不生成完全被包裹的内部死方块）
+        const startY = Math.max(-2, minNeighbor + 1);
+        for (let y = startY; y < h; y++) {
+          if (h <= 0) {
+            sandPositions.push(wx, y, wz);
+          } else if (y < h - 2) {
+            stonePositions.push(wx, y, wz);
+          } else {
+            dirtPositions.push(wx, y, wz);
+          }
+        }
+
+        // 在草地山丘上生成方块树林
+        if (h >= 2 && h <= 9 && gx > 4 && gx < WORLD_SIZE - 5 && gz > 4 && gz < WORLD_SIZE - 5) {
+          const treeChance = hash2D(gx * 7 + 19, gz * 13 + 37);
+          const forestDensity = valueNoise2D(wx * 0.07, wz * 0.07);
+          if (treeChance > 0.875 && forestDensity > 0.42) {
+            // 检查与已有树木间距
+            let tooClose = false;
+            for (let i = 0; i < treeLocations.length; i++) {
+              const dx = treeLocations[i].x - wx;
+              const dz = treeLocations[i].z - wz;
+              if (dx * dx + dz * dz < 18) {
+                tooClose = true;
+                break;
+              }
+            }
+            if (!tooClose) {
+              treeLocations.push({ x: wx, z: wz });
+              addTree(wx, h, wz, Math.floor(treeChance * 100));
+            }
+          }
+        }
+      }
+    }
+
+    // 在西侧海岬顶端放置一座袖珍日落木栈桥与萤石路灯，增加海岸线视觉锚点
+    function buildCoastlinePier() {
+      const pierZ = 6;
+      for (let px = -14; px <= -9; px++) {
+        woodPositions.push(px, 0, pierZ);
+        woodPositions.push(px, 0, pierZ + 1);
+      }
+      // 栈桥尽头灯柱
+      woodPositions.push(-9, 1, pierZ);
+      woodPositions.push(-9, 2, pierZ);
+      lanternPositions.push(-9, 3, pierZ);
+    }
+    buildCoastlinePier();
+
+    // 批量创建高效 InstancedMesh
+    const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+    const dummy = new THREE.Object3D();
+
+    function createVoxelInstancedMesh(positionsArray, material, castShadow = true, receiveShadow = true) {
+      const count = positionsArray.length / 3;
+      if (count === 0) return null;
+      const mesh = new THREE.InstancedMesh(boxGeo, material, count);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = receiveShadow;
+
+      for (let i = 0; i < count; i++) {
+        dummy.position.set(
+          positionsArray[i * 3],
+          positionsArray[i * 3 + 1],
+          positionsArray[i * 3 + 2]
+        );
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    createVoxelInstancedMesh(sandPositions, sandMat, true, true);
+    createVoxelInstancedMesh(grassPositions, grassMaterials, true, true);
+    createVoxelInstancedMesh(dirtPositions, dirtMat, true, true);
+    createVoxelInstancedMesh(stonePositions, stoneMat, true, true);
+    createVoxelInstancedMesh(woodPositions, woodMaterials, true, true);
+    createVoxelInstancedMesh(leavesPositions, leavesMat, true, true);
+    createVoxelInstancedMesh(lanternPositions, lanternMat, false, false);
+
+    // ==========================================
+    // 6. 大海与通向地平线的金色日光路 Shader
+    // ==========================================
+    // 将海面延伸到远方地平线，让金色日光路完整贯穿体素海湾直抵落日下方
+    const oceanGeo = new THREE.PlaneGeometry(820, 820, 180, 180);
+    oceanGeo.rotateX(-Math.PI / 2);
+
+    const oceanMat = new THREE.ShaderMaterial({
+      transparent: true,
+      uniforms: {
+        uTime: { value: 0 },
+        uSunDir: { value: sunDir },
+        uCameraPos: { value: camera.position },
+        uFogColor: { value: FOG_COLOR },
+        uFogDensity: { value: 0.0046 }
+      },
+      vertexShader: `
+        uniform float uTime;
+        varying vec3 vWorldPos;
+        varying float vWaveHeight;
+
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+
+          // 轻柔的体素风格海面起伏波浪
+          float w1 = sin(wp.x * 0.45 + uTime * 1.6) * cos(wp.z * 0.35 + uTime * 1.2) * 0.09;
+          float w2 = sin((wp.x * 0.8 - wp.z * 0.6) + uTime * 2.3) * 0.04;
+          wp.y += w1 + w2;
+
+          vWorldPos = wp.xyz;
+          vWaveHeight = w1 + w2;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform vec3 uSunDir;
+        uniform vec3 uCameraPos;
+        uniform vec3 uFogColor;
+        uniform float uFogDensity;
+
+        varying vec3 vWorldPos;
+        varying float vWaveHeight;
+
+        // 像素风棋盘波纹函数，让水面既有真实反射又保留 Minecraft 像素质感
+        float voxelRipple(vec2 p, float t) {
+          vec2 cell = floor(p * 2.0); // 0.5 单位像素格
+          float n = sin(cell.x * 1.7 + t * 2.1) * cos(cell.y * 1.3 - t * 1.8);
+          float n2 = sin((cell.x + cell.y) * 0.9 + t * 2.8);
+          return (n + n2) * 0.5;
+        }
+
+        void main() {
+          vec3 viewVec = uCameraPos - vWorldPos;
+          float dist = length(viewVec);
+          vec3 V = normalize(viewVec);
+
+          // 构造带有细微横向波浪扰动的水面法线（横向扰动拉宽夕阳在水面的光路闪烁）
+          float rx = sin(vWorldPos.x * 2.6 + uTime * 2.4) * cos(vWorldPos.z * 1.9 - uTime * 1.7);
+          float rz = cos(vWorldPos.x * 1.8 - uTime * 1.9) * sin(vWorldPos.z * 3.1 + uTime * 2.8);
+          float pix = voxelRipple(vWorldPos.xz, uTime);
+
+          vec3 N = normalize(vec3(
+            (rx * 0.085 + pix * 0.045),
+            1.0,
+            (rz * 0.14 + pix * 0.05)
+          ));
+
+          // 菲涅尔项：越往远方地平线看，海面越像镜子反射晚霞
+          float NoV = max(dot(N, V), 0.0);
+          float fresnel = pow(1.0 - NoV, 4.0);
+
+          // 暮色海水底色（近处深邃蓝绿紫，远处映照粉橙霞光）
+          vec3 deepWater = vec3(0.10, 0.17, 0.30);
+          vec3 skyReflect = vec3(0.82, 0.36, 0.42);
+          vec3 waterCol = mix(deepWater, skyReflect, clamp(fresnel * 0.85 + 0.12, 0.0, 1.0));
+
+          // ==================================================
+          // 核心视觉：通向地平线的金色日光路 (Golden Sun Path)
+          // ==================================================
+          vec3 R = reflect(-V, N);
+          // 水平方向对齐度与俯仰角对齐度分离控制，形成长长的 shimmering 光带
+          vec2 viewDirXZ = normalize(vec2(-V.x, -V.z));
+          vec2 sunDirXZ = normalize(vec2(uSunDir.x, uSunDir.z));
+          float alignXZ = max(dot(viewDirXZ, sunDirXZ), 0.0);
+
+          // 波浪扰动后的高光反射
+          float specBase = max(dot(R, uSunDir), 0.0);
+          float sunPathCore = pow(specBase, 42.0) * 1.8;
+          float sunPathWide = pow(specBase, 9.0) * 0.55;
+
+          // 结合像素波纹闪烁的碎金感
+          float sparkle = smoothstep(0.18, 0.72, pix * 0.5 + 0.5);
+          float shimmerCorridor = pow(alignXZ, 28.0) * (0.45 + 0.85 * sparkle) * smoothstep(4.0, 35.0, dist);
+
+          vec3 goldLight = vec3(1.55, 0.82, 0.26); // HDR 金色高光，配合 UnrealBloomPass 产生迷人辉光
+          vec3 orangeGlow = vec3(1.10, 0.42, 0.15);
+
+          waterCol += orangeGlow * (sunPathWide + shimmerCorridor * 0.5);
+          waterCol += goldLight * (sunPathCore + shimmerCorridor * pow(specBase, 14.0) * 1.4);
+
+          // 96x96 群岛浅滩区域微弱暖色透射
+          float islandBound = smoothstep(54.0, 36.0, max(abs(vWorldPos.x), abs(vWorldPos.z)));
+          waterCol += vec3(0.06, 0.10, 0.12) * islandBound;
+
+          // 指数薄雾融合，让远海与晚霞天际无缝衔接
+          float fogFactor = 1.0 - exp(- (dist * uFogDensity) * (dist * uFogDensity));
+          waterCol = mix(waterCol, uFogColor, clamp(fogFactor, 0.0, 1.0));
+
+          gl_FragColor = vec4(waterCol, 0.91);
+        }
+      `
+    });
+
+    const oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+    oceanMesh.position.y = -0.22; // 略低于 y=0 的沙滩方块顶面
+    oceanMesh.receiveShadow = true;
+    scene.add(oceanMesh);
+
+    // ==========================================
+    // 7. 夕阳空气金色光尘与体素海鸥点缀
+    // ==========================================
+    // 1) 漂浮在森林与海湾上空的金色落日微尘
+    const particleCount = 260;
+    const pGeo = new THREE.BufferGeometry();
+    const pPositions = new Float32Array(particleCount * 3);
+    const pPhases = new Float32Array(particleCount);
+
+    for (let i = 0; i < particleCount; i++) {
+      pPositions[i * 3] = (Math.random() - 0.5) * 92;
+      pPositions[i * 3 + 1] = 1.0 + Math.random() * 18;
+      pPositions[i * 3 + 2] = (Math.random() - 0.5) * 92;
+      pPhases[i] = Math.random() * Math.PI * 2;
+    }
+    pGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+
+    const pMat = new THREE.PointsMaterial({
+      color: 0xffc870,
+      size: 0.45,
+      transparent: true,
+      opacity: 0.75,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const dustParticles = new THREE.Points(pGeo, pMat);
+    scene.add(dustParticles);
+
+    // 2) 迎着夕阳盘旋的简化版体素飞鸟
+    const birdsGroup = new THREE.Group();
+    const birdMat = new THREE.MeshBasicMaterial({ color: 0x2c1423 });
+    const wingGeo = new THREE.BoxGeometry(0.6, 0.08, 0.25);
+    const birdsData = [];
+
+    for (let i = 0; i < 9; i++) {
+      const bird = new THREE.Group();
+      const leftWing = new THREE.Mesh(wingGeo, birdMat);
+      leftWing.position.x = -0.28;
+      const rightWing = new THREE.Mesh(wingGeo, birdMat);
+      rightWing.position.x = 0.28;
+      bird.add(leftWing, rightWing);
+
+      const angle = (i / 9) * Math.PI * 2;
+      const radius = 18 + (i % 3) * 8;
+      const height = 13 + (i % 4) * 2.5;
+      birdsData.push({
+        group: bird,
+        leftWing,
+        rightWing,
+        angle,
+        radius,
+        height,
+        speed: 0.22 + (i % 3) * 0.04,
+        flapOffset: i * 1.1
+      });
+      birdsGroup.add(bird);
+    }
+    scene.add(birdsGroup);
+
+    // ==========================================
+    // 8. 交互控制：环绕视角 vs 海岸线滑翔模式
+    // ==========================================
+    let isGliding = false;
+    let glideProgress = 0;
+
+    // 精心设计的闭合海岸线电影滑翔轨迹：
+    // 穿越东西两座岛屿之间的海湾上空 -> 掠过黄金沙滩与树冠 -> 迎向落日金色水路 -> 环绕山丘回到海湾
+    const glideWaypoints = [
+      new THREE.Vector3(14, 10.5, 36),   // 南湾高处俯冲入海湾
+      new THREE.Vector3(7, 5.2, 14),     // 贴近东侧沙滩海岸线低空掠过
+      new THREE.Vector3(3, 4.0, -8),     // 顺着海面金色日光路直面夕阳
+      new THREE.Vector3(-10, 6.8, -24),  // 掠过北端海岬与开阔水面
+      new THREE.Vector3(-28, 12.5, -6),  // 攀升飞越西岛方块树林上方
+      new THREE.Vector3(-20, 8.5, 18),   // 沿着西侧金色海岸线回旋
+      new THREE.Vector3(-2, 7.2, 30)     // 穿过南侧浅滩水道
+    ];
+    const glideCurve = new THREE.CatmullRomCurve3(glideWaypoints, true, 'catmullrom', 0.5);
+
+    // 摄像机平滑注视点插值状态
+    const currentCamPos = new THREE.Vector3();
+    const currentLookAt = new THREE.Vector3();
+
+    const glideBtn = document.getElementById('glideBtn');
+    const btnIcon = document.getElementById('btnIcon');
+    const btnText = document.getElementById('btnText');
+    const hintText = document.getElementById('hintText');
+
+    glideBtn.addEventListener('click', () => {
+      isGliding = !isGliding;
+      if (isGliding) {
+        document.body.classList.add('gliding');
+        glideBtn.classList.add('active');
+        btnIcon.textContent = '🧭';
+        btnText.textContent = '返回环绕视角';
+        hintText.textContent = '电影滑翔镜头：正沿黄金海岸线自动巡航 · 再次点击恢复自由环绕';
+
+        controls.enabled = false;
+        currentCamPos.copy(camera.position);
+        currentLookAt.copy(controls.target);
+      } else {
+        document.body.classList.remove('gliding');
+        glideBtn.classList.remove('active');
+        btnIcon.textContent = '🕊️';
+        btnText.textContent = '滑翔模式';
+        hintText.textContent = '拖拽旋转视角 · 滚轮/双指缩放 · 感受落日余晖';
+
+        // 平滑交还给 OrbitControls
+        camera.up.set(0, 1, 0);
+        camera.position.set(16, 22, 62);
+        controls.target.set(0, 3.5, -12);
+        controls.enabled = true;
+        controls.update();
+      }
+    });
+
+    // ==========================================
+    // 9. 响应式窗口适配与 60FPS 动画主循环
+    // ==========================================
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      composer.setSize(w, h);
+    });
+
+    const clock = new THREE.Clock();
+    const targetPos = new THREE.Vector3();
+    const aheadPos = new THREE.Vector3();
+    const desiredLook = new THREE.Vector3();
+    const sunFocusPoint = new THREE.Vector3(0, 5, -120);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.1);
+      const elapsed = clock.getElapsedTime();
+
+      // 更新天空、圆日与海面 Shader 时间
+      skyMat.uniforms.uTime.value = elapsed;
+      sunMat.uniforms.uTime.value = elapsed;
+      oceanMat.uniforms.uTime.value = elapsed;
+      oceanMat.uniforms.uCameraPos.value.copy(camera.position);
+
+      // 更新金色光尘缓慢升腾漂浮
+      const posAttr = pGeo.attributes.position;
+      for (let i = 0; i < particleCount; i++) {
+        let y = posAttr.getY(i) + Math.sin(elapsed * 0.8 + pPhases[i]) * 0.008;
+        posAttr.setY(i, y);
+      }
+      posAttr.needsUpdate = true;
+
+      // 更新远方海鸥盘旋与扇翅
+      for (let i = 0; i < birdsData.length; i++) {
+        const b = birdsData[i];
+        const a = b.angle + elapsed * b.speed;
+        const bx = Math.cos(a) * b.radius;
+        const bz = -18 + Math.sin(a) * (b.radius * 0.65);
+        const by = b.height + Math.sin(elapsed * 1.5 + b.flapOffset) * 0.6;
+
+        b.group.position.set(bx, by, bz);
+        b.group.rotation.y = -a + Math.PI;
+        const flap = Math.sin(elapsed * 7.5 + b.flapOffset) * 0.45;
+        b.leftWing.rotation.z = flap;
+        b.rightWing.rotation.z = -flap;
+      }
+
+      // 摄像机模式切换与更新
+      if (isGliding) {
+        glideProgress = (glideProgress + delta * 0.032) % 1.0;
+        const lookAheadT = (glideProgress + 0.055) % 1.0;
+
+        glideCurve.getPointAt(glideProgress, targetPos);
+        glideCurve.getPointAt(lookAheadT, aheadPos);
+
+        // 视线在航线前方与远方落日之间自然权衡，保证滑翔中始终能欣赏到壮丽晚霞与海岸
+        desiredLook.lerpVectors(aheadPos, sunFocusPoint, 0.34);
+        desiredLook.y = Math.max(1.5, aheadPos.y * 0.65);
+
+        const smoothFactor = 1.0 - Math.exp(-delta * 3.2);
+        currentCamPos.lerp(targetPos, smoothFactor);
+        currentLookAt.lerp(desiredLook, smoothFactor);
+
+        camera.position.copy(currentCamPos);
+        camera.lookAt(currentLookAt);
+
+        // 轻微滑翔侧倾感 (Bank angle)
+        const bankAngle = Math.sin(glideProgress * Math.PI * 4) * 0.045;
+        camera.rotateZ(bankAngle);
+      } else {
+        controls.update();
+      }
+
+      composer.render();
+    }
+
+    animate();
+  </script>
+
+  <script src="../prompt-panel.js" data-id="sunset-voxel-web"></script>
+</body>
+</html>
