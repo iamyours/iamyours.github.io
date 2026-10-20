@@ -1,0 +1,16 @@
+用 Three.js 在一个 HTML 文件中为我构建一个交互式 3D 喷气发动机，从进气口到排气口。
+让它看起来真实：大大的前风扇、压缩机级、内部发光的燃烧室、涡轮和喷嘴，金属质感（MeshStandardMaterial / 程序化环境贴图 RoomEnvironment）。风扇和轴会旋转。
+我可以拖动来围绕它轨道旋转，滚动来缩放。外壳做成半剖开的样子，以便看到内部。
+添加一个「分解」按钮。当我按下它时，每个部件会沿着发动机的轴线平滑滑开，部件名称（中文：进气风扇、低压压缩机、高压压缩机、燃烧室、高压涡轮、低压涡轮、尾喷管 等）会显示在标签上（CSS2DRenderer）。再按一次（按钮文字变为「复原」），它就会全部弹回原位。
+当我悬停（手机上点击）在某个部件上时，它会亮起并在底部显示一行中文文字说明它的作用。
+不要使用图片。
+
+【通用技术要求】
+- 直接输出一个可在现代浏览器打开的完整单文件 HTML 代码（一个代码块，从 <!DOCTYPE html> 到 </html>，不要省略任何部分）。页面语言 zh-CN，标题用中文。
+- 使用 Three.js r160，通过 importmap 从 CDN 固定版本加载："three": "https://unpkg.com/three@0.160.0/build/three.module.js"，"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"。除此之外不引用任何外部资源。
+- 所有几何体、材质、贴图都用代码程序化生成（可用 Canvas/Shader 生成贴图），不要加载 glb/gltf/obj/fbx、图片或 SVG。
+- 使用 OrbitControls 支持拖动旋转、滚轮/双指缩放（第一人称玩法的场景除外，按场景说明）。
+- 画布全屏、响应式适配窗口大小变化和手机屏幕，devicePixelRatio 最多取 2，目标稳定 60FPS。
+- 页面左上角放一个固定的链接「← 返回 3D 作品」，href="../"，半透明奶油色圆角小按钮样式。
+- 在 </body> 前加上这一行（原样保留，用于展示提示词）：<script src="../prompt-panel.js" data-id="jet-engine-deepseek"></script>
+- 控制台不能有报错。不要问我任何问题，直接构建。

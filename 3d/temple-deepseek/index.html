@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>天坛祈年殿 · 程序化 WebGL 场景</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #0d1a2b; }
+  canvas { display: block; touch-action: none; }
+
+  #backLink {
+    position: fixed; top: 14px; left: 14px; z-index: 30;
+    padding: 8px 14px;
+    background: rgba(255, 248, 230, 0.78);
+    color: #4a3b28;
+    font: 500 13px/1.2 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    border-radius: 999px;
+    text-decoration: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.6);
+    transition: background .2s;
+  }
+  #backLink:hover { background: rgba(255, 248, 230, 0.96); }
+
+  #panel {
+    position: fixed; top: 14px; right: 14px; z-index: 30;
+    display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;
+    max-width: 70vw;
+  }
+  .btn {
+    padding: 9px 16px;
+    background: rgba(255, 248, 230, 0.78);
+    color: #4a3b28;
+    font: 500 13px/1.2 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.6);
+    cursor: pointer;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    transition: background .2s, color .2s, border-color .2s;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:hover { background: rgba(255, 248, 230, 0.96); }
+  .btn.active { background: #c8a24a; color: #fff; border-color: #e6cb8a; }
+
+  #hint {
+    position: fixed; bottom: 12px; left: 50%; transform: translateX(-50%);
+    color: rgba(255,255,255,0.75);
+    font: 12px/1.4 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    z-index: 30; pointer-events: none;
+    text-shadow: 0 1px 4px rgba(0,0,0,.55);
+    white-space: nowrap;
+  }
+  @media (max-width: 520px) {
+    .btn { padding: 8px 12px; font-size: 12px; }
+    #hint { font-size: 11px; }
+    #backLink { padding: 7px 12px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<a id="backLink" href="../">← 返回 3D 作品</a>
+
+<div id="panel">
+  <button class="btn" id="btnOrbit">自动环绕</button>
+  <button class="btn" id="btnExplode">爆炸 / 重组</button>
+</div>
+
+<div id="hint">拖动旋转 · 滚轮 / 双指缩放</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   0. 基础工具
+   ============================================================ */
+const clamp01 = v => (v < 0 ? 0 : v > 1 ? 1 : v);
+const easeInOutCubic = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+// 固定种子随机
+let _seed = 20240517;
+function rnd() {
+  _seed = (_seed * 1664525 + 1013904223) % 4294967296;
+  return _seed / 4294967296;
+}
+
+/* ============================================================
+   1. 渲染器 / 场景 / 相机
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.02;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xc6dbef, 0.0016);
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 3000);
+camera.position.set(64, 46, 92);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 20, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.065;
+controls.minDistance = 42;
+controls.maxDistance = 260;
+controls.maxPolarAngle = Math.PI * 0.492;
+controls.autoRotate = false;
+controls.autoRotateSpeed = 0.75;
+controls.update();
+
+/* ============================================================
+   2. 天空 / 环境贴图（全程序化）
+   ============================================================ */
+function makeSkyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 32; c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.00, '#1f5fc4');
+  g.addColorStop(0.22, '#3d82d8');
+  g.addColorStop(0.42, '#86b4e8');
+  g.addColorStop(0.495, '#d6e6f4');
+  g.addColorStop(0.505, '#b9c0c2');
+  g.addColorStop(0.70, '#8e8f8c');
+  g.addColorStop(1.00, '#6e6f6b');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const skyTex = makeSkyTexture();
+scene.background = skyTex;
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileEquirectangularShader();
+const envRT = pmrem.fromEquirectangular(skyTex);
+scene.environment = envRT.texture;
+pmrem.dispose();
+
+/* ============================================================
+   3. 光照
+   ============================================================ */
+const hemi = new THREE.HemisphereLight(0xcfe4ff, 0x8d8474, 1.05);
+hemi.position.set(0, 120, 0);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff3dc, 2.7);
+sun.position.set(78, 122, 62);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -62;
+sun.shadow.camera.right = 62;
+sun.shadow.camera.top = 62;
+sun.shadow.camera.bottom = -62;
+sun.shadow.camera.near = 20;
+sun.shadow.camera.far = 380;
+sun.shadow.bias = -0.0008;
+sun.shadow.normalBias = 0.06;
+sun.target.position.set(0, 18, 0);
+scene.add(sun);
+scene.add(sun.target);
+
+// 补一盏柔和逆光，让屋檐轮廓更透气
+const fill = new THREE.DirectionalLight(0xa8c8ff, 0.55);
+fill.position.set(-70, 50, -80);
+scene.add(fill);
+
+/* ============================================================
+   4. 程序化纹理工厂
+   ============================================================ */
+function makeCanvasTexture(w, h, draw, rx = 1, ry = 1) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  const ctx = c.getContext('2d');
+  draw(ctx, w, h);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(rx, ry);
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+/* ---------- 4.1 蓝琉璃瓦 ---------- */
+const glazedTileTex = makeCanvasTexture(512, 512, (ctx, w, h) => {
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0.00, '#0e2a5e');
+  g.addColorStop(0.35, '#1c4a94');
+  g.addColorStop(0.70, '#17408a');
+  g.addColorStop(1.00, '#0b2350');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  // 竖向筒瓦（沿坡面方向）
+  const cols = 8, cw = w / cols;
+  for (let i = 0; i < cols; i++) {
+    const x = i * cw;
+    const gg = ctx.createLinearGradient(x, 0, x + cw, 0);
+    gg.addColorStop(0.00, 'rgba(0,8,32,0.62)');
+    gg.addColorStop(0.20, 'rgba(38,88,178,0.34)');
+    gg.addColorStop(0.48, 'rgba(150,205,255,0.44)');
+    gg.addColorStop(0.78, 'rgba(38,88,178,0.34)');
+    gg.addColorStop(1.00, 'rgba(0,8,32,0.62)');
+    ctx.fillStyle = gg;
+    ctx.fillRect(x, 0, cw, h);
+  }
+
+  // 横向瓦当（沿坡面分节）
+  for (let y = 0; y < h; y += 62) {
+    ctx.fillStyle = 'rgba(0,0,0,0.38)';
+    ctx.fillRect(0, y, w, 4);
+    ctx.fillStyle = 'rgba(190,225,255,0.30)';
+    ctx.fillRect(0, y + 4, w, 3);
+  }
+}, 10, 1.6);
+
+/* ---------- 4.2 汉白玉台基 ---------- */
+const marbleTex = makeCanvasTexture(512, 512, (ctx, w, h) => {
+  ctx.fillStyle = '#f1ede2';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < 260; i++) {
+    const x = Math.random() * w;
+    const y = Math.random() * h;
+    const r = 14 + Math.random() * 80;
+    const a = 0.015 + Math.random() * 0.045;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0, `rgba(146,144,132,${a})`);
+    g.addColorStop(1, 'rgba(146,144,132,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  ctx.strokeStyle = 'rgba(120,118,108,0.30)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i <= 4; i++) {
+    ctx.beginPath(); ctx.moveTo(0, (i * h) / 4); ctx.lineTo(w, (i * h) / 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo((i * w) / 4, 0); ctx.lineTo((i * w) / 4, h); ctx.stroke();
+  }
+}, 8, 1);
+
+/* ---------- 4.3 彩画（青绿金） ---------- */
+const caihuaTex = makeCanvasTexture(512, 128, (ctx, w, h) => {
+  ctx.fillStyle = '#123a6b';
+  ctx.fillRect(0, 0, w, h);
+
+  const n = 8, seg = w / n;
+  for (let i = 0; i < n; i++) {
+    const cx = i * seg + seg / 2;
+    const cy = h / 2;
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, seg * 0.35, 0, Math.PI * 2);
+    ctx.fillStyle = i % 2 ? '#1c6543' : '#2b8757';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#e3bd58';
+    ctx.stroke();
+
+    // 旋子纹
+    ctx.beginPath();
+    ctx.arc(cx, cy, seg * 0.19, 0.6, Math.PI * 1.7);
+    ctx.strokeStyle = '#e3bd58';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(cx, cy, seg * 0.085, 0, Math.PI * 2);
+    ctx.fillStyle = '#e3bd58';
+    ctx.fill();
+  }
+
+  ctx.fillStyle = '#e3bd58';
+  ctx.fillRect(0, 0, w, 6);
+  ctx.fillRect(0, h - 6, w, 6);
+}, 10, 1);
+
+/* ---------- 4.4 墙体 / 门窗 ---------- */
+const wallTex = makeCanvasTexture(256, 512, (ctx, w, h) => {
+  // 红色墙底
+  ctx.fillStyle = '#8d2c21';
+  ctx.fillRect(0, 0, w, h);
+
+  // 竖向木框
+  ctx.fillStyle = '#6a1e16';
+  ctx.fillRect(0, 0, 12, h);
+  ctx.fillRect(w - 12, 0, 12, h);
+
+  // 上部窗棂
+  const winY = 34, winH = 172;
+  ctx.fillStyle = '#241408';
+  ctx.fillRect(28, winY, w - 56, winH);
+  ctx.strokeStyle = '#d9b45c';
+  ctx.lineWidth = 3;
+  for (let i = 1; i < 5; i++) {
+    const x = 28 + ((w - 56) * i) / 5;
+    ctx.beginPath(); ctx.moveTo(x, winY); ctx.lineTo(x, winY + winH); ctx.stroke();
+  }
+  for (let j = 1; j < 7; j++) {
+    const y = winY + (winH * j) / 7;
+    ctx.beginPath(); ctx.moveTo(28, y); ctx.lineTo(w - 28, y); ctx.stroke();
+  }
+  ctx.strokeStyle = '#e6c87e';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(26, winY - 2, w - 52, winH + 4);
+
+  // 中部彩画横带
+  ctx.fillStyle = '#123a6b';
+  ctx.fillRect(0, 226, w, 44);
+  ctx.fillStyle = '#2b8757';
+  for (let i = 0; i < 4; i++) {
+    ctx.beginPath();
+    ctx.arc(34 + i * 62, 248, 14, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = '#e3bd58';
+  ctx.fillRect(0, 226, w, 4);
+  ctx.fillRect(0, 266, w, 4);
+
+  // 下部大门
+  ctx.fillStyle = '#5c1a12';
+  ctx.fillRect(28, 284, w - 56, h - 300);
+  ctx.strokeStyle = '#e6c87e';
+  ctx.lineWidth = 5;
+  ctx.strokeRect(28, 284, w - 56, h - 300);
+
+  // 门钉
+  ctx.fillStyle = '#d8a83c';
+  for (let r = 0; r < 4; r++) {
+    for (let c = 0; c < 3; c++) {
+      ctx.beginPath();
+      ctx.arc(72 + c * 56, 322 + r * 46, 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}, 12, 1);
+
+/* ---------- 4.5 广场地面 ---------- */
+const groundTex = makeCanvasTexture(256, 256, (ctx, w, h) => {
+  ctx.fillStyle = '#b8b2a4';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let i = 0; i < 2600; i++) {
+    const v = Math.random() * 44 - 22;
+    ctx.fillStyle = `rgba(${130 + v},${126 + v},${114 + v},0.16)`;
+    ctx.fillRect(Math.random() * w, Math.random() * h, 2, 2);
+  }
+
+  ctx.strokeStyle = 'rgba(108,103,93,0.45)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i <= 4; i++) {
+    ctx.beginPath(); ctx.moveTo(0, (i * h) / 4); ctx.lineTo(w, (i * h) / 4); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo((i * w) / 4, 0); ctx.lineTo((i * w) / 4, h); ctx.stroke();
+  }
+}, 64, 64);
+
+/* ============================================================
+   5. 材质
+   ============================================================ */
+const matMarble = new THREE.MeshStandardMaterial({
+  map: marbleTex, color: 0xffffff, roughness: 0.80, metalness: 0.03
+});
+const matRoof = new THREE.MeshStandardMaterial({
+  map: glazedTileTex, color: 0xdfe9ff, roughness: 0.32, metalness: 0.28,
+  side: THREE.DoubleSide
+});
+const matPillar = new THREE.MeshStandardMaterial({
+  color: 0x9d2a22, roughness: 0.58, metalness: 0.05
+});
+const matGold = new THREE.MeshStandardMaterial({
+  color: 0xd9a93c, roughness: 0.24, metalness: 0.92
+});
+const matCaihua = new THREE.MeshStandardMaterial({
+  map: caihuaTex, roughness: 0.66, metalness: 0.16, side: THREE.DoubleSide
+});
+const matWall = new THREE.MeshStandardMaterial({
+  map: wallTex, roughness: 0.72, metalness: 0.06, side: THREE.DoubleSide
+});
+const matDougong = new THREE.MeshStandardMaterial({
+  color: 0x2f7a52, roughness: 0.55, metalness: 0.25
+});
+
+/* ============================================================
+   6. 场景根节点 & 爆炸动画登记
+   ============================================================ */
+const temple = new THREE.Group();
+scene.add(temple);
+
+const animItems = [];   // 普通对象位移/缩放
+const instAnim = [];    // InstancedMesh 逐实例散开
+
+function registerAnim(obj, offset, sxz, delay, dur) {
+  animItems.push({
+    obj,
+    basePos: obj.position.clone(),
+    baseScale: obj.scale.clone(),
+    offset: offset || new THREE.Vector3(0, 0, 0),
+    sxz: sxz === undefined ? 1 : sxz,
+    delay: delay || 0,
+    dur: dur || 0.55
+  });
+}
+
+/* ============================================================
+   7. 尺寸常量
+   ============================================================ */
+const PLINTH_LAYERS = [
+  { r: 26.0, h: 2.2 },
+  { r: 22.8, h: 2.2 },
+  { r: 19.6, h: 2.2 }
+];
+const PLINTH_TOP = 6.6;          // = 3 * 2.2
+
+const PILLAR_R = 15.3;
+const PILLAR_COUNT = 12;
+const PILLAR_BOTTOM = 6.6;
+const PILLAR_TOP = 16.2;
+const PILLAR_H = PILLAR_TOP - PILLAR_BOTTOM;
+
+const WALL_R = 14.55;
+const WALL_H = 9.8;
+
+const ROOF_DEFS = [
+  { R: 20.5, r: 12.4, y0: 16.6, y1: 23.2, flare: 1.00, delay: 0.18, lift: 5.0 },
+  { R: 17.2, r: 8.8,  y0: 27.0, y1: 32.6, flare: 0.90, delay: 0.12, lift: 10.5 },
+  { R: 13.2, r: 1.1,  y0: 35.0, y1: 43.0, flare: 0.80, delay: 0.06, lift: 16.5 }
+];
+
+/* ============================================================
+   8. 台基（三层汉白玉 + 栏杆 + 台阶）
+   ============================================================ */
+const plinthGroups = [];
+let py = 0;
+
+for (let i = 0; i < PLINTH_LAYERS.length; i++) {
+  const L = PLINTH_LAYERS[i];
+  const g = new THREE.Group();
+  temple.add(g);
+  plinthGroups.push(g);
+
+  const topY = py + L.h;
+
+  // --- 台面圆盘 ---
+  const disc = new THREE.Mesh(
+    new THREE.CylinderGeometry(L.r, L.r + 0.42, L.h, 96, 1),
+    matMarble
+  );
+  disc.position.y = py + L.h / 2;
+  disc.castShadow = true;
+  disc.receiveShadow = true;
+  g.add(disc);
+
+  // --- 望柱（InstancedMesh）---
+  const railR = L.r - 0.95;
+  const postCount = 60;
+  const postGeo = new THREE.CylinderGeometry(0.15, 0.20, 1.25, 6);
+  postGeo.translate(0, 0.625, 0);
+  const posts = new THREE.InstancedMesh(postGeo, matMarble, postCount);
+  posts.castShadow = true;
+  posts.receiveShadow = true;
+
+  const dummy = new THREE.Object3D();
+  for (let k = 0; k < postCount; k++) {
+    const a = (k / postCount) * Math.PI * 2;
+    dummy.position.set(Math.cos(a) * railR, topY, Math.sin(a) * railR);
+    dummy.rotation.set(0, -a, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    posts.setMatrixAt(k, dummy.matrix);
+  }
+  posts.instanceMatrix.needsUpdate = true;
+  g.add(posts);
+
+  // --- 扶手环 ---
+  const rail = new THREE.Mesh(
+    new THREE.TorusGeometry(railR, 0.11, 6, 96),
+    matMarble
+  );
+  rail.rotation.x = -Math.PI / 2;
+  rail.position.y = topY + 1.12;
+  rail.castShadow = true;
+  g.add(rail);
+
+  // --- 中央石阶 ---
+  const stairGroup = new THREE.Group();
+  const steps = 6;
+  const run = 3.6;
+  const rise = L.h / steps;
+  for (let s = 0; s < steps; s++) {
+    const depth = run / steps;
+    const hh = rise * (s + 1);
+    const stepMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(9.0, hh, depth),
+      matMarble
+    );
+    stepMesh.position.set(
+      0,
+      py + hh / 2,
+      L.r + run - (s + 0.5) * depth
+    );
+    stepMesh.castShadow = true;
+    stepMesh.receiveShadow = true;
+    stairGroup.add(stepMesh);
+  }
+  g.add(stairGroup);
+
+  // 爆炸：台基向外扩张
+  registerAnim(g, new THREE.Vector3(0, 0, 0), 1.10 + i * 0.10, 0.30 + i * 0.045, 0.55);
+
+  py = topY;
+}
+
+/* ============================================================
+   9. 大红圆柱（InstancedMesh）
+   ============================================================ */
+const pillarGeo = new THREE.CylinderGeometry(0.52, 0.60, PILLAR_H, 14);
+const pillarMesh = new THREE.InstancedMesh(pillarGeo, matPillar, PILLAR_COUNT);
+pillarMesh.castShadow = true;
+pillarMesh.receiveShadow = true;
+temple.add(pillarMesh);
+
+const pillarData = [];
+for (let i = 0; i < PILLAR_COUNT; i++) {
+  const a = (i / PILLAR_COUNT) * Math.PI * 2;
+  pillarData.push({
+    pos: new THREE.Vector3(
+      Math.cos(a) * PILLAR_R,
+      PILLAR_BOTTOM + PILLAR_H / 2,
+      Math.sin(a) * PILLAR_R
+    ),
+    dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)),
+    delay: 0.22 + (i / PILLAR_COUNT) * 0.10
+  });
+}
+instAnim.push({ mesh: pillarMesh, data: pillarData, amount: 7.5, dur: 0.55 });
+
+/* ============================================================
+   10. 殿身墙体（含门窗彩画）
+   ============================================================ */
+const wallMesh = new THREE.Mesh(
+  new THREE.CylinderGeometry(WALL_R, WALL_R, WALL_H, 96, 1, true),
+  matWall
+);
+wallMesh.position.y = PILLAR_BOTTOM + WALL_H / 2;
+wallMesh.castShadow = true;
+wallMesh.receiveShadow = true;
+temple.add(wallMesh);
+registerAnim(wallMesh, new THREE.Vector3(0, 0, 0), 1.30, 0.28, 0.55);
+
+/* --- 檐下额枋（彩画环） --- */
+const frieze = new THREE.Mesh(
+  new THREE.CylinderGeometry(15.75, 15.75, 1.15, 96, 1, true),
+  matCaihua
+);
+frieze.position.y = 16.72;
+frieze.castShadow = true;
+temple.add(frieze);
+registerAnim(frieze, new THREE.Vector3(0, 0, 0), 1.30, 0.27, 0.55);
+
+/* 中檐 / 上檐下的彩画环 */
+const frieze2 = new THREE.Mesh(
+  new THREE.CylinderGeometry(12.45, 12.45, 0.95, 80, 1, true),
+  matCaihua
+);
+frieze2.position.y = 26.4;
+frieze2.castShadow = true;
+temple.add(frieze2);
+registerAnim(frieze2, new THREE.Vector3(0, 9.5, 0), 1, 0.14, 0.55);
+
+const frieze3 = new THREE.Mesh(
+  new THREE.CylinderGeometry(9.0, 9.0, 0.85, 72, 1, true),
+  matCaihua
+);
+frieze3.position.y = 34.2;
+frieze3.castShadow = true;
+temple.add(frieze3);
+registerAnim(frieze3, new THREE.Vector3(0, 14.5, 0), 1, 0.08, 0.55);
+
+/* ============================================================
+   11. 斗拱（InstancedMesh）
+   ============================================================ */
+const dougongGeo = new THREE.BoxGeometry(1.0, 1.05, 0.85);
+const dougongMat = matDougong;
+const dougongSets = [
+  { count: 48, radius: 15.8, y: 17.10, delay: 0.22, lift: 3.0, out: 3.2 },
+  { count: 40, radius: 12.55, y: 26.55, delay: 0.18, lift: 8.5, out: 2.6 },
+  { count: 32, radius: 9.10, y: 34.35, delay: 0.14, lift: 13.5, out: 2.2 }
+];
+
+dougongSets.forEach(set => {
+  const mesh = new THREE.InstancedMesh(dougongGeo, dougongMat, set.count);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  temple.add(mesh);
+
+  const data = [];
+  for (let i = 0; i < set.count; i++) {
+    const a = (i / set.count) * Math.PI * 2;
+    data.push({
+      pos: new THREE.Vector3(Math.cos(a) * set.radius, set.y, Math.sin(a) * set.radius),
+      dir: new THREE.Vector3(Math.cos(a), 0, Math.sin(a)),
+      rotY: -a,
+      delay: set.delay + (i / set.count) * 0.06
+    });
+  }
+  instAnim.push({
+    mesh,
+    data,
+    amount: set.out,
+    lift: set.lift,
+    dur: 0.55,
+    needsUpdate: true
+  });
+});
+
+/* ============================================================
+   12. 屋顶（LatheGeometry 曲线轮廓）
+   ============================================================ */
+function roofProfile(R, r, y0, y1, flare) {
+  const pts = [];
+  const baseR = R * 0.93;
+
+  // 檐口：外缘微翘
+  pts.push(new THREE.Vector2(R, y0 + 0.92 * flare));
+  pts.push(new THREE.Vector2(R * 0.986, y0 + 0.58 * flare));
+  pts.push(new THREE.Vector2(R * 0.957, y0 + 0.20 * flare));
+  pts.push(new THREE.Vector2(baseR, y0));
+
+  // 主体曲线：底部平缓、上部陡峭（举折）
+  const N = 30;
+  for (let i = 1; i <= N; i++) {
+    const t = i / N;
+    const rr = r + (baseR - r) * Math.pow(1 - t, 1.50);
+    const yy = y0 + (y1 - y0) * Math.pow(t, 1.55);
+    pts.push(new THREE.Vector2(rr, yy));
+  }
+  return pts;
+}
+
+const roofMeshes = [];
+
+ROOF_DEFS.forEach(def => {
+  const profile = roofProfile(def.R, def.r, def.y0, def.y1, def.flare);
+  const geo = new THREE.LatheGeometry(profile, 128);
+  geo.computeVertexNormals();
+
+  const roof = new THREE.Mesh(geo, matRoof);
+  roof.castShadow = true;
+  roof.receiveShadow = true;
+  temple.add(roof);
+  roofMeshes.push(roof);
+
+  // 檐口金边（增加厚度感）
+  const rimY = def.y0 + 0.92 * def.flare;
+  const rim = new THREE.Mesh(
+    new THREE.TorusGeometry(def.R, 0.22, 6, 128),
+    new THREE.MeshStandardMaterial({
+      color: 0x1a3f80, roughness: 0.35, metalness: 0.35
+    })
+  );
+  rim.rotation.x = -Math.PI / 2;
+  rim.position.y = rimY;
+  rim.castShadow = true;
+  temple.add(rim);
+
+  // 屋顶与金边一起做爆炸动画
+  const grp = new THREE.Group();
+  // 直接把两个网格的位移分开登记即可
+  registerAnim(roof, new THREE.Vector3(0, def.lift, 0), 1, def.delay, 0.55);
+  registerAnim(rim, new THREE.Vector3(0, def.lift, 0), 1, def.delay, 0.55);
+});
+
+/* ============================================================
+   13. 鎏金宝顶
+   ============================================================ */
+function buildFinial() {
+  const pts = [
+    new THREE.Vector2(0.00, 0.00),
+    new THREE.Vector2(1.55, 0.05),
+    new THREE.Vector2(1.72, 0.55),
+    new THREE.Vector2(1.52, 1.15),
+    new THREE.Vector2(1.12, 1.95),
+    new THREE.Vector2(1.38, 2.45),
+    new THREE.Vector2(1.52, 3.00),
+    new THREE.Vector2(1.30, 3.60),
+    new THREE.Vector2(0.82, 4.20),
+    new THREE.Vector2(0.32, 4.62),
+    new THREE.Vector2(0.00, 4.72)
+  ];
+  const geo = new THREE.LatheGeometry(pts, 48);
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, matGold);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+const finial = buildFinial();
+finial.position.y = 42.6;
+temple.add(finial);
+registerAnim(finial, new THREE.Vector3(0, 22, 0), 1, 0.00, 0.55);
+
+/* ============================================================
+   14. 广场地面
+   ============================================================ */
+const groundMat = new THREE.MeshStandardMaterial({
+  map: groundTex, color: 0xd6d2c8, roughness: 0.96, metalness: 0.0
+});
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 1600), groundMat);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.02;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ============================================================
+   15. 绿树（InstancedMesh）
+   ============================================================ */
+(function buildTrees() {
+  const positions = [];
+  const treeCount = 54;
+
+  for (let i = 0; i < treeCount; i++) {
+    const a = rnd() * Math.PI * 2;
+    const radius = 66 + rnd() * 108;
+    // 避开正前方石阶视线
+    const x = Math.cos(a) * radius;
+    const z = Math.sin(a) * radius;
+    if (Math.abs(x) < 16 && z > 40 && z < 130) continue;
+    positions.push({ x, z, s: 0.75 + rnd() * 0.8 });
+  }
+
+  const trunkGeo = new THREE.CylinderGeometry(0.32, 0.52, 4.6, 6);
+  trunkGeo.translate(0, 2.3, 0);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5b4231, roughness: 0.95 });
+
+  const leafGeo = new THREE.SphereGeometry(2.7, 8, 6);
+  leafGeo.scale(1.0, 1.28, 1.0);
+  leafGeo.translate(0, 7.0, 0);
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x3f7c38, roughness: 0.9 });
+
+  const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, positions.length);
+  const leaves = new THREE.InstancedMesh(leafGeo, leafMat, positions.length);
+  trunks.castShadow = true;
+  leaves.castShadow = true;
+  trunks.receiveShadow = true;
+  leaves.receiveShadow = true;
+
+  const d = new THREE.Object3D();
+  positions.forEach((p, i) => {
+    d.position.set(p.x, 0, p.z);
+    d.rotation.set(0, rnd() * Math.PI * 2, 0);
+    d.scale.set(p.s, p.s, p.s);
+    d.updateMatrix();
+    trunks.setMatrixAt(i, d.matrix);
+    leaves.setMatrixAt(i, d.matrix);
+  });
+  trunks.instanceMatrix.needsUpdate = true;
+  leaves.instanceMatrix.needsUpdate = true;
+
+  scene.add(trunks);
+  scene.add(leaves);
+})();
+
+/* ============================================================
+   16. 爆炸 / 重组 动画系统
+   ============================================================ */
+let phase = 0;          // 0 = 完整，1 = 完全散开
+let phaseTarget = 0;
+let lastPhase = -1;
+
+const PHASE_SPEED = 0.85;   // 每秒推进量（约 1.18 秒完成全程）
+
+const _dummy = new THREE.Object3D();
+
+function updateInstancedMeshes() {
+  for (const item of instAnim) {
+    const { mesh, data, amount, lift, dur } = item;
+    const liftAmt = lift || 0;
+
+    for (let i = 0; i < data.length; i++) {
+      const d = data[i];
+      const lt = clamp01((phase - d.delay) / dur);
+      const e = easeInOutCubic(lt);
+
+      _dummy.position.copy(d.pos)
+        .addScaledVector(d.dir, e * amount);
+      _dummy.position.y += e * liftAmt;
+
+      _dummy.rotation.set(0, d.rotY !== undefined ? d.rotY : 0, 0);
+      _dummy.scale.set(1, 1, 1);
+      _dummy.updateMatrix();
+      mesh.setMatrixAt(i, _dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+}
+
+function applyExplosion() {
+  // 普通对象
+  for (const it of animItems) {
+    const lt = clamp01((phase - it.delay) / it.dur);
+    const e = easeInOutCubic(lt);
+
+    it.obj.position.copy(it.basePos).addScaledVector(it.offset, e);
+
+    const s = 1 + (it.sxz - 1) * e;
+    it.obj.scale.set(
+      it.baseScale.x * s,
+      it.baseScale.y,
+      it.baseScale.z * s
+    );
+  }
+  // 实例化对象
+  updateInstancedMeshes();
+}
+
+// 初始化一次
+updateInstancedMeshes();
+
+function tickPhase(dt) {
+  if (phase === phaseTarget) return false;
+
+  const diff = phaseTarget - phase;
+  const step = Math.sign(diff) * Math.min(Math.abs(diff), dt * PHASE_SPEED);
+
+  phase += step;
+  if (phaseTarget === 1) phase = Math.min(phase, 1);
+  else phase = Math.max(phase, 0);
+
+  return true;
+}
+
+/* ============================================================
+   17. UI 交互
+   ============================================================ */
+const btnOrbit = document.getElementById('btnOrbit');
+const btnExplode = document.getElementById('btnExplode');
+
+btnOrbit.addEventListener('click', () => {
+  controls.autoRotate = !controls.autoRotate;
+  btnOrbit.classList.toggle('active', controls.autoRotate);
+});
+
+let exploded = false;
+btnExplode.addEventListener('click', () => {
+  exploded = !exploded;
+  phaseTarget = exploded ? 1 : 0;
+  btnExplode.classList.toggle('active', exploded);
+});
+
+/* ============================================================
+   18. 窗口自适应
+   ============================================================ */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
+
+/* ============================================================
+   19. 主循环
+   ============================================================ */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (tickPhase(dt)) {
+    applyExplosion();
+    lastPhase = phase;
+  }
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+applyExplosion();
+animate();
+</script>
+
+<script src="../prompt-panel.js" data-id="temple-deepseek"></script>
+</body>
+</html>

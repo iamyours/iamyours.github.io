@@ -434,7 +434,7 @@
 
     <main class="gallery-main">
       <p class="intro-banner">
-        这些 3D 场景都由 AI 根据提示词生成，纯代码程序化建模，可以拖动旋转、缩放。每个场景两个版本并排：<b>CLI 版</b>（Gemini 通过 Antigravity CLI 生成）和 <b>Gemini 网页版（4 Argon）</b>，需求相同，方便对比。鹈鹕还多了其他模型生成的版本。
+        这些 3D 场景都由 AI 根据提示词生成，纯代码程序化建模，可以拖动旋转、缩放。每个场景三个版本并排：<b>CLI 版</b>（Gemini 通过 Antigravity CLI 生成）、<b>Gemini 网页版（4 Argon）</b>和 <b>DeepSeek V4.1 Flash</b>（ModelScope API），需求相同，方便对比。
       </p>
 
       <div id="scene-groups" class="scene-groups"></div>
@@ -447,15 +447,8 @@
       {
         id: 'pelican',
         geminiChat: 'https://gemini.google.com/app/2bdb9ed47de306b3',
-        // 额外版本：目录 <id><suffix>/、提示词 prompts/<id><suffix>.txt、缩略图 thumbs/<id><suffix>.jpg
-        extraVariants: [
-          {
-            suffix: '-deepseek',
-            badge: 'DeepSeek V4.1 Flash',
-            badgeClass: 'is-deepseek',
-            note: '同样的需求，直接调用 ModelScope API 上的 DeepSeek-V4.1-Flash 生成。'
-          }
-        ],
+        // 只属于这个场景的额外版本：目录 <id><suffix>/、提示词 prompts/<id><suffix>.txt、缩略图 thumbs/<id><suffix>.jpg
+        extraVariants: [],
         title: '鹈鹕骑自行车',
         description: '社区经典基准题：鹈鹕踩着脚踏沿环形小路骑行，腿、曲柄、车轮联动。',
         gradient: 'linear-gradient(135deg, #d8efc2 0%, #f7e3a1 55%, #f5c396 100%)'
@@ -503,6 +496,12 @@
         badge: 'Gemini 网页版（4 Argon）',
         badgeClass: 'is-web',
         note: '同样的需求，在 Gemini 网页上用 4 Argon（思考：高）生成。'
+      },
+      {
+        suffix: '-deepseek',
+        badge: 'DeepSeek V4.1 Flash',
+        badgeClass: 'is-deepseek',
+        note: '同样的需求，直接调用 ModelScope API 上的 DeepSeek-V4.1-Flash 生成。'
       }
     ];
 
