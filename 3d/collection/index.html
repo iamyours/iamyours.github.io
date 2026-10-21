@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>▶ 合集播放 · 3D 作品</title>
+  <style>
+    :root {
+      --ink: #3a2e24;
+      --cream: #fbf4e2;
+      --card: #fffaf0;
+      --hl: #f3d77a;
+      --hl2: #f7e08e;
+      --bar-bg: rgba(251, 244, 226, 0.92);
+      --strip-h: 118px;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #14110e; color: var(--ink); overflow: hidden;
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+    .player {
+      position: fixed; inset: 0;
+      width: 100vw; height: 100vh; height: 100dvh;
+      display: flex; flex-direction: column;
+    }
+    .stage { position: relative; flex: 1; min-height: 0; background: #0d0b09; }
+    .stage iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #0d0b09; }
+    .loading {
+      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: rgba(13, 11, 9, 0.88); color: var(--cream); font-size: 18px; font-weight: 800;
+      transition: opacity 0.5s ease; pointer-events: none; z-index: 2;
+    }
+    .loading.is-hidden { opacity: 0; }
+    .loading span {
+      padding: 10px 20px; border: 2px solid var(--cream); border-radius: 999px;
+      animation: pulse 1.2s ease-in-out infinite alternate;
+    }
+    @keyframes pulse { from { opacity: 0.55; } to { opacity: 1; } }
+
+    .btn {
+      appearance: none; -webkit-appearance: none;
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      min-height: 36px; padding: 6px 12px;
+      font: inherit; font-size: 14px; font-weight: 800; line-height: 1.2; color: var(--ink);
+      background: var(--hl); border: 2px solid var(--ink); border-radius: 12px;
+      box-shadow: 0 3px 0 var(--ink); cursor: pointer; text-decoration: none; white-space: nowrap;
+      user-select: none; -webkit-user-select: none;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+    }
+    .btn:hover { background: var(--hl2); }
+    .btn:active { transform: translateY(3px); box-shadow: 0 0 0 var(--ink); }
+    .btn.secondary { background: var(--card); }
+    .btn.secondary:hover { background: #f3e8cc; }
+    .btn[disabled] { opacity: 0.45; cursor: not-allowed; transform: none; box-shadow: 0 3px 0 var(--ink); }
+
+    /* 顶栏（占据自己的一行，不盖住场景里的按钮） */
+    .topbar {
+      position: relative; flex: 0 0 auto; z-index: 5;
+      display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px;
+      padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top));
+      background: var(--bar-bg); border-bottom: 2px solid var(--ink);
+      transition: opacity 0.4s ease, transform 0.3s ease;
+    }
+    .top-left, .top-right { display: flex; align-items: center; gap: 8px; min-width: 0; }
+    .top-right { justify-content: flex-end; }
+    .cat-title { font-size: 16px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .now { text-align: center; min-width: 0; }
+    .now-title { font-size: 18px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .now-meta { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12.5px; font-weight: 700; flex-wrap: wrap; }
+    .badge {
+      display: inline-block; padding: 1px 9px; border: 2px solid var(--ink); border-radius: 999px;
+      background: var(--hl); font-size: 12px; font-weight: 800;
+    }
+    .badge.is-web { background: #bcd9f5; }
+    .badge.is-flash { background: #bfe6c8; }
+    .badge.is-deepseek { background: #c9c3f2; }
+    .seg { display: inline-flex; border: 2px solid var(--ink); border-radius: 12px; overflow: hidden; box-shadow: 0 3px 0 var(--ink); }
+    .seg button {
+      appearance: none; border: 0; border-left: 2px solid var(--ink); background: var(--card); color: var(--ink);
+      font: inherit; font-size: 13px; font-weight: 800; padding: 6px 10px; min-height: 32px; cursor: pointer;
+    }
+    .seg button:first-child { border-left: 0; }
+    .seg button.is-on { background: var(--hl); }
+    .seg button[disabled] { opacity: 0.4; cursor: not-allowed; }
+    .open-link { font-size: 12.5px; font-weight: 800; color: var(--ink); white-space: nowrap; }
+
+    /* 底部控制 + 缩略图条 */
+    .bottom {
+      position: relative; z-index: 5; background: var(--bar-bg); border-top: 2px solid var(--ink);
+      padding-bottom: env(safe-area-inset-bottom);
+      transition: opacity 0.4s ease;
+    }
+    .controls { display: flex; align-items: center; gap: 8px; padding: 8px 12px; }
+    .controls .btn { min-width: 42px; min-height: 40px; padding: 6px 10px; font-size: 16px; }
+    .progress { flex: 1; height: 12px; border: 2px solid var(--ink); border-radius: 999px; background: var(--card); overflow: hidden; min-width: 60px; }
+    .progress-fill { height: 100%; width: 0; background: linear-gradient(90deg, #a6cc7a, #8cbc63); }
+    .solo-note { flex: 1; display: none; align-items: center; gap: 8px; font-size: 13.5px; font-weight: 800; min-width: 0; }
+    .solo-note span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .player.is-solo .progress { display: none; }
+    .player.is-solo .solo-note { display: flex; }
+    .counter { font-size: 13px; font-weight: 800; white-space: nowrap; }
+    .strip {
+      display: flex; gap: 10px; overflow-x: auto; overflow-y: hidden; padding: 4px 12px 10px;
+      scroll-behavior: smooth; -webkit-overflow-scrolling: touch;
+    }
+    .item {
+      flex: 0 0 auto; width: 148px; padding: 0; text-align: left; cursor: pointer;
+      background: var(--card); border: 2px solid var(--ink); border-radius: 12px; overflow: hidden;
+      font: inherit; color: var(--ink); box-shadow: 0 3px 0 var(--ink);
+    }
+    .item.is-current { background: var(--hl); outline: 3px solid #e07b39; outline-offset: 1px; }
+    .item-thumb { position: relative; aspect-ratio: 16 / 9; background: linear-gradient(135deg, #d7ebc2 0%, #f5df9d 52%, #f1c397 100%); border-bottom: 2px solid var(--ink); }
+    .item-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .item-thumb img.is-error { opacity: 0; }
+    .item-thumb .badge { position: absolute; left: 4px; bottom: 4px; font-size: 10.5px; padding: 0 6px; border-width: 1.5px; }
+    .item-title { padding: 3px 7px 5px; font-size: 12.5px; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* 隐藏界面 / 闲置时淡化 */
+    .player.ui-hidden .topbar { display: none; }
+    .player.ui-hidden .bottom { display: none; }
+    .player.is-idle:not(.ui-hidden) .topbar,
+    .player.is-idle:not(.ui-hidden) .bottom { opacity: 0.35; }
+    .show-ui {
+      position: absolute; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 6;
+      display: none;
+    }
+    .player.ui-hidden .show-ui { display: inline-flex; }
+    .empty {
+      position: absolute; inset: 0; display: none; align-items: center; justify-content: center;
+      color: var(--cream); font-size: 17px; font-weight: 800; text-align: center; padding: 20px; z-index: 3;
+    }
+
+    @media (max-width: 720px) {
+      .topbar { grid-template-columns: 1fr auto; grid-template-areas: "left right" "now now"; gap: 6px 8px; padding: 6px 8px; padding-top: max(6px, env(safe-area-inset-top)); }
+      .top-left { grid-area: left; }
+      .top-right { grid-area: right; }
+      .now { grid-area: now; }
+      .now-title { font-size: 16px; }
+      .cat-title { font-size: 14px; }
+      .open-link { display: none; }
+      .seg button { padding: 6px 8px; font-size: 12.5px; min-height: 36px; }
+      .controls { gap: 6px; padding: 6px 8px; }
+      .item { width: 112px; }
+      .item-title { font-size: 11.5px; }
+      .counter { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="player" id="player">
+    <header class="topbar" id="topbar">
+      <div class="top-left">
+        <a class="btn secondary" href="../" title="回到 3D 作品页">← 3D 作品</a>
+        <span class="cat-title" id="cat-title"></span>
+      </div>
+      <div class="now">
+        <div class="now-title" id="now-title">加载中…</div>
+        <div class="now-meta">
+          <span class="badge" id="now-badge"></span>
+          <span id="now-pos"></span>
+          <a class="open-link" id="open-link" href="#" target="_blank" rel="noopener">新窗口打开 ↗</a>
+        </div>
+      </div>
+      <div class="top-right">
+        <div class="seg" id="mode-seg" role="group" aria-label="选择播放哪个模型的版本">
+          <button type="button" data-mode="web" title="Gemini 网页版（4 Argon）">Gemini</button>
+          <button type="button" data-mode="flash" title="Gemini 网页版（3.8 Flash）">Flash</button>
+          <button type="button" data-mode="deepseek">DeepSeek</button>
+          <button type="button" data-mode="both">交替</button>
+        </div>
+      </div>
+    </header>
+
+    <div class="stage">
+      <iframe id="frame" title="3D 场景" allow="fullscreen; autoplay; clipboard-write"></iframe>
+      <div class="loading is-hidden" id="loading"><span>加载中…</span></div>
+      <div class="empty" id="empty">这个合集在当前模式下还没有可播放的场景。</div>
+      <button type="button" class="btn show-ui" id="show-ui" title="显示界面">👁 显示界面</button>
+    </div>
+
+    <div class="bottom" id="bottom">
+      <div class="controls">
+        <button type="button" class="btn secondary" id="prev" title="上一个（←）" aria-label="上一个">⏮</button>
+        <button type="button" class="btn" id="toggle" title="暂停 / 播放（空格）" aria-label="暂停或播放">⏸</button>
+        <button type="button" class="btn secondary" id="next" title="下一个（→）" aria-label="下一个">⏭</button>
+        <div class="progress" id="progress" title="每个场景播放 20 秒"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="solo-note" id="solo-note">
+          <span>🔁 单独播放中</span>
+          <button type="button" class="btn secondary" id="resume">▶ 恢复合集轮播</button>
+        </div>
+        <span class="counter" id="counter"></span>
+        <button type="button" class="btn secondary" id="hide-ui" title="隐藏界面" aria-label="隐藏界面">👁</button>
+      </div>
+      <div class="strip" id="strip" aria-label="场景列表"></div>
+    </div>
+  </div>
+
+  <script src="../catalog.js"></script>
+  <script>
+    (function () {
+      'use strict';
+      const DURATION = 20000;      // 每个场景停留 20 秒
+      const LOAD_TIMEOUT = 15000;  // 超过 15 秒还没 load 也开始计时
+
+      const MODELS = window.GALLERY_MODELS || {};
+      const ORDER = window.GALLERY_MODEL_ORDER || ['web', 'flash', 'deepseek'];
+      const CATS = window.GALLERY_CATEGORIES || [];
+      const MODE_ALIAS = { gemini: 'web' };
+
+      const $ = (id) => document.getElementById(id);
+      const player = $('player');
+      const frame = $('frame');
+      const loading = $('loading');
+      const fill = $('progress-fill');
+      const toggleBtn = $('toggle');
+      const strip = $('strip');
+
+      const params = new URLSearchParams(location.search);
+      const cat = CATS.find((c) => c.id === params.get('c')) || CATS[0];
+      if (!cat) { $('now-title').textContent = '没有可播放的合集'; return; }
+
+      const state = {
+        mode: 'both',
+        list: [],
+        index: 0,
+        playing: true,
+        solo: false,
+        elapsed: 0,
+        timerStarted: false,
+        lastTick: 0,
+        loadTimer: null
+      };
+
+      function scenesWith(mode) {
+        const out = [];
+        cat.scenes.forEach((s) => {
+          const avail = ORDER.filter((m) => (s.models || []).indexOf(m) !== -1);
+          const pick = mode === 'both' ? avail : avail.filter((m) => m === mode);
+          pick.forEach((m) => out.push({ scene: s, model: m }));
+        });
+        return out;
+      }
+
+      function normMode(m) {
+        m = MODE_ALIAS[m] || m;
+        return (m === 'both' || MODELS[m]) ? m : 'both';
+      }
+
+      function modeAvailable(m) { return scenesWith(m).length > 0; }
+
+      function updateModeButtons() {
+        document.querySelectorAll('#mode-seg button').forEach((b) => {
+          const m = b.dataset.mode;
+          const ok = modeAvailable(m);
+          b.disabled = !ok;
+          b.classList.toggle('is-on', m === state.mode);
+          b.title = ok
+            ? (m === 'both' ? '每个场景的各个版本依次播放' : '只播放 ' + (MODELS[m] ? MODELS[m].badge : m) + ' 版')
+            : ((MODELS[m] ? MODELS[m].short : m) + ' 版还没生成');
+        });
+      }
+
+      function syncUrl() {
+        const q = new URLSearchParams();
+        q.set('c', cat.id);
+        const cur = state.list[state.index];
+        if (state.solo && cur) q.set('s', cur.scene.id);
+        if (state.solo && cur) q.set('m', cur.model);
+        else if (state.mode !== 'both') q.set('m', state.mode);
+        history.replaceState(null, '', '?' + q.toString() + location.hash);
+      }
+
+      function buildStrip() {
+        strip.innerHTML = '';
+        state.list.forEach((it, i) => {
+          const mm = MODELS[it.model] || { short: it.model, badgeClass: '' };
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'item';
+          b.title = '单独播放：' + it.scene.title + ' · ' + mm.short;
+          const th = document.createElement('div');
+          th.className = 'item-thumb';
+          const img = document.createElement('img');
+          img.loading = 'lazy';
+          img.alt = '';
+          img.src = '../thumbs/' + it.scene.id + '-' + it.model + '.jpg';
+          img.addEventListener('error', () => img.classList.add('is-error'));
+          const bd = document.createElement('span');
+          bd.className = 'badge ' + (mm.badgeClass || '');
+          bd.textContent = mm.short;
+          th.appendChild(img);
+          th.appendChild(bd);
+          const t = document.createElement('div');
+          t.className = 'item-title';
+          t.textContent = it.scene.title;
+          b.appendChild(th);
+          b.appendChild(t);
+          b.addEventListener('click', () => playSolo(i));
+          strip.appendChild(b);
+        });
+      }
+
+      function highlight() {
+        Array.from(strip.children).forEach((el, i) => el.classList.toggle('is-current', i === state.index));
+        const cur = strip.children[state.index];
+        if (cur) {
+          const left = cur.offsetLeft - (strip.clientWidth - cur.offsetWidth) / 2;
+          strip.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+        }
+      }
+
+      function updateInfo() {
+        const it = state.list[state.index];
+        if (!it) return;
+        const mm = MODELS[it.model] || { badge: it.model, badgeClass: '' };
+        $('now-title').textContent = it.scene.title;
+        const badge = $('now-badge');
+        badge.className = 'badge ' + (mm.badgeClass || '');
+        badge.textContent = mm.badge;
+        $('now-pos').textContent = '第 ' + (state.index + 1) + ' / ' + state.list.length + ' 个';
+        $('counter').textContent = (state.index + 1) + ' / ' + state.list.length;
+        $('open-link').href = '../' + it.scene.id + '-' + it.model + '/';
+        document.title = '▶ ' + it.scene.title + ' · ' + cat.title + ' 合集 · 3D 作品';
+        player.classList.toggle('is-solo', state.solo);
+        toggleBtn.textContent = (!state.solo && state.playing) ? '⏸' : '▶';
+        toggleBtn.title = state.solo ? '恢复合集轮播' : (state.playing ? '暂停（空格）' : '播放（空格）');
+      }
+
+      function load(i) {
+        if (!state.list.length) return;
+        state.index = (i + state.list.length) % state.list.length;
+        const it = state.list[state.index];
+        state.elapsed = 0;
+        state.timerStarted = false;
+        fill.style.width = '0%';
+        loading.classList.remove('is-hidden');
+        clearTimeout(state.loadTimer);
+        state.loadTimer = setTimeout(startTimer, LOAD_TIMEOUT);
+        // 换 src：旧场景随之卸载，释放 WebGL 上下文
+        frame.src = '../' + it.scene.id + '-' + it.model + '/';
+        updateInfo();
+        highlight();
+        syncUrl();
+      }
+
+      function startTimer() {
+        clearTimeout(state.loadTimer);
+        loading.classList.add('is-hidden');
+        if (state.timerStarted) return;
+        state.timerStarted = true;
+        state.lastTick = performance.now();
+      }
+
+      frame.addEventListener('load', () => {
+        if (!frame.getAttribute('src')) return;
+        // 让场景先渲染一会儿再撤掉遮罩
+        setTimeout(startTimer, 400);
+      });
+
+      function tick(now) {
+        if (state.timerStarted && state.playing && !state.solo && state.list.length > 1) {
+          state.elapsed += now - state.lastTick;
+          if (state.elapsed >= DURATION) {
+            load(state.index + 1);
+          } else {
+            fill.style.width = (state.elapsed / DURATION * 100).toFixed(2) + '%';
+          }
+        }
+        state.lastTick = now;
+        requestAnimationFrame(tick);
+      }
+
+      function setMode(m, keepScene) {
+        m = normMode(m);
+        if (!modeAvailable(m)) m = 'both';
+        const cur = state.list[state.index];
+        state.mode = m;
+        state.list = scenesWith(m);
+        updateModeButtons();
+        buildStrip();
+        if (!state.list.length) {
+          $('empty').style.display = 'flex';
+          return;
+        }
+        $('empty').style.display = 'none';
+        let idx = 0;
+        if (keepScene && cur) {
+          const same = state.list.findIndex((it) => it.scene.id === cur.scene.id && it.model === cur.model);
+          const sameScene = state.list.findIndex((it) => it.scene.id === cur.scene.id);
+          idx = same !== -1 ? same : (sameScene !== -1 ? sameScene : 0);
+        }
+        load(idx);
+      }
+
+      function playSolo(i) {
+        state.solo = true;
+        load(i);
+      }
+
+      function resumeCarousel() {
+        state.solo = false;
+        state.playing = true;
+        state.elapsed = 0;
+        fill.style.width = '0%';
+        updateInfo();
+        syncUrl();
+      }
+
+      function togglePlay() {
+        if (state.solo) { resumeCarousel(); return; }
+        state.playing = !state.playing;
+        updateInfo();
+      }
+
+      // 事件
+      document.querySelectorAll('#mode-seg button').forEach((b) => {
+        b.addEventListener('click', () => { if (!b.disabled) setMode(b.dataset.mode, true); });
+      });
+      $('prev').addEventListener('click', () => load(state.index - 1));
+      $('next').addEventListener('click', () => load(state.index + 1));
+      toggleBtn.addEventListener('click', togglePlay);
+      $('resume').addEventListener('click', resumeCarousel);
+      $('hide-ui').addEventListener('click', () => player.classList.add('ui-hidden'));
+      $('show-ui').addEventListener('click', () => player.classList.remove('ui-hidden'));
+      document.addEventListener('keydown', (e) => {
+        if (e.target && /input|textarea|select/i.test(e.target.tagName)) return;
+        if (e.key === 'ArrowLeft') { load(state.index - 1); e.preventDefault(); }
+        else if (e.key === 'ArrowRight') { load(state.index + 1); e.preventDefault(); }
+        else if (e.key === ' ' || e.code === 'Space') { togglePlay(); e.preventDefault(); }
+      });
+
+      // 鼠标 3 秒不动时控制栏变淡
+      let idleTimer = null;
+      function wake() {
+        player.classList.remove('is-idle');
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => player.classList.add('is-idle'), 3000);
+      }
+      ['mousemove', 'touchstart', 'keydown'].forEach((ev) => document.addEventListener(ev, wake, { passive: true }));
+      $('topbar').addEventListener('mouseenter', wake);
+      $('bottom').addEventListener('mouseenter', wake);
+      wake();
+
+      // 初始化
+      $('cat-title').textContent = cat.emoji + ' ' + cat.title + ' 合集';
+      document.title = '▶ ' + cat.title + ' 合集 · 3D 作品';
+      const want = normMode(params.get('m') || 'both');
+      const sid = params.get('s');
+      if (sid) {
+        // 单独播放：取指定模型的版本，没有就取该场景第一个可用版本
+        state.mode = modeAvailable(want) ? want : 'both';
+        state.list = scenesWith(state.mode);
+        let idx = state.list.findIndex((it) => it.scene.id === sid);
+        if (idx === -1) {
+          state.mode = 'both';
+          state.list = scenesWith('both');
+          idx = state.list.findIndex((it) => it.scene.id === sid && (it.model === want));
+          if (idx === -1) idx = state.list.findIndex((it) => it.scene.id === sid);
+        }
+        updateModeButtons();
+        buildStrip();
+        if (!state.list.length) { $('empty').style.display = 'flex'; }
+        else if (idx === -1) load(0);
+        else playSolo(idx);
+      } else {
+        setMode(want, false);
+      }
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>

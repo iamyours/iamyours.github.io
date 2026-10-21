@@ -351,6 +351,10 @@
       background-color: #c9c3f2;
     }
 
+    .variant-badge.is-flash {
+      background-color: #bfe6c8;
+    }
+
     .variant-badge.is-opus {
       background-color: #f2c6a8;
     }
@@ -388,6 +392,69 @@
       .scene-grid[data-count="3"] {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+    }
+
+    /* 第二批：三个合集 */
+    .cat-nav {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      margin: -8px 0 24px;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .cat-nav .btn {
+      padding: 6px 12px;
+      font-size: 13.5px;
+    }
+
+    .category-section {
+      margin-top: 40px;
+      scroll-margin-top: 16px;
+    }
+
+    .category-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin: 0 0 18px;
+      padding: 14px 18px;
+      background: var(--topbar-grad);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 4px 0 var(--ink);
+    }
+
+    .category-title {
+      margin: 0;
+      font-size: 24px;
+      font-weight: 800;
+    }
+
+    .category-desc {
+      margin: 2px 0 0;
+      font-size: 14px;
+      font-weight: 600;
+      opacity: 0.85;
+    }
+
+    .category-section .scene-groups {
+      gap: 22px;
+    }
+
+    .source-link {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--ink);
+      opacity: 0.8;
+    }
+
+    .scene-grid[data-count="1"] .scene-card {
+      grid-column: 1 / 2;
     }
 
     .chat-link {
@@ -435,12 +502,18 @@
     <main class="gallery-main">
       <p class="intro-banner">
         这些 3D 场景都由 AI 根据提示词生成，纯代码程序化建模，可以拖动旋转、缩放。每个场景三个版本并排：<b>CLI 版</b>（Gemini 通过 Antigravity CLI 生成）、<b>Gemini 网页版（4 Argon）</b>和 <b>DeepSeek V4.1 Flash</b>（ModelScope API），需求相同，方便对比。鹈鹕还多了一个 <b>Claude Opus 5.5</b>（Antigravity CLI）版本。
+        下面新增三个合集（体素世界、机械与载具、星球与宇宙），题材来自 X 上的热门提示词，每个场景由 <b>Gemini 网页版（4 Argon）</b>、<b>Gemini 网页版（3.8 Flash）</b>和 <b>DeepSeek V4.1 Flash</b> 用同一提示词分别生成，点「▶ 播放合集」可以连续播放。
       </p>
 
+      <nav class="cat-nav" id="cat-nav" aria-label="新增合集"></nav>
+
       <div id="scene-groups" class="scene-groups"></div>
+
+      <div id="category-sections"></div>
     </main>
   </div>
 
+  <script src="catalog.js"></script>
   <script>
     // 场景列表（写成 JS 数组，方便以后扩展）
     const SCENES = [
@@ -578,7 +651,7 @@
       return p;
     }
 
-    function createSceneCard(base, variant) {
+    function createSceneCard(base, variant, playHref) {
       const scene = Object.assign({}, base, {
         id: base.id + variant.suffix,
         title: base.title + ' · ' + variant.badge,
@@ -649,9 +722,16 @@
       togglePromptBtn.textContent = '📜 查看提示词';
 
       actionsEl.appendChild(enterLink);
+      if (playHref) {
+        const playLink = document.createElement('a');
+        playLink.className = 'btn btn-secondary';
+        playLink.href = playHref;
+        playLink.textContent = '▶ 单独播放';
+        actionsEl.appendChild(playLink);
+      }
       actionsEl.appendChild(togglePromptBtn);
 
-      if (variant.suffix === '-web' && base.geminiChat) {
+      if ((variant.suffix === '-web' || variant.suffix === '-flash') && base.geminiChat) {
         const chatLink = document.createElement('a');
         chatLink.className = 'chat-link';
         chatLink.href = base.geminiChat;
@@ -763,7 +843,113 @@
       groups.appendChild(frag);
     }
 
+    // 第二批：按类别渲染合集（数据来自 catalog.js）
+    function renderCategories() {
+      const host = document.getElementById('category-sections');
+      const nav = document.getElementById('cat-nav');
+      const cats = window.GALLERY_CATEGORIES || [];
+      const models = window.GALLERY_MODELS || {};
+      const order = window.GALLERY_MODEL_ORDER || [];
+      if (!host || !cats.length) return;
+
+      if (nav) {
+        const label = document.createElement('span');
+        label.textContent = '新增合集：';
+        nav.appendChild(label);
+        cats.forEach((cat) => {
+          const a = document.createElement('a');
+          a.className = 'btn btn-secondary';
+          a.href = '#cat-' + cat.id;
+          a.textContent = cat.emoji + ' ' + cat.title;
+          nav.appendChild(a);
+        });
+      }
+
+      const frag = document.createDocumentFragment();
+      cats.forEach((cat) => {
+        const section = document.createElement('section');
+        section.className = 'category-section';
+        section.id = 'cat-' + cat.id;
+
+        const head = document.createElement('div');
+        head.className = 'category-head';
+        const titles = document.createElement('div');
+        const h = document.createElement('h2');
+        h.className = 'category-title';
+        h.textContent = cat.emoji + ' ' + cat.title;
+        const d = document.createElement('p');
+        d.className = 'category-desc';
+        const count = cat.scenes.filter((s) => s.models && s.models.length).length;
+        d.textContent = cat.description + '（' + count + ' 个场景）';
+        titles.appendChild(h);
+        titles.appendChild(d);
+        const play = document.createElement('a');
+        play.className = 'btn';
+        play.href = 'collection/?c=' + encodeURIComponent(cat.id);
+        play.textContent = '▶ 播放合集';
+        head.appendChild(titles);
+        head.appendChild(play);
+        section.appendChild(head);
+
+        const groups = document.createElement('div');
+        groups.className = 'scene-groups';
+        cat.scenes.forEach((scene) => {
+          const avail = order.filter((m) => (scene.models || []).indexOf(m) !== -1 && models[m]);
+          if (!avail.length) return;
+          const group = document.createElement('section');
+          group.className = 'scene-group';
+          group.dataset.group = scene.id;
+
+          const gh = document.createElement('div');
+          gh.className = 'scene-group-head';
+          const gt = document.createElement('h3');
+          gt.className = 'scene-group-title';
+          gt.textContent = scene.title;
+          const gd = document.createElement('p');
+          gd.className = 'scene-group-desc';
+          gd.textContent = scene.description;
+          gh.appendChild(gt);
+          gh.appendChild(gd);
+          if (scene.source) {
+            const src = document.createElement('a');
+            src.className = 'source-link';
+            src.href = scene.source;
+            src.target = '_blank';
+            src.rel = 'noopener';
+            src.textContent = '原帖 ↗';
+            gh.appendChild(src);
+          }
+
+          const grid = document.createElement('div');
+          grid.className = 'scene-grid';
+          grid.dataset.count = String(avail.length);
+          avail.forEach((m) => {
+            const mm = models[m];
+            const variant = { suffix: '-' + m, badge: mm.badge, badgeClass: mm.badgeClass, note: mm.note };
+            const href = 'collection/?c=' + encodeURIComponent(cat.id) +
+              '&s=' + encodeURIComponent(scene.id) + '&m=' + encodeURIComponent(m);
+            const base = Object.assign({}, scene, { geminiChat: (scene.chats || {})[m] });
+            grid.appendChild(createSceneCard(base, variant, href));
+          });
+
+          group.appendChild(gh);
+          group.appendChild(grid);
+          groups.appendChild(group);
+        });
+        section.appendChild(groups);
+        frag.appendChild(section);
+      });
+      host.appendChild(frag);
+
+      // 带 #cat-xxx 打开时，渲染完成后再定位一次
+      if (location.hash && location.hash.indexOf('#cat-') === 0) {
+        const target = document.getElementById(location.hash.slice(1));
+        if (target) target.scrollIntoView();
+      }
+    }
+
     renderGallery();
+    renderCategories();
   </script>
 </body>
 </html>

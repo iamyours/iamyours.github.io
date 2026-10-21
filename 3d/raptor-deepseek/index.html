@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>SpaceX 猛禽发动机 · 3D 模型</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #ffffff;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app {
+    position: fixed;
+    inset: 0;
+  }
+  #app canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  #back {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 20;
+    display: inline-block;
+    padding: 9px 15px;
+    font: 500 13px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    letter-spacing: .2px;
+    color: #4a4136;
+    background: rgba(255, 250, 235, 0.82);
+    border: 1px solid rgba(120, 100, 70, 0.16);
+    border-radius: 999px;
+    text-decoration: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 3px 12px rgba(90, 75, 50, 0.10);
+    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+  }
+  #back:hover {
+    background: rgba(255, 247, 224, 0.96);
+    transform: translateY(-1px);
+    box-shadow: 0 5px 16px rgba(90, 75, 50, 0.16);
+  }
+  #back:active {
+    transform: translateY(0);
+  }
+</style>
+</head>
+<body>
+
+<div id="app"></div>
+<a id="back" href="../">← 返回 3D 作品</a>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   1. 渲染器 / 场景 / 相机
+   ========================================================= */
+const container = document.getElementById('app');
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.08;
+container.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xffffff);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 400);
+camera.position.set(10.5, 5.5, 15);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.panSpeed = 0.7;
+controls.minDistance = 9;
+controls.maxDistance = 44;
+controls.minPolarAngle = 0.10;
+controls.maxPolarAngle = Math.PI - 0.10;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.55;
+controls.update();
+
+/* =========================================================
+   2. 程序化环境贴图（用于金属反射）
+   ========================================================= */
+function buildEnvironmentTexture() {
+  const w = 1024, h = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  const g = ctx.createLinearGradient(0, 0, 0, h);
+  g.addColorStop(0.00, '#ffffff');
+  g.addColorStop(0.30, '#f6f8fb');
+  g.addColorStop(0.50, '#e2e8ef');
+  g.addColorStop(0.68, '#b8c2ce');
+  g.addColorStop(0.85, '#8e99a6');
+  g.addColorStop(1.00, '#6f7986');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, w, h);
+
+  // 主光斑
+  ctx.globalCompositeOperation = 'lighter';
+  const spot1 = ctx.createRadialGradient(w * 0.70, h * 0.20, 4, w * 0.70, h * 0.20, 190);
+  spot1.addColorStop(0, 'rgba(255,255,255,1)');
+  spot1.addColorStop(0.4, 'rgba(255,255,255,0.42)');
+  spot1.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spot1;
+  ctx.fillRect(0, 0, w, h);
+
+  // 副光斑
+  const spot2 = ctx.createRadialGradient(w * 0.20, h * 0.32, 4, w * 0.20, h * 0.32, 150);
+  spot2.addColorStop(0, 'rgba(255,255,255,0.92)');
+  spot2.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = spot2;
+  ctx.fillRect(0, 0, w, h);
+
+  // 底部补光，避免金属底部死黑
+  const spot3 = ctx.createRadialGradient(w * 0.50, h * 0.98, 10, w * 0.50, h * 0.98, 260);
+  spot3.addColorStop(0, 'rgba(210,222,235,0.85)');
+  spot3.addColorStop(1, 'rgba(210,222,235,0)');
+  ctx.fillStyle = spot3;
+  ctx.fillRect(0, 0, w, h);
+
+  ctx.globalCompositeOperation = 'source-over';
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  pmrem.compileEquirectangularShader();
+  const rt = pmrem.fromEquirectangular(tex);
+  pmrem.dispose();
+  tex.dispose();
+
+  return rt.texture;
+}
+
+scene.environment = buildEnvironmentTexture();
+
+/* =========================================================
+   3. 灯光
+   ========================================================= */
+const hemi = new THREE.HemisphereLight(0xffffff, 0xd6dde5, 0.55);
+scene.add(hemi);
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.75);
+keyLight.position.set(9, 14, 10);
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xe4eeff, 0.75);
+fillLight.position.set(-12, 5, 8);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 1.05);
+rimLight.position.set(-7, -8, -12);
+scene.add(rimLight);
+
+/* =========================================================
+   4. 程序化贴图：喷管冷却通道凹凸
+   ========================================================= */
+function makeChannelTexture() {
+  const w = 1024, h = 8, period = 16;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, 0, w, h);
+
+  for (let x = 0; x < w; x += period) {
+    const g = ctx.createLinearGradient(x, 0, x + period, 0);
+    g.addColorStop(0.00, '#0d0d0d');
+    g.addColorStop(0.30, '#efefef');
+    g.addColorStop(0.70, '#efefef');
+    g.addColorStop(1.00, '#0d0d0d');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, 0, period, h);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+const channelTex = makeChannelTexture();
+
+/* =========================================================
+   5. 材质
+   ========================================================= */
+const matNozzle = new THREE.MeshStandardMaterial({
+  color: 0xa9b0b9,
+  metalness: 1.0,
+  roughness: 0.31,
+  bumpMap: channelTex,
+  bumpScale: 0.30,
+  side: THREE.DoubleSide
+});
+
+const matChamber = new THREE.MeshStandardMaterial({
+  color: 0x9ba3ac,
+  metalness: 1.0,
+  roughness: 0.28,
+  bumpMap: channelTex,
+  bumpScale: 0.20,
+  side: THREE.DoubleSide
+});
+
+const matSteel = new THREE.MeshStandardMaterial({
+  color: 0x8f97a0,
+  metalness: 1.0,
+  roughness: 0.36
+});
+
+const matDark = new THREE.MeshStandardMaterial({
+  color: 0x4a5057,
+  metalness: 0.95,
+  roughness: 0.46
+});
+
+const matCopper = new THREE.MeshStandardMaterial({
+  color: 0xb87a4c,
+  metalness: 1.0,
+  roughness: 0.34
+});
+
+const matGold = new THREE.MeshStandardMaterial({
+  color: 0xc9a562,
+  metalness: 1.0,
+  roughness: 0.30
+});
+
+/* =========================================================
+   6. 发动机主体
+   ========================================================= */
+const engine = new THREE.Group();
+engine.position.y = 1.25;
+scene.add(engine);
+
+const NOZZLE_LEN = 7.0;
+const R_THROAT = 1.0;
+const R_EXIT = 3.2;
+
+function nozzleRadiusAt(y) {
+  const t = THREE.MathUtils.clamp(-y / NOZZLE_LEN, 0, 1);
+  const f = 2.2 * t * t - 1.2 * t * t * t;   // f(0)=0, f(1)=1, f'(0)=0
+  return R_THROAT + (R_EXIT - R_THROAT) * f;
+}
+
+/* 燃烧室半径查表（用于管路贴合） */
+const CHAMBER_PROFILE = [
+  [0.00, 1.00],
+  [0.38, 1.18],
+  [0.78, 1.28],
+  [1.20, 1.33],
+  [1.65, 1.34],
+  [1.95, 1.33],
+  [2.15, 1.28],
+  [2.30, 1.18],
+  [2.44, 0.95]
+];
+
+function bodyRadiusAt(y) {
+  if (y <= 0) return nozzleRadiusAt(y);
+  const P = CHAMBER_PROFILE;
+  if (y >= P[P.length - 1][0]) return P[P.length - 1][1];
+  for (let i = 0; i < P.length - 1; i++) {
+    if (y >= P[i][0] && y <= P[i + 1][0]) {
+      const k = (y - P[i][0]) / (P[i + 1][0] - P[i][0]);
+      return P[i][1] + (P[i + 1][1] - P[i][1]) * k;
+    }
+  }
+  return 1.0;
+}
+
+/* ---------- 6.1 喷管（含内外壁与出口唇口） ---------- */
+(function buildNozzle() {
+  const N = 84;
+  const inner = [];
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const y = -NOZZLE_LEN * t;
+    inner.push(new THREE.Vector2(nozzleRadiusAt(y), y));
+  }
+
+  const profile = [];
+  // 内壁：喉部 → 出口
+  for (let i = 0; i <= N; i++) {
+    profile.push(new THREE.Vector2(inner[i].x, inner[i].y));
+  }
+  // 外壁：出口 → 喉部（带壁厚）
+  for (let i = N; i >= 0; i--) {
+    const th = 0.13 * Math.pow(i / N, 0.65);
+    profile.push(new THREE.Vector2(inner[i].x + th, inner[i].y));
+  }
+
+  const geo = new THREE.LatheGeometry(profile, 220);
+  const mesh = new THREE.Mesh(geo, matNozzle);
+  engine.add(mesh);
+})();
+
+/* ---------- 6.2 燃烧室与喷注器圆顶 ---------- */
+(function buildChamber() {
+  const raw = [
+    [1.00, 0.00],
+    [1.08, 0.14],
+    [1.18, 0.38],
+    [1.28, 0.78],
+    [1.33, 1.20],
+    [1.34, 1.65],
+    [1.33, 1.95],
+    [1.28, 2.15],
+    [1.18, 2.30],
+    [1.05, 2.40],
+    [0.95, 2.44],
+    [0.00, 2.44]
+  ];
+  const pts = raw.map(p => new THREE.Vector2(p[0], p[1]));
+  const geo = new THREE.LatheGeometry(pts, 110);
+  engine.add(new THREE.Mesh(geo, matChamber));
+})();
+
+/* ---------- 6.3 喷注器法兰 + 螺栓环 ---------- */
+(function buildFlange() {
+  const flange = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.18, 1.12, 0.14, 72),
+    matSteel
+  );
+  flange.position.y = 2.44;
+  engine.add(flange);
+
+  const boltGeo = new THREE.CylinderGeometry(0.045, 0.045, 0.09, 6);
+  const boltRing = new THREE.Group();
+  for (let i = 0; i < 24; i++) {
+    const a = (i / 24) * Math.PI * 2;
+    const b = new THREE.Mesh(boltGeo, matDark);
+    b.position.set(Math.cos(a) * 1.04, 2.54, Math.sin(a) * 1.04);
+    boltRing.add(b);
+  }
+  engine.add(boltRing);
+})();
+
+/* ---------- 6.4 涡轮泵组 ---------- */
+function createPump(x, z) {
+  const g = new THREE.Group();
+  g.position.set(x, 2.48, z);
+
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(0.58, 0.58, 0.16, 40), matDark);
+  base.position.y = 0.08;
+  g.add(base);
+
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.50, 0.55, 1.20, 40), matSteel);
+  body.position.y = 0.76;
+  g.add(body);
+
+  [0.42, 1.02].forEach(yy => {
+    const band = new THREE.Mesh(new THREE.TorusGeometry(0.525, 0.034, 8, 56), matDark);
+    band.rotation.x = Math.PI / 2;
+    band.position.y = yy;
+    g.add(band);
+  });
+
+  const top = new THREE.Mesh(new THREE.CylinderGeometry(0.56, 0.56, 0.14, 40), matDark);
+  top.position.y = 1.43;
+  g.add(top);
+
+  const dome = new THREE.Mesh(
+    new THREE.SphereGeometry(0.46, 32, 18, 0, Math.PI * 2, 0, Math.PI / 2),
+    matSteel
+  );
+  dome.position.y = 1.50;
+  g.add(dome);
+
+  const port = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.16, 0.24, 20), matCopper);
+  port.position.y = 1.93;
+  g.add(port);
+
+  return g;
+}
+
+engine.add(createPump(-0.68, 0));
+engine.add(createPump(0.68, 0));
+
+// 中央连接段
+(function buildCenterManifold() {
+  const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.30, 1.05, 28), matDark);
+  cyl.position.y = 3.15;
+  engine.add(cyl);
+
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(0.26, 24, 14), matGold);
+  cap.position.y = 3.68;
+  engine.add(cap);
+
+  const sy = new THREE.Mesh(new THREE.SphereGeometry(0.20, 20, 12), matDark);
+  sy.position.y = 2.72;
+  engine.add(sy);
+})();
+
+/* ---------- 6.5 沿喷管外壁的输送管路 ---------- */
+function makeConduit(a0, a1, y0, y1, offset, radius, mat) {
+  const steps = 48;
+  const pts = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const y = y0 + (y1 - y0) * t;
+    const r = bodyRadiusAt(y) + offset;
+    const a = a0 + (a1 - a0) * t;
+    pts.push(new THREE.Vector3(Math.cos(a) * r, y, Math.sin(a) * r));
+  }
+  const curve = new THREE.CatmullRomCurve3(pts);
+  const geo = new THREE.TubeGeometry(curve, 110, radius, 10, false);
+  return new THREE.Mesh(geo, mat);
+}
+
+// 三条主输送管
+engine.add(makeConduit(0.45, 0.92, 2.32, -5.40, 0.20, 0.085, matSteel));
+engine.add(makeConduit(2.45, 2.92, 2.32, -5.40, 0.20, 0.085, matSteel));
+engine.add(makeConduit(4.45, 4.92, 2.32, -5.40, 0.20, 0.085, matSteel));
+
+// 两条细的燃气/氧气管
+engine.add(makeConduit(1.62, 1.92, 2.28, -3.10, 0.27, 0.052, matCopper));
+engine.add(makeConduit(3.62, 3.92, 2.28, -3.10, 0.27, 0.052, matGold));
+
+/* ---------- 6.6 出口唇口加强环 ---------- */
+(function buildLipRing() {
+  const y = -6.86;
+  const r = nozzleRadiusAt(y) + 0.135;
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(r, 0.055, 10, 128), matDark);
+  ring.rotation.x = Math.PI / 2;
+  ring.position.y = y;
+  engine.add(ring);
+})();
+
+/* ---------- 6.7 顶部小型接头与短管 ---------- */
+(function buildTopDetails() {
+  const barGeo = new THREE.CylinderGeometry(0.07, 0.07, 1.0, 14);
+  const bar = new THREE.Mesh(barGeo, matSteel);
+  bar.rotation.z = Math.PI / 2;
+  bar.position.set(0, 4.05, 0);
+  engine.add(bar);
+
+  const t1 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.55, 16), matCopper);
+  t1.position.set(-0.90, 3.55, 0.30);
+  t1.rotation.z = 0.4;
+  engine.add(t1);
+
+  const t2 = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 0.55, 16), matCopper);
+  t2.position.set(0.90, 3.55, -0.30);
+  t2.rotation.z = -0.4;
+  engine.add(t2);
+
+  // 两个小阀门球
+  const valveGeo = new THREE.SphereGeometry(0.15, 18, 12);
+  const v1 = new THREE.Mesh(valveGeo, matDark);
+  v1.position.set(-0.90, 3.85, 0.30);
+  engine.add(v1);
+  const v2 = new THREE.Mesh(valveGeo, matDark);
+  v2.position.set(0.90, 3.85, -0.30);
+  engine.add(v2);
+})();
+
+/* =========================================================
+   7. 响应式与渲染循环
+   ========================================================= */
+function onWindowResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onWindowResize);
+window.addEventListener('orientationchange', onWindowResize);
+
+let rafId = 0;
+
+function animate() {
+  rafId = requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+// 页面卸载时清理
+window.addEventListener('beforeunload', () => {
+  cancelAnimationFrame(rafId);
+  controls.dispose();
+  renderer.dispose();
+});
+</script>
+
+<script src="../prompt-panel.js" data-id="raptor-deepseek"></script>
+</body>
+</html>

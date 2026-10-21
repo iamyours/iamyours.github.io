@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>梅赛德斯-AMG F1 体素赛车</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #131922;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { display: block; }
+
+  .back-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    display: inline-block;
+    padding: 8px 15px;
+    background: rgba(255, 248, 231, 0.82);
+    color: #2a2f38;
+    text-decoration: none;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 3px 14px rgba(0, 0, 0, 0.32);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.3px;
+    line-height: 1;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .back-btn:hover {
+    background: rgba(255, 250, 238, 1);
+    transform: translateY(-1px);
+  }
+  .back-btn:active { transform: translateY(0); }
+
+  .hint {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 100;
+    padding: 7px 16px;
+    border-radius: 999px;
+    background: rgba(16, 22, 30, 0.55);
+    border: 1px solid rgba(0, 210, 190, 0.22);
+    color: rgba(210, 235, 235, 0.85);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    pointer-events: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    animation: fadeHint 0.9s ease 1.6s both;
+  }
+  @keyframes fadeHint {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+  @media (max-width: 520px) {
+    .hint { font-size: 11px; padding: 6px 12px; }
+    .back-btn { font-size: 12px; padding: 7px 12px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="back-btn" href="../">← 返回 3D 作品</a>
+<div class="hint">拖动旋转 · 滚轮 / 双指缩放</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ============================================================
+   1. 渲染器 / 场景 / 相机 / 控制器
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x131922);
+scene.fog = new THREE.Fog(0x131922, 38, 108);
+
+const camera = new THREE.PerspectiveCamera(
+  45, window.innerWidth / window.innerHeight, 0.1, 400
+);
+camera.position.set(11, 9, 15);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.065;
+controls.enablePan = false;
+controls.minDistance = 6;
+controls.maxDistance = 48;
+controls.minPolarAngle = 0.12;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.65;
+controls.target.set(0, 1.4, 0);
+
+/* ============================================================
+   2. 程序化环境贴图（提升金属质感）
+   ============================================================ */
+(function buildEnvironment() {
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  const envScene = new THREE.Scene();
+
+  const room = new THREE.Mesh(
+    new THREE.BoxGeometry(40, 26, 40),
+    new THREE.MeshBasicMaterial({ color: 0x2c333e, side: THREE.BackSide })
+  );
+  envScene.add(room);
+
+  const topLight = new THREE.Mesh(
+    new THREE.PlaneGeometry(26, 26),
+    new THREE.MeshBasicMaterial({ color: 0xffffff })
+  );
+  topLight.rotation.x = Math.PI / 2;
+  topLight.position.y = 12.9;
+  envScene.add(topLight);
+
+  const cyanLight = new THREE.Mesh(
+    new THREE.PlaneGeometry(24, 14),
+    new THREE.MeshBasicMaterial({ color: 0x3fe6d6 })
+  );
+  cyanLight.position.set(0, 1, -19.9);
+  envScene.add(cyanLight);
+
+  const warmLight = new THREE.Mesh(
+    new THREE.PlaneGeometry(20, 12),
+    new THREE.MeshBasicMaterial({ color: 0xffd9a8 })
+  );
+  warmLight.position.set(19.9, 2, 0);
+  warmLight.rotation.y = -Math.PI / 2;
+  envScene.add(warmLight);
+
+  const rt = pmrem.fromScene(envScene, 0.02);
+  scene.environment = rt.texture;
+
+  room.geometry.dispose();
+  room.material.dispose();
+  topLight.geometry.dispose();
+  topLight.material.dispose();
+  cyanLight.geometry.dispose();
+  cyanLight.material.dispose();
+  warmLight.geometry.dispose();
+  warmLight.material.dispose();
+  pmrem.dispose();
+})();
+
+/* ============================================================
+   3. 灯光
+   ============================================================ */
+const hemiLight = new THREE.HemisphereLight(0xa8c8ff, 0x0a0d12, 1.55);
+scene.add(hemiLight);
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 3.1);
+keyLight.position.set(9, 16, 8);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 70;
+keyLight.shadow.camera.left = -16;
+keyLight.shadow.camera.right = 16;
+keyLight.shadow.camera.top = 16;
+keyLight.shadow.camera.bottom = -16;
+keyLight.shadow.bias = -0.0012;
+keyLight.shadow.normalBias = 0.022;
+scene.add(keyLight);
+scene.add(keyLight.target);
+
+const fillLight = new THREE.DirectionalLight(0x00d2be, 1.7);
+fillLight.position.set(-13, 7, -11);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0x8fbcff, 1.3);
+rimLight.position.set(-7, 5, 15);
+scene.add(rimLight);
+
+/* ============================================================
+   4. 地面（Canvas 程序化贴图）
+   ============================================================ */
+function makeGroundTexture() {
+  const size = 256;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = size;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#0d1117';
+  ctx.fillRect(0, 0, size, size);
+
+  ctx.strokeStyle = 'rgba(0, 210, 190, 0.14)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(2, 2, size - 4, size - 4);
+
+  ctx.strokeStyle = 'rgba(150, 180, 200, 0.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(size / 2, 0);
+  ctx.lineTo(size / 2, size);
+  ctx.moveTo(0, size / 2);
+  ctx.lineTo(size, size / 2);
+  ctx.stroke();
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(24, 24);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(90, 90),
+  new THREE.MeshStandardMaterial({
+    map: makeGroundTexture(),
+    color: 0xffffff,
+    roughness: 0.88,
+    metalness: 0.18
+  })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ============================================================
+   5. 体素赛车构建
+   ============================================================ */
+const COL = {
+  carbon:    0x1a1d22, // 碳黑车身
+  carbon2:   0x2c3138, // 次级碳纤维
+  silver:    0xc9ced4, // 梅赛德斯银
+  silverD:   0x8e959c, // 深银
+  petronas:  0x00d2be, // 马石油青绿
+  petronasD: 0x00877e,
+  tire:      0x131417, // 轮胎
+  rim:       0x9ba1a8, // 轮辋
+  rimD:      0x33383f, // 轮毂中心
+  glass:     0x08090b, // 座舱内部
+  helmet:    0x00d2be  // 头盔
+};
+
+const P = {}; // 颜色 -> 几何体数组
+
+function addBox(x, y, z, w, h, d, color) {
+  const g = new THREE.BoxGeometry(1, 1, 1);
+  g.scale(w, h, d);
+  g.translate(x, y, z);
+  (P[color] = P[color] || []).push(g);
+}
+
+function addBoxPair(x, y, z, w, h, d, color) {
+  addBox(x, y, z, w, h, d, color);
+  addBox(x, y, -z, w, h, d, color);
+}
+
+/* ---------- 体素车轮 ---------- */
+function addWheel(cx, cy, cz, R, width) {
+  const s = 0.7;                       // 单个体素边长
+  const n = Math.ceil(R / s) + 1;
+  const rimR = R * 0.70;               // 轮辋半径
+  const halfW = width / 2;
+  const nz = Math.max(2, Math.round(width / s));
+  const slice = width / nz;
+
+  for (let i = -n; i <= n; i++) {
+    for (let j = -n; j <= n; j++) {
+      const px = cx + (i + 0.5) * s;
+      const py = cy + (j + 0.5) * s;
+      const ddx = px - cx;
+      const ddy = py - cy;
+      const dist = Math.sqrt(ddx * ddx + ddy * ddy);
+      if (dist > R) continue;
+
+      let color;
+      if (dist < rimR * 0.34) color = COL.rimD;
+      else if (dist < rimR) color = COL.rim;
+      else color = COL.tire;
+
+      for (let k = 0; k < nz; k++) {
+        const pz = cz - halfW + (k + 0.5) * slice;
+        addBox(px, py, pz, s, s, slice, color);
+      }
+    }
+  }
+}
+
+/* ============================================================
+   6. 组装 F1 赛车（单位：1 体素单位，最后整体缩放）
+   坐标：+X 车头方向 / +Y 向上 / +Z 车身右侧
+   ============================================================ */
+
+/* ---------- 底板 Floor ---------- */
+addBox(-2, 1.15, 0, 40, 1.0, 11.0, COL.carbon);       // 主底板  x: -22..18
+addBox(20, 1.15, 0, 8, 1.0, 8.0, COL.carbon);         // 前段收窄 x: 16..24
+addBox(-2, 1.72, 0, 40, 0.3, 11.4, COL.silverD);      // 银色边缘
+addBoxPair(-2, 1.45, 5.5, 38, 0.4, 0.5, COL.petronasD); // 侧向青绿导流
+
+/* ---------- 鼻锥 Nose ---------- */
+addBox(13.0, 3.6, 0, 12.0, 3.0, 4.4, COL.silver);
+addBox(21.0, 3.2, 0,  7.0, 2.4, 3.6, COL.silver);
+addBox(26.0, 2.9, 0,  5.0, 1.9, 2.8, COL.silver);
+// 鼻锥顶部青绿饰条
+addBox(13.0, 5.18, 0, 12.0, 0.22, 2.0, COL.petronas);
+addBox(21.0, 4.46, 0,  7.0, 0.22, 1.5, COL.petronas);
+// 鼻锥侧边深色
+addBoxPair(13.0, 3.0, 2.2, 12.0, 1.2, 0.3, COL.carbon2);
+
+/* ---------- 单体壳 / 座舱 ---------- */
+addBox(2.0, 4.3, 0, 13.0, 4.6, 6.0, COL.carbon);
+addBox(1.5, 6.5, 0, 8.0, 0.7, 4.4, COL.silverD);      // 座舱框
+addBox(1.5, 6.92, 0, 6.0, 0.4, 3.0, COL.glass);       // 舱口
+addBox(1.0, 7.42, 0, 2.2, 1.4, 2.2, COL.helmet);      // 车手头盔
+addBox(1.0, 7.55, 1.12, 2.2, 0.55, 0.28, COL.glass);  // 面罩右
+addBox(1.0, 7.55, -1.12, 2.2, 0.55, 0.28, COL.glass); // 面罩左
+
+/* ---------- Halo 保护架 ---------- */
+addBox(6.2, 7.30, 0, 0.75, 1.9, 0.9, COL.carbon2);    // 前立柱
+addBox(4.6, 8.15, 0, 3.2, 0.6, 4.6, COL.carbon2);     // 前横梁
+addBoxPair(1.8, 8.15, 2.0, 6.4, 0.6, 0.62, COL.carbon2); // 左右环臂
+
+/* ---------- 侧箱 Sidepods ---------- */
+addBoxPair(4.5, 3.40, 4.50, 7.0, 3.0, 3.4, COL.carbon);
+addBoxPair(-2.0, 3.80, 4.70, 7.0, 4.2, 3.8, COL.carbon);
+addBoxPair(-9.0, 3.60, 4.40, 8.0, 3.8, 3.2, COL.carbon);
+// 侧箱青绿装饰条
+addBoxPair(-2.0, 6.02, 4.70, 7.0, 0.3, 3.6, COL.petronas);
+addBoxPair(4.5, 4.98, 4.50, 7.0, 0.26, 3.2, COL.petronas);
+// 侧箱散热口
+addBoxPair(-12.6, 4.6, 4.4, 0.4, 2.0, 2.4, COL.petronasD);
+
+/* ---------- 引擎盖 / 进气口 ---------- */
+addBox(-3.5, 7.2, 0, 2.6, 2.6, 2.2, COL.carbon);      // 进气口
+addBox(-3.5, 8.55, 0, 2.2, 0.3, 1.8, COL.petronasD);  // 进气口顶
+addBox(-8.0, 6.0, 0, 7.0, 3.8, 4.2, COL.carbon);      // x -11.5..-4.5
+addBox(-13.0, 5.2, 0, 5.0, 3.0, 3.2, COL.carbon);     // x -15.5..-10.5
+addBox(-17.5, 4.6, 0, 5.0, 2.4, 2.6, COL.carbon);     // x -20..-15
+// 鲨鱼鳍
+addBox(-12.0, 7.7, 0, 12.0, 1.5, 0.5, COL.carbon2);
+addBox(-12.0, 8.35, 0, 12.0, 0.25, 0.5, COL.petronas);
+// 尾部排气
+addBox(-20.6, 4.7, 0, 1.4, 1.2, 1.4, COL.silverD);
+
+/* ---------- 后翼 Rear Wing ---------- */
+addBox(-20.5, 10.0, 0, 1.8, 8.0, 1.4, COL.carbon);         // 中央支柱
+addBoxPair(-23.5, 12.4, 7.60, 6.0, 4.6, 0.7, COL.silver);  // 端板
+addBox(-23.0, 14.20, 0, 5.0, 0.7, 15.0, COL.petronas);     // 主翼面
+addBox(-24.5, 12.80, 0, 4.0, 0.7, 15.0, COL.silver);       // 下层翼面
+addBox(-21.4, 13.50, 0, 0.5, 0.5, 14.4, COL.carbon2);      // 细支撑
+
+/* ---------- 前翼 Front Wing ---------- */
+addBoxPair(26.0, 3.40, 9.20, 6.0, 2.6, 0.7, COL.silver);   // 端板
+addBox(25.5, 2.40, 0, 5.0, 0.7, 18.0, COL.silver);         // 主翼面
+addBox(23.5, 3.10, 0, 4.0, 0.6, 16.0, COL.petronas);       // 上层翼面
+addBox(27.6, 2.85, 0, 1.2, 0.5, 12.0, COL.carbon2);        // 翼刀
+
+/* ---------- 悬挂 ---------- */
+addBoxPair(16.5, 5.40, 6.0, 3.5, 0.6, 3.2, COL.carbon2);   // 前上
+addBoxPair(16.5, 2.60, 6.0, 3.5, 0.6, 3.2, COL.carbon2);   // 前下
+addBoxPair(-14.5, 5.60, 6.2, 3.5, 0.6, 3.4, COL.carbon2);  // 后上
+addBoxPair(-14.5, 2.60, 6.2, 3.5, 0.6, 3.4, COL.carbon2);  // 后下
+
+/* ---------- 车轮 ---------- */
+addWheel(17.0, 4.2, 8.6, 4.2, 3.0);
+addWheel(17.0, 4.2, -8.6, 4.2, 3.0);
+addWheel(-15.0, 4.4, 8.6, 4.4, 3.6);
+addWheel(-15.0, 4.4, -8.6, 4.4, 3.6);
+
+/* ============================================================
+   7. 合并几何体 → 按颜色生成网格
+   ============================================================ */
+const carGroup = new THREE.Group();
+const CAR_SCALE = 0.2;
+carGroup.scale.setScalar(CAR_SCALE);
+scene.add(carGroup);
+
+function materialFor(color) {
+  const isTire = color === COL.tire;
+  const isRim = color === COL.rim || color === COL.rimD;
+  const isGlass = color === COL.glass;
+  return new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: isTire ? 0.95 : isGlass ? 0.35 : isRim ? 0.32 : 0.42,
+    metalness: isTire ? 0.02 : isGlass ? 0.6 : isRim ? 0.9 : 0.58
+  });
+}
+
+let voxelCount = 0;
+const colorKeys = Object.keys(P);
+for (let i = 0; i < colorKeys.length; i++) {
+  const key = colorKeys[i];
+  const geos = P[key];
+  if (!geos || geos.length === 0) continue;
+
+  const colorNum = Number(key);
+  const merged = mergeGeometries(geos, false);
+  if (!merged) {
+    geos.forEach((g) => g.dispose());
+    continue;
+  }
+  voxelCount += geos.length;
+  geos.forEach((g) => g.dispose());
+
+  const mesh = new THREE.Mesh(merged, materialFor(colorNum));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  carGroup.add(mesh);
+}
+
+/* ============================================================
+   8. 相机自动取景
+   ============================================================ */
+const bbox = new THREE.Box3().setFromObject(carGroup);
+const size = bbox.getSize(new THREE.Vector3());
+const center = bbox.getCenter(new THREE.Vector3());
+const maxDim = Math.max(size.x, size.y, size.z);
+
+const fovRad = (camera.fov * Math.PI) / 180;
+let dist = maxDim / (2 * Math.tan(fovRad / 2));
+dist *= 1.32;
+dist = Math.min(Math.max(dist, 10), 34);
+
+const viewDir = new THREE.Vector3(0.72, 0.50, 0.95).normalize();
+camera.position.copy(center).addScaledVector(viewDir, dist);
+controls.target.copy(center);
+controls.target.y = center.y * 0.92;
+controls.update();
+
+/* ============================================================
+   9. 交互：自动旋转在用户操作后暂停，静置恢复
+   ============================================================ */
+let idleTimer = null;
+controls.addEventListener('start', () => {
+  controls.autoRotate = false;
+  if (idleTimer) clearTimeout(idleTimer);
+});
+controls.addEventListener('end', () => {
+  if (idleTimer) clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    controls.autoRotate = true;
+  }, 3200);
+});
+
+/* ============================================================
+   10. 响应窗口尺寸
+   ============================================================ */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(onResize, 120);
+});
+
+/* ============================================================
+   11. 渲染循环
+   ============================================================ */
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+/* 页面卸载时释放资源 */
+window.addEventListener('beforeunload', () => {
+  renderer.dispose();
+});
+</script>
+
+<script src="../prompt-panel.js" data-id="f1-car-deepseek"></script>
+</body>
+</html>

@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<title>体素蒸汽火车 · 日落河谷</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #140d16;
+  }
+  canvas { display: block; }
+  #back {
+    position: fixed; top: 16px; left: 16px; z-index: 100;
+    display: inline-block;
+    padding: 9px 15px;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+    line-height: 1;
+    color: #4b3a26;
+    text-decoration: none;
+    background: rgba(255, 246, 230, 0.72);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.18);
+    transition: background 0.22s ease;
+    white-space: nowrap;
+  }
+  #back:hover { background: rgba(255, 250, 240, 0.94); }
+  #loading {
+    position: fixed; inset: 0; z-index: 50;
+    display: flex; align-items: center; justify-content: center;
+    background: #140d16;
+    color: #e8b57c;
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 14px; letter-spacing: 2px;
+    transition: opacity 0.7s ease;
+    pointer-events: none;
+  }
+  #loading.hide { opacity: 0; }
+</style>
+</head>
+<body>
+<a id="back" href="../">← 返回 3D 作品</a>
+<div id="loading">正在生成河谷…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   0. 工具函数
+   ============================================================ */
+const clamp01 = v => (v < 0 ? 0 : v > 1 ? 1 : v);
+
+function smoothstep(a, b, x) {
+  const t = clamp01((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+}
+
+function hash2(i, j) {
+  const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453123;
+  return s - Math.floor(s);
+}
+
+function vnoise(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf);
+  const v = yf * yf * (3 - 2 * yf);
+  const a = hash2(xi, yi);
+  const b = hash2(xi + 1, yi);
+  const c = hash2(xi, yi + 1);
+  const d = hash2(xi + 1, yi + 1);
+  return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+}
+
+/* ============================================================
+   1. 渲染器 / 场景 / 相机
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.12;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0xb8744a, 0.0034);
+
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.5, 4000);
+camera.position.set(88, 40, 118);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, -2, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 45;
+controls.maxDistance = 340;
+controls.minPolarAngle = Math.PI * 0.08;
+controls.maxPolarAngle = Math.PI * 0.492;
+controls.rotateSpeed = 0.65;
+controls.zoomSpeed = 0.85;
+controls.update();
+
+/* ============================================================
+   2. 光照
+   ============================================================ */
+const SUN_DIR = new THREE.Vector3(-0.82, 0.22, -0.53).normalize();
+
+const sunLight = new THREE.DirectionalLight(0xffb478, 3.1);
+sunLight.position.copy(SUN_DIR).multiplyScalar(230);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(2048, 2048);
+sunLight.shadow.camera.left = -155;
+sunLight.shadow.camera.right = 155;
+sunLight.shadow.camera.top = 155;
+sunLight.shadow.camera.bottom = -155;
+sunLight.shadow.camera.near = 20;
+sunLight.shadow.camera.far = 620;
+sunLight.shadow.bias = -0.0007;
+sunLight.shadow.normalBias = 0.12;
+scene.add(sunLight);
+scene.add(sunLight.target);
+
+const hemi = new THREE.HemisphereLight(0x6070a8, 0x4a2c1e, 1.35);
+scene.add(hemi);
+
+const fillLight = new THREE.DirectionalLight(0x7088c8, 0.5);
+fillLight.position.set(70, 55, 120);
+scene.add(fillLight);
+
+/* ============================================================
+   3. 天空穹顶（程序化着色器）
+   ============================================================ */
+const skyMat = new THREE.ShaderMaterial({
+  side: THREE.BackSide,
+  depthWrite: false,
+  uniforms: {
+    uTop: { value: new THREE.Color(0x30205c) },
+    uMid: { value: new THREE.Color(0xd2603a) },
+    uBot: { value: new THREE.Color(0xf7ad63) },
+    uSunDir: { value: SUN_DIR.clone() },
+    uSunCol: { value: new THREE.Color(0xffd9a0) }
+  },
+  vertexShader: /* glsl */`
+    varying vec3 vDir;
+    void main() {
+      vDir = position;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    varying vec3 vDir;
+    uniform vec3 uTop, uMid, uBot, uSunDir, uSunCol;
+
+    void main() {
+      vec3 dir = normalize(vDir);
+      float h = dir.y;
+
+      vec3 col = mix(uBot, uMid, smoothstep(-0.04, 0.22, h));
+      col = mix(col, uTop, smoothstep(0.14, 0.78, h));
+
+      float d = max(dot(dir, normalize(uSunDir)), 0.0);
+
+      // 大气辉光
+      col += uSunCol * pow(d, 5.0) * 0.35;
+      col += uSunCol * pow(d, 32.0) * 0.55;
+      col += uSunCol * pow(d, 320.0) * 1.4;
+
+      // 太阳圆盘
+      float disk = smoothstep(0.9983, 0.9993, d);
+      col += uSunCol * disk * 2.6;
+
+      // 地平线以下压暗
+      col = mix(col, col * 0.55, smoothstep(0.0, -0.35, h));
+
+      gl_FragColor = vec4(col, 1.0);
+    }
+  `
+});
+const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(1600, 32, 20), skyMat);
+skyMesh.frustumCulled = false;
+scene.add(skyMesh);
+
+/* ============================================================
+   4. 地形高度场
+   ============================================================ */
+const WATER_Y = -22;
+
+function heightAt(x, z) {
+  const ax = Math.abs(x);
+  const az = Math.abs(z);
+
+  // 河谷横截面：中间低，两侧抬升
+  let h = -26 + 26 * smoothstep(45, 125, ax);
+
+  // 远处山体（只沿轨道外侧升起，形成峡谷）
+  const zf = smoothstep(12, 26, az);
+  const mountain = smoothstep(128, 176, ax) * zf;
+  h += 54 * mountain;
+
+  // 有机起伏
+  const nf = smoothstep(35, 110, ax);
+  h += (vnoise(x * 0.028 + 11.3, z * 0.028 + 7.7) - 0.5) * 15 * nf;
+  h += (vnoise(x * 0.088 + 3.1, z * 0.088 + 19.2) - 0.5) * 4.5 * nf;
+
+  // 河槽下切
+  h -= Math.exp(-(x * x) / (2 * 30 * 30)) * 4.5;
+
+  return h;
+}
+
+/* ============================================================
+   5. 体素地形（InstancedMesh）
+   ============================================================ */
+const CELL = 6;
+const TERR_X = 600;
+const TERR_Z = 300;
+const NX = Math.floor(TERR_X / CELL);
+const NZ = Math.floor(TERR_Z / CELL);
+
+const terrainCells = [];
+for (let ix = 0; ix < NX; ix++) {
+  for (let iz = 0; iz < NZ; iz++) {
+    const x = -TERR_X / 2 + (ix + 0.5) * CELL;
+    const z = -TERR_Z / 2 + (iz + 0.5) * CELL;
+    const y = heightAt(x, z);
+    if (y < -33) continue;
+    terrainCells.push({ x, y, z });
+  }
+}
+
+const dummy = new THREE.Object3D();
+const tmpColor = new THREE.Color();
+const tmpColor2 = new THREE.Color();
+
+function terrainColor(y, x, z, out) {
+  let hex;
+  if (y < -18) hex = 0x4a4030;
+  else if (y < -12) hex = 0x8d7c58;
+  else if (y < 3) hex = 0x577244;
+  else if (y < 20) hex = 0x42603c;
+  else if (y < 44) hex = 0x5c5749;
+  else hex = 0x7d766a;
+  out.setHex(hex);
+  const v = 0.80 + vnoise(x * 0.21 + 4.4, z * 0.21 + 9.1) * 0.40;
+  out.multiplyScalar(v);
+  return out;
+}
+
+const voxelGeo = new THREE.BoxGeometry(1, 1, 1);
+const pillarMat = new THREE.MeshLambertMaterial();
+const capMat = new THREE.MeshLambertMaterial();
+
+const pillarMesh = new THREE.InstancedMesh(voxelGeo, pillarMat, terrainCells.length);
+const capMesh = new THREE.InstancedMesh(voxelGeo, capMat, terrainCells.length);
+pillarMesh.receiveShadow = true;
+capMesh.receiveShadow = true;
+capMesh.castShadow = false;
+pillarMesh.castShadow = false;
+
+const BOTTOM = -70;
+
+for (let i = 0; i < terrainCells.length; i++) {
+  const c = terrainCells[i];
+
+  // 柱体
+  const capTop = c.y;
+  const capBot = c.y - 2.2;
+  const pillarH = capBot - BOTTOM;
+
+  dummy.position.set(c.x, BOTTOM + pillarH * 0.5, c.z);
+  dummy.rotation.set(0, 0, 0);
+  dummy.scale.set(CELL, pillarH, CELL);
+  dummy.updateMatrix();
+  pillarMesh.setMatrixAt(i, dummy.matrix);
+
+  terrainColor(c.y, c.x, c.z, tmpColor);
+  tmpColor2.copy(tmpColor).multiplyScalar(0.55);
+  pillarMesh.setColorAt(i, tmpColor2);
+
+  // 顶部方块
+  dummy.position.set(c.x, capBot + 1.1, c.z);
+  dummy.scale.set(CELL, 2.2, CELL);
+  dummy.updateMatrix();
+  capMesh.setMatrixAt(i, dummy.matrix);
+  capMesh.setColorAt(i, tmpColor);
+}
+
+pillarMesh.instanceMatrix.needsUpdate = true;
+capMesh.instanceMatrix.needsUpdate = true;
+if (pillarMesh.instanceColor) pillarMesh.instanceColor.needsUpdate = true;
+if (capMesh.instanceColor) capMesh.instanceColor.needsUpdate = true;
+
+scene.add(pillarMesh);
+scene.add(capMesh);
+
+/* ============================================================
+   6. 水面
+   ============================================================ */
+const waterGeo = new THREE.PlaneGeometry(1600, 900, 1, 1);
+waterGeo.rotateX(-Math.PI / 2);
+
+const waterMat = new THREE.ShaderMaterial({
+  transparent: true,
+  uniforms: {
+    uTime: { value: 0 },
+    uSunDir: { value: SUN_DIR.clone() },
+    uDeep: { value: new THREE.Color(0x16202f) },
+    uShallow: { value: new THREE.Color(0x3d4d5e) },
+    uSunCol: { value: new THREE.Color(0xffb070) },
+    uSkyCol: { value: new THREE.Color(0xc8734a) },
+    uFogColor: { value: new THREE.Color(0xb8744a) },
+    uFogDensity: { value: 0.0034 }
+  },
+  vertexShader: /* glsl */`
+    varying vec3 vWorld;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vWorld = wp.xyz;
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */`
+    varying vec3 vWorld;
+    uniform float uTime;
+    uniform vec3 uSunDir, uDeep, uShallow, uSunCol, uSkyCol, uFogColor;
+    uniform float uFogDensity;
+
+    void main() {
+      vec3 V = normalize(cameraPosition - vWorld);
+
+      float w1 = sin(vWorld.x * 0.32 + uTime * 1.15);
+      float w2 = sin(vWorld.z * 0.27 - uTime * 0.92);
+      float w3 = sin((vWorld.x + vWorld.z) * 0.17 + uTime * 0.55);
+
+      vec3 N = normalize(vec3(w1 * 0.055 + w3 * 0.035, 1.0, w2 * 0.055 + w3 * 0.035));
+
+      float fres = pow(1.0 - max(dot(N, V), 0.0), 3.0);
+
+      vec3 col = mix(uDeep, uShallow, 0.32 + 0.30 * (w1 * 0.5 + 0.5));
+
+      // 天空反射
+      col = mix(col, uSkyCol, fres * 0.62);
+
+      // 太阳镜面高光
+      vec3 H = normalize(V + normalize(uSunDir));
+      float spec = pow(max(dot(N, H), 0.0), 110.0);
+      col += uSunCol * spec * 3.2;
+
+      // 波光粼粼
+      float sparkle = pow(max(0.0, 1.0 - abs(dot(N, H))), 6.0);
+      col += uSunCol * sparkle * 0.16;
+
+      // 手动雾
+      float dist = length(cameraPosition - vWorld);
+      float f = 1.0 - exp(-uFogDensity * uFogDensity * dist * dist);
+      col = mix(col, uFogColor, clamp(f, 0.0, 1.0));
+
+      gl_FragColor = vec4(col, 0.94);
+    }
+  `
+});
+
+const waterMesh = new THREE.Mesh(waterGeo, waterMat);
+waterMesh.position.set(0, WATER_Y, 0);
+scene.add(waterMesh);
+
+/* ============================================================
+   7. 高架桥
+   ============================================================ */
+const bridgeGroup = new THREE.Group();
+
+const deckMat = new THREE.MeshLambertMaterial({ color: 0x6b5240 });
+const deckDarkMat = new THREE.MeshLambertMaterial({ color: 0x4a3830 });
+const stoneMat = new THREE.MeshLambertMaterial({ color: 0x7d7268 });
+const stoneDarkMat = new THREE.MeshLambertMaterial({ color: 0x5c534b });
+
+// 桥面板
+const deck = new THREE.Mesh(new THREE.BoxGeometry(300, 2.6, 18), deckMat);
+deck.position.set(0, -1.3, 0);
+deck.castShadow = true;
+deck.receiveShadow = true;
+bridgeGroup.add(deck);
+
+// 纵向大梁
+for (const sz of [-1, 1]) {
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(300, 3.0, 1.8), deckDarkMat);
+  beam.position.set(0, -0.9, sz * 8.2);
+  beam.castShadow = true;
+  beam.receiveShadow = true;
+  bridgeGroup.add(beam);
+}
+
+// 枕木
+const sleeperGeo = new THREE.BoxGeometry(2.2, 0.7, 12);
+const sleeperMat = new THREE.MeshLambertMaterial({ color: 0x3a2c22 });
+const sleeperCount = Math.floor(290 / 4.5);
+const sleeperMesh = new THREE.InstancedMesh(sleeperGeo, sleeperMat, sleeperCount);
+sleeperMesh.castShadow = true;
+sleeperMesh.receiveShadow = true;
+for (let i = 0; i < sleeperCount; i++) {
+  dummy.position.set(-145 + i * 4.5, 0.35, 0);
+  dummy.rotation.set(0, 0, 0);
+  dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix();
+  sleeperMesh.setMatrixAt(i, dummy.matrix);
+}
+sleeperMesh.instanceMatrix.needsUpdate = true;
+bridgeGroup.add(sleeperMesh);
+
+// 钢轨
+const railMat = new THREE.MeshLambertMaterial({ color: 0x9aa0aa });
+for (const sz of [-1, 1]) {
+  const rail = new THREE.Mesh(new THREE.BoxGeometry(300, 0.5, 0.8), railMat);
+  rail.position.set(0, 0.95, sz * 4.2);
+  rail.castShadow = true;
+  bridgeGroup.add(rail);
+}
+
+// 桥墩
+for (let px = -120; px <= 120; px += 40) {
+  const pier = new THREE.Mesh(new THREE.BoxGeometry(9, 54, 13), stoneMat);
+  pier.position.set(px, -29, 0);
+  pier.castShadow = true;
+  pier.receiveShadow = true;
+  bridgeGroup.add(pier);
+
+  const cap = new THREE.Mesh(new THREE.BoxGeometry(13, 2.4, 17), stoneDarkMat);
+  cap.position.set(px, -3.2, 0);
+  cap.castShadow = true;
+  cap.receiveShadow = true;
+  bridgeGroup.add(cap);
+
+  // 桥墩上的横向装饰石条
+  for (let k = 0; k < 3; k++) {
+    const ring = new THREE.Mesh(new THREE.BoxGeometry(10.5, 1.2, 14.5), stoneDarkMat);
+    ring.position.set(px, -12 - k * 11, 0);
+    bridgeGroup.add(ring);
+  }
+}
+scene.add(bridgeGroup);
+
+/* ============================================================
+   8. 隧道口（两端）
+   ============================================================ */
+const tunnelGroup = new THREE.Group();
+
+const caveMat = new THREE.MeshBasicMaterial({ color: 0x150d09 });
+const caveMatFog = new THREE.MeshBasicMaterial({ color: 0x1c120c });
+
+for (const s of [-1, 1]) {
+  // 黑洞（遮挡车厢）
+  const cave = new THREE.Mesh(new THREE.BoxGeometry(100, 32, 22), caveMat);
+  cave.position.set(s * 170, 6, 0);
+  tunnelGroup.add(cave);
+
+  // 山体包裹（石材质感大方块）
+  const rockA = new THREE.Mesh(new THREE.BoxGeometry(40, 44, 26), stoneDarkMat);
+  rockA.position.set(s * 148, 10, 0);
+  rockA.castShadow = true;
+  rockA.receiveShadow = true;
+  tunnelGroup.add(rockA);
+
+  // 石拱门
+  for (const sz of [-1, 1]) {
+    const pillar = new THREE.Mesh(new THREE.BoxGeometry(13, 36, 9), stoneMat);
+    pillar.position.set(s * 124, 9, sz * 14.5);
+    pillar.castShadow = true;
+    pillar.receiveShadow = true;
+    tunnelGroup.add(pillar);
+  }
+
+  const lintel = new THREE.Mesh(new THREE.BoxGeometry(13, 8, 38), stoneMat);
+  lintel.position.set(s * 124, 24, 0);
+  lintel.castShadow = true;
+  lintel.receiveShadow = true;
+  tunnelGroup.add(lintel);
+
+  const keystone = new THREE.Mesh(new THREE.BoxGeometry(11, 5, 6), stoneDarkMat);
+  keystone.position.set(s * 121, 24, 0);
+  tunnelGroup.add(keystone);
+}
+scene.add(tunnelGroup);
+
+/* ============================================================
+   9. 蒸汽火车
+   ============================================================ */
+const matCache = new Map();
+function getMat(color) {
+  if (!matCache.has(color)) {
+    matCache.set(color, new THREE.MeshLambertMaterial({ color }));
+  }
+  return matCache.get(color);
+}
+
+function addBox(parent, w, h, d, x, y, z, color) {
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), getMat(color));
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  parent.add(mesh);
+  return mesh;
+}
+
+const trainGroup = new THREE.Group();
+scene.add(trainGroup);
+
+const C_DARK = 0x2c2c36;
+const C_BLACK = 0x1c1c24;
+const C_BODY = 0x7c2b24;
+const C_BRASS = 0xc2963f;
+const C_GREY = 0x474751;
+const C_COAL = 0x14141a;
+
+const wheels = [];
+
+function makeWheel(radius, thickness) {
+  const g = new THREE.Group();
+
+  const cylGeo = new THREE.CylinderGeometry(radius, radius, thickness, 12);
+  cylGeo.rotateX(Math.PI / 2);
+  const disc = new THREE.Mesh(cylGeo, getMat(0x8f2f26));
+  disc.castShadow = true;
+  g.add(disc);
+
+  // 轮辐（可见旋转）
+  const spoke = new THREE.Mesh(
+    new THREE.BoxGeometry(radius * 1.45, radius * 0.3, thickness * 1.12),
+    getMat(0x34343e)
+  );
+  spoke.castShadow = true;
+  g.add(spoke);
+
+  const spoke2 = new THREE.Mesh(
+    new THREE.BoxGeometry(radius * 0.3, radius * 1.45, thickness * 1.12),
+    getMat(0x34343e)
+  );
+  spoke2.castShadow = true;
+  g.add(spoke2);
+
+  // 轮毂
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius * 0.22, radius * 0.22, thickness * 1.3, 8),
+    getMat(0xc2963f)
+  );
+  hub.rotation.x = Math.PI / 2;
+  g.add(hub);
+
+  return g;
+}
+
+/* ---------- 机车 ---------- */
+const loco = new THREE.Group();
+trainGroup.add(loco);
+
+// 底架
+addBox(loco, 23, 1.8, 7.6, 0, 5.2, 0, C_DARK);
+
+// 锅炉
+const boilerGeo = new THREE.CylinderGeometry(2.7, 2.7, 15, 14);
+boilerGeo.rotateZ(Math.PI / 2);
+const boiler = new THREE.Mesh(boilerGeo, getMat(0x3c3c48));
+boiler.position.set(0.5, 8.6, 0);
+boiler.castShadow = true;
+boiler.receiveShadow = true;
+loco.add(boiler);
+
+// 锅炉箍
+for (const bx of [-4.5, -0.5, 3.5, 7]) {
+  const bandGeo = new THREE.CylinderGeometry(2.86, 2.86, 0.55, 14);
+  bandGeo.rotateZ(Math.PI / 2);
+  const band = new THREE.Mesh(bandGeo, getMat(C_BRASS));
+  band.position.set(bx, 8.6, 0);
+  band.castShadow = true;
+  loco.add(band);
+}
+
+// 烟箱前盖
+const faceGeo = new THREE.CylinderGeometry(2.9, 2.9, 1.2, 14);
+faceGeo.rotateZ(Math.PI / 2);
+const facePlate = new THREE.Mesh(faceGeo, getMat(0x2a2a34));
+facePlate.position.set(8.2, 8.6, 0);
+facePlate.castShadow = true;
+loco.add(facePlate);
+
+// 烟囱
+addBox(loco, 2.8, 4.2, 2.8, 6.8, 13.4, 0, C_BLACK);
+addBox(loco, 4.1, 1.2, 4.1, 6.8, 16.1, 0, C_BLACK);
+addBox(loco, 3.2, 0.6, 3.2, 6.8, 15.4, 0, C_BRASS);
+
+// 蒸汽室
+const domeGeo = new THREE.CylinderGeometry(1.5, 1.5, 1.7, 10);
+const dome = new THREE.Mesh(domeGeo, getMat(C_BRASS));
+dome.position.set(1.2, 11.9, 0);
+dome.castShadow = true;
+loco.add(dome);
+
+// 砂箱
+addBox(loco, 2.0, 1.5, 2.0, -3.2, 12.0, 0, C_BODY);
+
+// 驾驶室
+addBox(loco, 8.5, 9.6, 7.8, -8, 10.9, 0, C_BODY);
+addBox(loco, 9.6, 0.9, 8.9, -8, 16.1, 0, C_DARK);
+// 侧窗
+addBox(loco, 4.2, 2.6, 0.35, -8, 12.9, 3.95, 0x0e0e16);
+addBox(loco, 4.2, 2.6, 0.35, -8, 12.9, -3.95, 0x0e0e16);
+// 后窗
+addBox(loco, 0.35, 2.6, 3.6, -12.2, 12.9, 0, 0x0e0e16);
+
+// 前照灯
+const lampMat = new THREE.MeshBasicMaterial({ color: 0xffe8b0 });
+const lamp = new THREE.Mesh(new THREE.BoxGeometry(1.3, 1.9, 1.9), lampMat);
+lamp.position.set(8.9, 10.4, 0);
+loco.add(lamp);
+
+// 排障器
+addBox(loco, 2.2, 2.6, 7.0, 12.3, 4.6, 0, C_DARK);
+addBox(loco, 1.6, 1.2, 6.0, 13.6, 3.2, 0, C_BLACK);
+
+// 司机
+addBox(loco, 2.0, 3.4, 0.9, -9.5, 13.4, 2.6, 0x2a3a52);
+addBox(loco, 1.4, 1.4, 1.4, -9.5, 15.9, 2.6, 0xc99a6a);
+
+// 机车车轮
+const DRIVER_R = 2.4;
+for (const wx of [-3.5, 0, 3.5]) {
+  for (const sz of [-1, 1]) {
+    const w = makeWheel(DRIVER_R, 0.95);
+    w.position.set(wx, DRIVER_R, sz * 4.0);
+    loco.add(w);
+    wheels.push({ obj: w, r: DRIVER_R });
+  }
+}
+const FRONT_R = 1.5;
+for (const sz of [-1, 1]) {
+  const w = makeWheel(FRONT_R, 0.8);
+  w.position.set(7.6, FRONT_R, 4.0 * sz);
+  loco.add(w);
+  wheels.push({ obj: w, r: FRONT_R });
+}
+
+/* ---------- 煤水车 ---------- */
+const tender = new THREE.Group();
+trainGroup.add(tender);
+
+addBox(tender, 18, 1.8, 7.6, -25, 5.2, 0, C_DARK);
+addBox(tender, 18, 7.5, 7.6, -25, 9.85, 0, C_BLACK);
+addBox(tender, 18.4, 0.8, 8.0, -25, 13.4, 0, C_BODY);
+addBox(tender, 14, 2.2, 6.4, -25, 14.9, 0, C_COAL);
+addBox(tender, 9, 1.4, 4.8, -26, 16.3, 0, 0x1e1e26);
+
+const TENDER_R = 1.8;
+for (const wx of [-31, -25, -19]) {
+  for (const sz of [-1, 1]) {
+    const w = makeWheel(TENDER_R, 0.85);
+    w.position.set(wx, TENDER_R, sz * 4.0);
+    tender.add(w);
+    wheels.push({ obj: w, r: TENDER_R });
+  }
+}
+
+// 连接杆
+addBox(trainGroup, 3.0, 0.9, 0.9, -14, 5.4, 2.4, C_GREY);
+addBox(trainGroup, 3.0, 0.9, 0.9, -14, 5.4, -2.4, C_GREY);
+
+/* ============================================================
+   10. 烟雾粒子系统
+   ============================================================ */
+const SMOKE_MAX = 150;
+const smokeGeo = new THREE.BoxGeometry(1, 1, 1);
+const smokeMat = new THREE.MeshBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.45,
+  depthWrite: false
+});
+const smokeMesh = new THREE.InstancedMesh(smokeGeo, smokeMat, SMOKE_MAX);
+smokeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+smokeMesh.frustumCulled = false;
+scene.add(smokeMesh);
+
+const particles = [];
+for (let i = 0; i < SMOKE_MAX; i++) {
+  particles.push({
+    alive: false,
+    pos: new THREE.Vector3(),
+    vel: new THREE.Vector3(),
+    life: 0,
+    maxLife: 1,
+    size0: 1,
+    size1: 1
+  });
+}
+
+let smokeTimer = 0;
+let smokeCursor = 0;
+const smokeColor = new THREE.Color();
+
+// 初始化所有实例为隐藏
+const hideMtx = new THREE.Matrix4().makeScale(0.0001, 0.0001, 0.0001);
+for (let i = 0; i < SMOKE_MAX; i++) {
+  smokeMesh.setMatrixAt(i, hideMtx);
+  smokeMesh.setColorAt(i, smokeColor.setHex(0x000000));
+}
+smokeMesh.instanceMatrix.needsUpdate = true;
+if (smokeMesh.instanceColor) smokeMesh.instanceColor.needsUpdate = true;
+
+/* ============================================================
+   11. 动画循环
+   ============================================================ */
+let trainX = -120;
+const SPEED = 19;
+const RESET_X = 158;
+const START_X = -160;
+
+let elapsed = 0;
+let lastTime = performance.now();
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const now = performance.now();
+  let dt = (now - lastTime) / 1000;
+  lastTime = now;
+  if (dt > 0.06) dt = 0.06;
+  elapsed += dt;
+
+  /* ---- 火车移动 ---- */
+  trainX += SPEED * dt;
+  if (trainX > RESET_X) trainX = START_X;
+  trainGroup.position.x = trainX;
+
+  /* ---- 车轮旋转 ---- */
+  for (let i = 0; i < wheels.length; i++) {
+    wheels[i].obj.rotation.z -= (SPEED * dt) / wheels[i].r;
+  }
+
+  /* ---- 烟雾生成 ---- */
+  smokeTimer += dt;
+  const spawnInterval = 0.055;
+  while (smokeTimer > spawnInterval) {
+    smokeTimer -= spawnInterval;
+    const p = particles[smokeCursor];
+    smokeCursor = (smokeCursor + 1) % SMOKE_MAX;
+
+    p.alive = true;
+    p.pos.set(trainX + 6.8 + (Math.random() - 0.5) * 0.8, 16.6, (Math.random() - 0.5) * 0.8);
+    p.vel.set(
+      -SPEED * 0.28 + (Math.random() - 0.5) * 2.5,
+      4.2 + Math.random() * 2.6,
+      (Math.random() - 0.5) * 1.6
+    );
+    p.maxLife = 2.6 + Math.random() * 1.6;
+    p.life = p.maxLife;
+    p.size0 = 1.3 + Math.random() * 0.8;
+    p.size1 = 7.5 + Math.random() * 4.0;
+  }
+
+  /* ---- 烟雾更新 ---- */
+  for (let i = 0; i < SMOKE_MAX; i++) {
+    const p = particles[i];
+    if (!p.alive) {
+      dummy.position.set(0, -9999, 0);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0.0001, 0.0001, 0.0001);
+      dummy.updateMatrix();
+      smokeMesh.setMatrixAt(i, dummy.matrix);
+      continue;
+    }
+
+    p.life -= dt;
+    if (p.life <= 0) {
+      p.alive = false;
+      dummy.position.set(0, -9999, 0);
+      dummy.scale.set(0.0001, 0.0001, 0.0001);
+      dummy.updateMatrix();
+      smokeMesh.setMatrixAt(i, dummy.matrix);
+      continue;
+    }
+
+    p.vel.x *= 0.985;
+    p.vel.z *= 0.985;
+    p.vel.y += 1.6 * dt;
+    p.pos.addScaledVector(p.vel, dt);
+
+    const t = 1 - p.life / p.maxLife;
+    const size = p.size0 + (p.size1 - p.size0) * t;
+
+    dummy.position.copy(p.pos);
+    dummy.rotation.set(t * 1.6, t * 0.9, t * 1.1);
+    dummy.scale.set(size, size, size);
+    dummy.updateMatrix();
+    smokeMesh.setMatrixAt(i, dummy.matrix);
+
+    // 颜色：浅灰 → 暖褐 → 接近雾色
+    const c1 = new THREE.Color(0xd8d0c6);
+    const c2 = new THREE.Color(0x9a6e58);
+    smokeColor.copy(c1).lerp(c2, Math.min(1, t * 1.3));
+    smokeMesh.setColorAt(i, smokeColor);
+  }
+  smokeMesh.instanceMatrix.needsUpdate = true;
+  if (smokeMesh.instanceColor) smokeMesh.instanceColor.needsUpdate = true;
+
+  /* ---- 水面时间 ---- */
+  waterMat.uniforms.uTime.value = elapsed;
+
+  /* ---- 天空跟随相机（保持无限远感） ---- */
+  skyMesh.position.copy(camera.position);
+
+  /* ---- 控制器 ---- */
+  controls.update();
+
+  /* ---- 渲染 ---- */
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   12. 响应式
+   ============================================================ */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(onResize, 120);
+});
+
+/* ============================================================
+   13. 启动
+   ============================================================ */
+renderer.compile(scene, camera);
+animate();
+
+const loadingEl = document.getElementById('loading');
+if (loadingEl) {
+  setTimeout(() => {
+    loadingEl.classList.add('hide');
+    setTimeout(() => loadingEl.remove(), 800);
+  }, 260);
+}
+</script>
+
+<script src="../prompt-panel.js" data-id="steam-train-deepseek"></script>
+</body>
+</html>

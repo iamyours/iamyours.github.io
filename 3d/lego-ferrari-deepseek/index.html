@@ -1,0 +1,1305 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>法拉利 V12 超跑 · 三维互动教学</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    overflow: hidden;
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+    background: #0f141c;
+    color: #1b2330;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  #app {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(120% 95% at 50% -5%, #f4f8ff 0%, #dbe4f1 32%, #adbfd8 68%, #8296b1 100%);
+  }
+  #app canvas { display: block; width: 100%; height: 100%; }
+
+  /* 返回按钮 */
+  #backBtn {
+    position: fixed;
+    top: 14px;
+    left: 14px;
+    z-index: 40;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(255, 249, 235, 0.82);
+    color: #4a3a26;
+    text-decoration: none;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(10px) saturate(1.3);
+    -webkit-backdrop-filter: blur(10px) saturate(1.3);
+    box-shadow: 0 6px 18px rgba(30, 44, 68, 0.18);
+    transition: background .2s, transform .2s;
+  }
+  #backBtn:hover { background: rgba(255, 253, 246, 0.98); transform: translateY(-1px); }
+
+  /* 标题 */
+  #hud {
+    position: fixed;
+    left: 16px;
+    top: 58px;
+    z-index: 20;
+    pointer-events: none;
+    max-width: 44vw;
+  }
+  #hud h1 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: .4px;
+    color: #16202e;
+    text-shadow: 0 1px 0 rgba(255,255,255,.7);
+  }
+  #hud p {
+    margin: 6px 0 0;
+    font-size: 12px;
+    line-height: 1.6;
+    color: #46586f;
+    text-shadow: 0 1px 0 rgba(255,255,255,.6);
+  }
+
+  /* 右侧讲解面板 */
+  #panel {
+    position: fixed;
+    right: 14px;
+    top: 14px;
+    z-index: 30;
+    width: 322px;
+    max-height: calc(100vh - 190px);
+    background: rgba(255, 255, 255, 0.76);
+    backdrop-filter: blur(16px) saturate(1.35);
+    -webkit-backdrop-filter: blur(16px) saturate(1.35);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    border-radius: 18px;
+    box-shadow: 0 20px 48px rgba(24, 40, 64, 0.2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: transform .32s cubic-bezier(.4,0,.2,1), opacity .32s;
+  }
+  #panel.hidden { transform: translateX(118%); opacity: 0; pointer-events: none; }
+
+  .panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 14px 16px 10px;
+    border-bottom: 1px solid rgba(30, 55, 90, 0.08);
+  }
+  .panel-head .kicker {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #b0372f;
+    font-weight: 700;
+    margin-bottom: 3px;
+  }
+  #partTitle {
+    font-size: 16px;
+    font-weight: 700;
+    color: #131d2a;
+    line-height: 1.25;
+  }
+  #panelClose {
+    flex: 0 0 auto;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(28, 45, 70, 0.08);
+    color: #33455c;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background .2s;
+  }
+  #panelClose:hover { background: rgba(28, 45, 70, 0.16); }
+
+  #panelBody {
+    padding: 12px 16px 16px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #partDesc {
+    font-size: 12.5px;
+    line-height: 1.85;
+    color: #3d4d63;
+    margin: 0 0 12px;
+  }
+  #partDesc b { color: #b0372f; font-weight: 600; }
+
+  .specs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 7px;
+    margin-bottom: 14px;
+  }
+  .spec {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(30, 55, 90, 0.07);
+    border-radius: 10px;
+    padding: 7px 9px;
+  }
+  .spec .k { font-size: 10px; color: #7a8ba1; letter-spacing: .3px; }
+  .spec .v { font-size: 13px; font-weight: 700; color: #1c2836; margin-top: 2px; }
+
+  .list-label {
+    font-size: 10px;
+    letter-spacing: 1.6px;
+    color: #8296ab;
+    font-weight: 700;
+    margin: 0 0 8px;
+  }
+  #partList {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .part-btn {
+    padding: 6px 11px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-family: inherit;
+    color: #33455c;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(30, 55, 90, 0.1);
+    cursor: pointer;
+    transition: all .18s;
+    white-space: nowrap;
+  }
+  .part-btn:hover { background: #fff; border-color: rgba(176, 55, 47, 0.35); color: #b0372f; }
+  .part-btn.active {
+    background: #c8102e;
+    border-color: #c8102e;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(200, 16, 46, 0.35);
+  }
+
+  /* 底部工具栏 */
+  #toolbar {
+    position: fixed;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    flex-wrap: wrap;
+    justify-content: center;
+    padding: 8px 10px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.72);
+    backdrop-filter: blur(16px) saturate(1.3);
+    -webkit-backdrop-filter: blur(16px) saturate(1.3);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    box-shadow: 0 14px 34px rgba(24, 40, 64, 0.2);
+    max-width: calc(100vw - 20px);
+  }
+  #toolbar button {
+    padding: 8px 13px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-family: inherit;
+    font-weight: 500;
+    color: #33455c;
+    background: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(30, 55, 90, 0.09);
+    cursor: pointer;
+    transition: all .18s;
+    white-space: nowrap;
+  }
+  #toolbar button:hover { background: #fff; color: #b0372f; }
+  #toolbar button.on {
+    background: #c8102e;
+    border-color: #c8102e;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(200, 16, 46, 0.34);
+  }
+
+  .slider-box {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 8px 0 4px;
+  }
+  .slider-box span {
+    font-size: 11px;
+    color: #64768c;
+    white-space: nowrap;
+  }
+  #explodeRange {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 104px;
+    height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #c8102e var(--p, 0%), rgba(30, 55, 90, 0.14) var(--p, 0%));
+    outline: none;
+    cursor: pointer;
+  }
+  #explodeRange::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid #c8102e;
+    box-shadow: 0 2px 6px rgba(0,0,0,.22);
+    cursor: pointer;
+  }
+  #explodeRange::-moz-range-thumb {
+    width: 13px; height: 13px; border-radius: 50%;
+    background: #fff; border: 3px solid #c8102e; cursor: pointer;
+  }
+
+  /* 3D 标注 */
+  #labels { position: fixed; inset: 0; pointer-events: none; z-index: 15; overflow: hidden; }
+  .tag {
+    position: absolute;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    line-height: 1.5;
+    color: #1b2534;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(30, 55, 90, 0.1);
+    box-shadow: 0 4px 12px rgba(20, 35, 60, 0.16);
+    white-space: nowrap;
+    transform: translate(-50%, -50%) scale(.9);
+    opacity: 0;
+    transition: opacity .22s, transform .22s;
+  }
+  .tag.show { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  .tag::before {
+    content: "";
+    position: absolute;
+    left: -4px; top: 50%;
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: #c8102e;
+    transform: translate(-50%, -50%);
+  }
+
+  /* 面板重新打开按钮 */
+  #reopen {
+    position: fixed;
+    right: 14px;
+    top: 14px;
+    z-index: 29;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.78);
+    backdrop-filter: blur(12px);
+    color: #c8102e;
+    font-size: 17px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 10px 26px rgba(24, 40, 64, 0.18);
+    display: none;
+  }
+  #reopen.show { display: block; }
+
+  @media (max-width: 860px) {
+    #hud { max-width: 52vw; top: 56px; }
+    #hud h1 { font-size: 13.5px; }
+    #hud p { font-size: 11px; }
+    #panel {
+      width: calc(100vw - 28px);
+      max-height: 44vh;
+      top: auto;
+      bottom: 74px;
+      right: 14px;
+    }
+    #panel.hidden { transform: translateY(130%); }
+    #reopen { top: 14px; }
+    #toolbar { gap: 5px; padding: 6px 8px; border-radius: 20px; }
+    #toolbar button { padding: 7px 10px; font-size: 11px; }
+    #explodeRange { width: 74px; }
+    .slider-box span { font-size: 10px; }
+  }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:860px){#toolbar{left:12px;transform:none;max-width:calc(100vw - 140px)}}</style>
+</head>
+<body>
+
+<div id="app"></div>
+<div id="labels"></div>
+
+<a id="backBtn" href="../">← 返回 3D 作品</a>
+
+<div id="hud">
+  <h1>法拉利 V12 超跑 · 三维互动教学</h1>
+  <p>拖动旋转 · 滚轮 / 双指缩放 · 点击车体部件查看讲解</p>
+</div>
+
+<button id="reopen" title="打开讲解面板">?</button>
+
+<div id="panel">
+  <div class="panel-head">
+    <div>
+      <span class="kicker">TEACHING MODULE</span>
+      <div id="partTitle">整车概览</div>
+    </div>
+    <button id="panelClose" title="收起">×</button>
+  </div>
+  <div id="panelBody">
+    <p id="partDesc"></p>
+    <div class="specs" id="specs"></div>
+    <div class="list-label">选择学习部件</div>
+    <div id="partList"></div>
+  </div>
+</div>
+
+<div id="toolbar">
+  <button id="btnExplode">拆解视图</button>
+  <button id="btnEngine">引擎运转</button>
+  <button id="btnWheels">车轮转动</button>
+  <button id="btnLabels">显示标注</button>
+  <button id="btnReset">重置视角</button>
+  <div class="slider-box">
+    <span>拆解</span>
+    <input id="explodeRange" type="range" min="0" max="100" value="0" step="1">
+  </div>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   1. 渲染器 / 场景 / 相机
+   ========================================================= */
+const appEl = document.getElementById('app');
+
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  alpha: true,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.02;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+appEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
+const DEFAULT_CAM_POS = new THREE.Vector3(5.4, 3.1, 5.9);
+const DEFAULT_TARGET = new THREE.Vector3(0, 0.62, 0);
+camera.position.copy(DEFAULT_CAM_POS);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.minDistance = 3.0;
+controls.maxDistance = 19;
+controls.minPolarAngle = Math.PI * 0.06;
+controls.maxPolarAngle = Math.PI * 0.492;
+controls.target.copy(DEFAULT_TARGET);
+
+/* =========================================================
+   2. 程序化环境贴图（Canvas 生成，不加载任何外部资源）
+   ========================================================= */
+function createEnvTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512;
+  c.height = 256;
+  const ctx = c.getContext('2d');
+
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.00, '#ffffff');
+  g.addColorStop(0.32, '#e7eefb');
+  g.addColorStop(0.49, '#b9c9de');
+  g.addColorStop(0.51, '#7c8ea6');
+  g.addColorStop(0.72, '#3b4657');
+  g.addColorStop(1.00, '#191d24');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 512, 256);
+
+  const blob = (x, y, r, a) => {
+    const rg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    rg.addColorStop(0, 'rgba(255,255,255,' + a + ')');
+    rg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+  blob(120, 58, 96, 0.95);
+  blob(330, 46, 78, 0.85);
+  blob(460, 70, 62, 0.7);
+  blob(230, 24, 54, 0.6);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envMapTex = pmrem.fromEquirectangular(createEnvTexture()).texture;
+scene.environment = envMapTex;
+pmrem.dispose();
+
+/* =========================================================
+   3. 灯光
+   ========================================================= */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8fa3bd, 0.85));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 2.5);
+keyLight.position.set(5.5, 9.5, 6.5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 32;
+keyLight.shadow.camera.left = -7.5;
+keyLight.shadow.camera.right = 7.5;
+keyLight.shadow.camera.top = 7.5;
+keyLight.shadow.camera.bottom = -7.5;
+keyLight.shadow.bias = -0.0006;
+keyLight.shadow.normalBias = 0.022;
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0xc6dbff, 0.8);
+fillLight.position.set(-7, 4.5, -5.5);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.55);
+rimLight.position.set(-1, 3.4, -9);
+scene.add(rimLight);
+
+/* =========================================================
+   4. 地面接触阴影
+   ========================================================= */
+const ground = new THREE.Mesh(
+  new THREE.CircleGeometry(11, 64),
+  new THREE.ShadowMaterial({ color: 0x223044, opacity: 0.3 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = 0.002;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* =========================================================
+   5. 材质工厂（每个部件独立实例，便于单独变透明）
+   ========================================================= */
+const MAT = {
+  paint: () => new THREE.MeshPhysicalMaterial({
+    color: 0xc2101f, metalness: 0.55, roughness: 0.28,
+    clearcoat: 1.0, clearcoatRoughness: 0.06, envMapIntensity: 1.35
+  }),
+  paintDark: () => new THREE.MeshPhysicalMaterial({
+    color: 0x8d0b16, metalness: 0.6, roughness: 0.32,
+    clearcoat: 0.9, clearcoatRoughness: 0.1, envMapIntensity: 1.2
+  }),
+  glass: () => new THREE.MeshPhysicalMaterial({
+    color: 0x0c131c, metalness: 0.4, roughness: 0.06,
+    transparent: true, opacity: 0.68, side: THREE.DoubleSide,
+    envMapIntensity: 1.7, clearcoat: 1.0, depthWrite: false
+  }),
+  rubber: () => new THREE.MeshStandardMaterial({
+    color: 0x131519, roughness: 0.95, metalness: 0.02
+  }),
+  rim: () => new THREE.MeshStandardMaterial({
+    color: 0xb9c3cf, metalness: 1.0, roughness: 0.24
+  }),
+  dark: () => new THREE.MeshStandardMaterial({
+    color: 0x1c2026, metalness: 0.55, roughness: 0.48
+  }),
+  metal: () => new THREE.MeshStandardMaterial({
+    color: 0x8f97a1, metalness: 0.95, roughness: 0.3
+  }),
+  chrome: () => new THREE.MeshStandardMaterial({
+    color: 0xe6ecf3, metalness: 1.0, roughness: 0.1
+  }),
+  brake: () => new THREE.MeshStandardMaterial({
+    color: 0x2a2f38, metalness: 0.82, roughness: 0.42
+  }),
+  caliper: () => new THREE.MeshStandardMaterial({
+    color: 0xe8b020, metalness: 0.65, roughness: 0.32
+  }),
+  headlight: () => new THREE.MeshStandardMaterial({
+    color: 0xffffff, emissive: 0xfff0c8, emissiveIntensity: 1.2,
+    roughness: 0.12, metalness: 0.1
+  }),
+  taillight: () => new THREE.MeshStandardMaterial({
+    color: 0xff2222, emissive: 0xff1010, emissiveIntensity: 1.8,
+    roughness: 0.3, metalness: 0.2
+  }),
+  engineBlock: () => new THREE.MeshStandardMaterial({
+    color: 0x2b3038, metalness: 0.85, roughness: 0.42
+  }),
+  camCover: () => new THREE.MeshStandardMaterial({
+    color: 0xb0121f, metalness: 0.7, roughness: 0.3
+  })
+};
+
+/* =========================================================
+   6. 构建汽车
+   ========================================================= */
+const carGroup = new THREE.Group();
+scene.add(carGroup);
+
+const parts = [];   // 教学部件注册表
+
+/* ---------- 6.1 车身外壳 ---------- */
+const BODY_PTS = [
+  [ 2.10, 0.10],
+  [ 2.24, 0.26],
+  [ 2.22, 0.48],
+  [ 2.02, 0.60],
+  [ 1.30, 0.72],
+  [ 0.74, 0.80],
+  [ 0.30, 1.18],
+  [-0.34, 1.24],
+  [-1.02, 1.06],
+  [-1.58, 0.92],
+  [-2.06, 0.90],
+  [-2.26, 0.72],
+  [-2.30, 0.34],
+  [-2.14, 0.12]
+];
+
+const bodyShape = new THREE.Shape();
+bodyShape.moveTo(BODY_PTS[0][0], BODY_PTS[0][1]);
+for (let i = 1; i < BODY_PTS.length; i++) bodyShape.lineTo(BODY_PTS[i][0], BODY_PTS[i][1]);
+bodyShape.closePath();
+
+const bodyGeo = new THREE.ExtrudeGeometry(bodyShape, {
+  depth: 1.56,
+  bevelEnabled: true,
+  bevelThickness: 0.09,
+  bevelSize: 0.09,
+  bevelSegments: 4,
+  steps: 1,
+  curveSegments: 8
+});
+bodyGeo.computeBoundingBox();
+const bb = bodyGeo.boundingBox;
+bodyGeo.translate(0, 0, -(bb.min.z + bb.max.z) / 2);
+
+const bodyGroup = new THREE.Group();
+carGroup.add(bodyGroup);
+
+const bodyShell = new THREE.Mesh(bodyGeo, MAT.paint());
+bodyShell.castShadow = true;
+bodyShell.receiveShadow = true;
+bodyGroup.add(bodyShell);
+
+/* ---- 车身附件：前唇 / 进气 / 扩散器 / 排气 / 灯组 / 后视镜 ---- */
+function addBodyDetail(geo, mat, pos, rot) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(pos[0], pos[1], pos[2]);
+  if (rot) m.rotation.set(rot[0], rot[1], rot[2]);
+  m.castShadow = true;
+  m.receiveShadow = true;
+  bodyGroup.add(m);
+  return m;
+}
+
+// 前唇
+addBodyDetail(new THREE.BoxGeometry(0.42, 0.06, 1.52), MAT.dark(), [2.02, 0.10, 0]);
+// 前进气口
+addBodyDetail(new THREE.BoxGeometry(0.10, 0.17, 1.10), MAT.dark(), [2.19, 0.34, 0]);
+addBodyDetail(new THREE.BoxGeometry(0.08, 0.11, 0.34), MAT.dark(), [2.20, 0.34, 0.62]);
+addBodyDetail(new THREE.BoxGeometry(0.08, 0.11, 0.34), MAT.dark(), [2.20, 0.34, -0.62]);
+// 侧裙
+addBodyDetail(new THREE.BoxGeometry(2.30, 0.07, 0.14), MAT.dark(), [0.10, 0.13, 0.86]);
+addBodyDetail(new THREE.BoxGeometry(2.30, 0.07, 0.14), MAT.dark(), [0.10, 0.13, -0.86]);
+// 侧进气口（后翼子板）
+addBodyDetail(new THREE.BoxGeometry(0.34, 0.16, 0.08), MAT.dark(), [-1.02, 0.58, 0.865]);
+addBodyDetail(new THREE.BoxGeometry(0.34, 0.16, 0.08), MAT.dark(), [-1.02, 0.58, -0.865]);
+// 扩散器
+addBodyDetail(new THREE.BoxGeometry(0.22, 0.16, 1.42), MAT.dark(), [-2.20, 0.14, 0]);
+// 排气
+const exhaustGeo = new THREE.CylinderGeometry(0.062, 0.062, 0.16, 20);
+exhaustGeo.rotateZ(Math.PI / 2);
+addBodyDetail(exhaustGeo, MAT.chrome(), [-2.29, 0.30, 0.36]);
+addBodyDetail(exhaustGeo.clone(), MAT.chrome(), [-2.29, 0.30, -0.36]);
+
+// 前大灯
+const headGeo = new THREE.BoxGeometry(0.11, 0.09, 0.36);
+addBodyDetail(headGeo, MAT.headlight(), [2.05, 0.51, 0.55], [0, 0, -0.18]);
+addBodyDetail(headGeo.clone(), MAT.headlight(), [2.05, 0.51, -0.55], [0, 0, -0.18]);
+// 尾灯
+const tailGeo = new THREE.BoxGeometry(0.07, 0.09, 0.42);
+addBodyDetail(tailGeo, MAT.taillight(), [-2.235, 0.60, 0.48]);
+addBodyDetail(tailGeo.clone(), MAT.taillight(), [-2.235, 0.60, -0.48]);
+
+// 后视镜
+for (const s of [1, -1]) {
+  const stalk = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.16), MAT.dark());
+  stalk.position.set(0.62, 0.86, s * 0.90);
+  bodyGroup.add(stalk);
+
+  const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.09, 0.14), MAT.paintDark());
+  mirror.position.set(0.60, 0.90, s * 1.00);
+  mirror.castShadow = true;
+  bodyGroup.add(mirror);
+}
+
+/* ---------- 6.2 玻璃座舱 ---------- */
+const glassGroup = new THREE.Group();
+carGroup.add(glassGroup);
+
+// 前挡风玻璃
+const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.05, 1.40), MAT.glass());
+windshield.position.set(0.52, 0.985, 0);
+windshield.rotation.z = 2.402;
+glassGroup.add(windshield);
+
+// 后挡风玻璃
+const rearGlass = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.05, 1.32), MAT.glass());
+rearGlass.position.set(-0.68, 1.155, 0);
+rearGlass.rotation.z = -2.88;
+glassGroup.add(rearGlass);
+
+// 侧窗
+const WIN_PTS = [[0.64, 0.79], [0.30, 1.13], [-0.35, 1.17], [-0.95, 1.00], [-0.86, 0.85]];
+const winShape = new THREE.Shape();
+winShape.moveTo(WIN_PTS[0][0], WIN_PTS[0][1]);
+for (let i = 1; i < WIN_PTS.length; i++) winShape.lineTo(WIN_PTS[i][0], WIN_PTS[i][1]);
+winShape.closePath();
+const winGeo = new THREE.ShapeGeometry(winShape);
+for (const zz of [0.885, -0.885]) {
+  const w = new THREE.Mesh(winGeo, MAT.glass());
+  w.position.z = zz;
+  glassGroup.add(w);
+}
+
+/* ---------- 6.3 车轮 ---------- */
+function buildWheel() {
+  const g = new THREE.Group();
+  const R = 0.42;
+  const W = 0.30;
+
+  // 轮胎
+  const tireGeo = new THREE.CylinderGeometry(R, R, W, 48, 1, false);
+  tireGeo.rotateX(Math.PI / 2);
+  const tire = new THREE.Mesh(tireGeo, MAT.rubber());
+  tire.castShadow = true;
+  tire.receiveShadow = true;
+  g.add(tire);
+
+  // 胎壁
+  const swGeo = new THREE.TorusGeometry(R - 0.05, 0.052, 8, 48);
+  for (const s of [1, -1]) {
+    const sw = new THREE.Mesh(swGeo, MAT.rubber());
+    sw.position.z = s * (W / 2 - 0.022);
+    g.add(sw);
+  }
+
+  // 轮辋外圈
+  const rimRing = new THREE.Mesh(new THREE.TorusGeometry(0.305, 0.03, 10, 48), MAT.rim());
+  rimRing.position.z = W / 2 - 0.045;
+  g.add(rimRing);
+
+  // 轮毂盘
+  const discGeo = new THREE.CylinderGeometry(0.295, 0.295, 0.03, 48);
+  discGeo.rotateX(Math.PI / 2);
+  const disc = new THREE.Mesh(discGeo, MAT.brake());
+  disc.position.z = -0.045;
+  g.add(disc);
+
+  // 辐条
+  const spokeCount = 6;
+  for (let i = 0; i < spokeCount; i++) {
+    const a = (i / spokeCount) * Math.PI * 2;
+    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.058, 0.05), MAT.rim());
+    spoke.position.set(Math.cos(a) * 0.15, Math.sin(a) * 0.15, W / 2 - 0.075);
+    spoke.rotation.z = a;
+    spoke.castShadow = true;
+    g.add(spoke);
+  }
+
+  // 中心轮毂
+  const hubGeo = new THREE.CylinderGeometry(0.078, 0.078, 0.13, 20);
+  hubGeo.rotateX(Math.PI / 2);
+  const hub = new THREE.Mesh(hubGeo, MAT.chrome());
+  hub.position.z = 0.055;
+  g.add(hub);
+
+  // 刹车卡钳
+  const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.10, 0.17, 0.075), MAT.caliper());
+  caliper.position.set(0.13, 0.10, -0.055);
+  g.add(caliper);
+
+  return g;
+}
+
+const wheelDefs = [
+  { id: 'wheelFR', name: '右前轮', pos: [ 1.40, 0.42,  0.90], ex: [ 0.75, -0.06,  1.15] },
+  { id: 'wheelFL', name: '左前轮', pos: [ 1.40, 0.42, -0.90], ex: [ 0.75, -0.06, -1.15] },
+  { id: 'wheelRR', name: '右后轮', pos: [-1.42, 0.44,  0.90], ex: [-0.75, -0.06,  1.15] },
+  { id: 'wheelRL', name: '左后轮', pos: [-1.42, 0.44, -0.90], ex: [-0.75, -0.06, -1.15] }
+];
+
+const wheelGroups = [];
+for (const def of wheelDefs) {
+  const w = buildWheel();
+  w.position.set(def.pos[0], def.pos[1], def.pos[2]);
+  carGroup.add(w);
+  wheelGroups.push(w);
+  def.group = w;
+}
+
+/* ---------- 6.4 V12 发动机 ---------- */
+const engineGroup = new THREE.Group();
+engineGroup.position.set(-1.45, 0.44, 0);
+carGroup.add(engineGroup);
+
+// 缸体
+const block = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.30, 0.56), MAT.engineBlock());
+block.castShadow = true;
+engineGroup.add(block);
+
+// 油底壳
+const oilPan = new THREE.Mesh(new THREE.BoxGeometry(0.92, 0.12, 0.46), MAT.dark());
+oilPan.position.y = -0.20;
+engineGroup.add(oilPan);
+
+// 两侧汽缸盖（V 型）
+for (const s of [1, -1]) {
+  const head = new THREE.Mesh(new THREE.BoxGeometry(1.02, 0.20, 0.22), MAT.camCover());
+  head.position.set(0, 0.28, s * 0.185);
+  head.rotation.x = s * 0.52;
+  head.castShadow = true;
+  engineGroup.add(head);
+
+  // 凸轮轴盖装饰条
+  const strip = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.035, 0.07), MAT.chrome());
+  strip.position.set(0, 0.385, s * 0.245);
+  strip.rotation.x = s * 0.52;
+  engineGroup.add(strip);
+}
+
+// 进排气歧管
+for (const s of [1, -1]) {
+  for (let i = 0; i < 6; i++) {
+    const pipeGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.16, 10);
+    const pipe = new THREE.Mesh(pipeGeo, MAT.chrome());
+    pipe.position.set(-0.42 + i * 0.168, 0.10, s * 0.32);
+    pipe.rotation.x = s * 0.35;
+    engineGroup.add(pipe);
+  }
+}
+
+// 活塞（动画）
+const pistons = [];
+for (const s of [1, -1]) {
+  for (let i = 0; i < 6; i++) {
+    const piston = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.052, 0.052, 0.15, 12),
+      MAT.chrome()
+    );
+    const baseX = -0.42 + i * 0.168;
+    const baseY = 0.16;
+    piston.position.set(baseX, baseY, s * 0.155);
+    piston.userData.baseY = baseY;
+    piston.userData.phase = i * 0.72 + (s > 0 ? 0 : 1.9);
+    engineGroup.add(piston);
+    pistons.push(piston);
+  }
+}
+
+/* ---------- 6.5 尾翼 ---------- */
+const wingGroup = new THREE.Group();
+wingGroup.position.set(-2.02, 0.82, 0);
+carGroup.add(wingGroup);
+
+const wingPlane = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.045, 1.46), MAT.paintDark());
+wingPlane.position.y = 0.34;
+wingPlane.rotation.z = 0.12;
+wingPlane.castShadow = true;
+wingGroup.add(wingPlane);
+
+for (const s of [1, -1]) {
+  const strut = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.34, 0.055), MAT.dark());
+  strut.position.set(0.02, 0.17, s * 0.44);
+  strut.castShadow = true;
+  wingGroup.add(strut);
+}
+// 端板
+for (const s of [1, -1]) {
+  const plate = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.13, 0.025), MAT.paintDark());
+  plate.position.set(0, 0.35, s * 0.73);
+  wingGroup.add(plate);
+}
+
+/* =========================================================
+   7. 部件注册
+   ========================================================= */
+const overview = {
+  title: '整车概览',
+  desc: '法拉利 V12 旗舰超跑采用<b>中前置 V12 自然吸气发动机</b>与后轮驱动布局。点击车体任意部件，或使用下方「选择学习部件」列表，可以聚焦观察结构细节，并自动淡出其余部件。使用底部滑杆进行 <b>爆炸拆解</b>，逐层理解整车总布置。',
+  specs: [
+    ['动力形式', 'V12 自吸'],
+    ['排量', '6.5 L'],
+    ['最大功率', '830 cv'],
+    ['驱动布局', '中前置后驱']
+  ]
+};
+
+const PART_DEFS = [
+  {
+    id: 'body', name: '车身外壳', group: bodyGroup, explode: new THREE.Vector3(0, 1.45, 0), focusDist: 5.0,
+    desc: '车身采用<b>碳纤维增强复合材料</b>与铝合金混合结构，在保证扭转刚度的同时大幅减重。整车外形通过风洞反复优化，车底采用平整化导流设计，配合前唇与扩散器形成地面效应，高速时产生可观下压力。',
+    specs: [['材质', '碳纤维/铝'], ['车重', '约 1525 kg'], ['风阻 Cd', '0.32'], ['结构', '单体壳']]
+  },
+  {
+    id: 'glass', name: '座舱玻璃', group: glassGroup, explode: new THREE.Vector3(0, 2.75, 0), focusDist: 4.2,
+    desc: '前挡风、侧窗与后窗构成低风阻座舱。玻璃采用<b>夹层安全玻璃</b>，中间 PVB 层在受到冲击时能粘住碎片，避免二次伤害。大倾角设计可减少气流分离，同时保证驾驶视野。',
+    specs: [['类型', '夹层安全玻璃'], ['倾角', '约 60°'], ['功能', '减阻/防护'], ['透光率', '≥70%']]
+  },
+  {
+    id: 'engine', name: 'V12 发动机', group: engineGroup, explode: new THREE.Vector3(-1.55, 0.55, 0), focusDist: 3.4,
+    desc: '这是一台<b>6.5 L 自然吸气 V12</b>，12 个气缸分为两组以约 65° 夹角排布。曲轴每转两圈，全部气缸依次完成一次四冲程循环（进气—压缩—做功—排气）。开启「引擎运转」可观察活塞相位差与点火顺序。',
+    specs: [['排量', '6.5 L'], ['气缸', 'V12'], ['最大转速', '9500 rpm'], ['最大功率', '830 cv']]
+  },
+  {
+    id: 'wing', name: '空气动力尾翼', group: wingGroup, explode: new THREE.Vector3(-1.05, 2.45, 0), focusDist: 3.8,
+    desc: '尾部扰流板将流经车顶的气流向上偏转，根据<b>伯努利原理与动量守恒</b>产生向下的反作用力，提高后轴抓地力。主动式尾翼还会根据车速与制动状态调整攻角，兼顾高速稳定性与低速低阻力。',
+    specs: [['作用', '产生下压力'], ['调校', '主动可调'], ['位置', '车尾'], ['受益轴', '后轴']]
+  }
+];
+
+for (const d of PART_DEFS) {
+  parts.push({
+    id: d.id,
+    name: d.name,
+    group: d.group,
+    basePos: d.group.position.clone(),
+    explode: d.explode.clone(),
+    desc: d.desc,
+    specs: d.specs,
+    focusDist: d.focusDist
+  });
+}
+
+// 车轮部件
+for (const def of wheelDefs) {
+  parts.push({
+    id: def.id,
+    name: def.name,
+    group: def.group,
+    basePos: def.group.position.clone(),
+    explode: new THREE.Vector3(def.ex[0], def.ex[1], def.ex[2]),
+    desc: '锻造铝合金轮毂搭配<b>碳陶复合制动盘</b>。碳陶刹车盘比铸铁盘轻约 40%，耐热可达 1000 ℃ 以上，能显著抑制连续制动时的热衰减。轮胎为低扁平比高性能胎，宽胎面提供更大的接地面积与侧向抓地力。',
+    specs: [['轮毂', '锻造铝合金'], ['制动', '碳陶通风盘'], ['轮胎', '低扁平比'], ['驱动', def.id.startsWith('wheelR') ? '驱动轮' : '转向轮']],
+    focusDist: 2.3
+  });
+}
+
+/* ---- 为所有网格打上 partId，并计算局部中心 ---- */
+for (const p of parts) {
+  p.group.updateMatrixWorld(true);
+  const box3 = new THREE.Box3().setFromObject(p.group);
+  p.centerOffset = box3.getCenter(new THREE.Vector3()).sub(p.group.position);
+  p.group.traverse((o) => {
+    if (o.isMesh) {
+      o.userData.partId = p.id;
+      if (o.material) o.userData.baseMats = Array.isArray(o.material) ? o.material.slice() : [o.material];
+    }
+  });
+}
+
+/* =========================================================
+   8. 交互与 UI
+   ========================================================= */
+const panelEl = document.getElementById('panel');
+const panelCloseBtn = document.getElementById('panelClose');
+const reopenBtn = document.getElementById('reopen');
+const partTitleEl = document.getElementById('partTitle');
+const partDescEl = document.getElementById('partDesc');
+const specsEl = document.getElementById('specs');
+const partListEl = document.getElementById('partList');
+const labelsEl = document.getElementById('labels');
+
+const btnExplode = document.getElementById('btnExplode');
+const btnEngine = document.getElementById('btnEngine');
+const btnWheels = document.getElementById('btnWheels');
+const btnLabels = document.getElementById('btnLabels');
+const btnReset = document.getElementById('btnReset');
+const explodeRange = document.getElementById('explodeRange');
+
+let selectedPartId = null;
+let explodeTarget = 0;
+let explodeCurrent = 0;
+let engineOn = false;
+let wheelsOn = false;
+let labelsOn = false;
+
+/* ---- 讲解面板渲染 ---- */
+function renderInfo(title, desc, specs) {
+  partTitleEl.textContent = title;
+  partDescEl.innerHTML = desc;
+  specsEl.innerHTML = '';
+  if (specs && specs.length) {
+    for (const [k, v] of specs) {
+      const d = document.createElement('div');
+      d.className = 'spec';
+      d.innerHTML = '<div class="k">' + k + '</div><div class="v">' + v + '</div>';
+      specsEl.appendChild(d);
+    }
+  }
+}
+
+/* ---- 部件列表按钮 ---- */
+const listButtons = [];
+{
+  const ovBtn = document.createElement('button');
+  ovBtn.className = 'part-btn active';
+  ovBtn.textContent = '整车概览';
+  ovBtn.dataset.id = 'overview';
+  ovBtn.addEventListener('click', () => selectPart(null));
+  partListEl.appendChild(ovBtn);
+  listButtons.push(ovBtn);
+}
+for (const p of parts) {
+  const b = document.createElement('button');
+  b.className = 'part-btn';
+  b.textContent = p.name;
+  b.dataset.id = p.id;
+  b.addEventListener('click', () => selectPart(p));
+  partListEl.appendChild(b);
+  listButtons.push(b);
+}
+
+function updateListActive() {
+  for (const b of listButtons) {
+    b.classList.toggle('active', b.dataset.id === (selectedPartId || 'overview'));
+  }
+}
+
+/* ---- 变暗 / 恢复 ---- */
+function setPartDimmed(p, dim) {
+  p.group.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    const mats = o.userData.baseMats;
+    if (!mats) return;
+    for (const m of mats) {
+      if (dim) {
+        if (m.userData._orig === undefined) {
+          m.userData._orig = {
+            opacity: m.opacity,
+            transparent: m.transparent,
+            depthWrite: m.depthWrite
+          };
+        }
+        m.transparent = true;
+        m.opacity = m.userData._orig.opacity * 0.13;
+        m.depthWrite = false;
+      } else {
+        if (m.userData._orig !== undefined) {
+          m.opacity = m.userData._orig.opacity;
+          m.transparent = m.userData._orig.transparent;
+          m.depthWrite = m.userData._orig.depthWrite;
+          m.userData._orig = undefined;
+        }
+      }
+      m.needsUpdate = true;
+    }
+  });
+}
+
+function applyDimming() {
+  for (const p of parts) {
+    setPartDimmed(p, selectedPartId !== null && p.id !== selectedPartId);
+  }
+}
+
+/* ---- 相机飞行动画 ---- */
+let camTween = null;
+
+function flyTo(pos, target, dur = 0.9) {
+  camTween = {
+    fromPos: camera.position.clone(),
+    fromTarget: controls.target.clone(),
+    toPos: pos.clone(),
+    toTarget: target.clone(),
+    t: 0,
+    dur: dur
+  };
+  controls.enabled = false;
+}
+
+function easeInOutQuad(k) {
+  return k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+}
+
+/* ---- 选择部件 ---- */
+function selectPart(p) {
+  if (!p) {
+    selectedPartId = null;
+    renderInfo(overview.title, overview.desc, overview.specs);
+    updateListActive();
+    applyDimming();
+    flyTo(DEFAULT_CAM_POS, DEFAULT_TARGET, 1.0);
+    return;
+  }
+
+  selectedPartId = p.id;
+  renderInfo(p.name, p.desc, p.specs);
+  updateListActive();
+  applyDimming();
+
+  // 计算当前世界中心
+  const box3 = new THREE.Box3().setFromObject(p.group);
+  const center = box3.getCenter(new THREE.Vector3());
+  const dir = new THREE.Vector3(0.72, 0.52, 0.86).normalize();
+  const dist = p.focusDist || 3.6;
+  flyTo(center.clone().addScaledVector(dir, dist), center, 0.85);
+}
+
+/* ---- 射线拾取 ---- */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let downX = 0;
+let downY = 0;
+
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  downX = e.clientX;
+  downY = e.clientY;
+});
+
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 7) return;
+  pickAt(e.clientX, e.clientY);
+});
+
+function pickAt(clientX, clientY) {
+  const rect = renderer.domElement.getBoundingClientRect();
+  pointer.x = ((clientX - rect.left) / rect.width) * 2 - 1;
+  pointer.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+  raycaster.setFromCamera(pointer, camera);
+
+  const hits = raycaster.intersectObjects(carGroup.children, true);
+  if (!hits.length) return;
+
+  for (const hit of hits) {
+    let obj = hit.object;
+    while (obj && !obj.userData.partId) obj = obj.parent;
+    if (obj && obj.userData.partId) {
+      const target = parts.find((x) => x.id === obj.userData.partId);
+      if (target) selectPart(target);
+      return;
+    }
+  }
+}
+
+/* ---- 面板开关 ---- */
+function hidePanel() {
+  panelEl.classList.add('hidden');
+  reopenBtn.classList.add('show');
+}
+function showPanel() {
+  panelEl.classList.remove('hidden');
+  reopenBtn.classList.remove('show');
+}
+panelCloseBtn.addEventListener('click', hidePanel);
+reopenBtn.addEventListener('click', showPanel);
+
+/* ---- 工具栏 ---- */
+function setExplode(v) {
+  explodeTarget = v;
+  explodeRange.value = String(Math.round(v * 100));
+  explodeRange.style.setProperty('--p', Math.round(v * 100) + '%');
+  btnExplode.classList.toggle('on', v > 0.5);
+}
+
+btnExplode.addEventListener('click', () => {
+  setExplode(explodeTarget > 0.5 ? 0 : 1);
+});
+
+explodeRange.addEventListener('input', () => {
+  const v = Number(explodeRange.value) / 100;
+  explodeTarget = v;
+  explodeRange.style.setProperty('--p', explodeRange.value + '%');
+  btnExplode.classList.toggle('on', v > 0.5);
+});
+
+btnEngine.addEventListener('click', () => {
+  engineOn = !engineOn;
+  btnEngine.classList.toggle('on', engineOn);
+});
+
+btnWheels.addEventListener('click', () => {
+  wheelsOn = !wheelsOn;
+  btnWheels.classList.toggle('on', wheelsOn);
+});
+
+btnLabels.addEventListener('click', () => {
+  labelsOn = !labelsOn;
+  btnLabels.classList.toggle('on', labelsOn);
+});
+
+btnReset.addEventListener('click', () => {
+  selectPart(null);
+  setExplode(0);
+  engineOn = false;
+  wheelsOn = false;
+  btnEngine.classList.remove('on');
+  btnWheels.classList.remove('on');
+});
+
+/* ---- 3D 标注 ---- */
+const tagEls = new Map();
+for (const p of parts) {
+  const el = document.createElement('div');
+  el.className = 'tag';
+  el.textContent = p.name;
+  labelsEl.appendChild(el);
+  tagEls.set(p.id, el);
+}
+
+/* ---- 初始化面板 ---- */
+renderInfo(overview.title, overview.desc, overview.specs);
+updateListActive();
+explodeRange.style.setProperty('--p', '0%');
+
+/* =========================================================
+   9. 主循环
+   ========================================================= */
+const clock = new THREE.Clock();
+const tmpVec = new THREE.Vector3();
+
+function updateLabels() {
+  if (!labelsOn) return;
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  for (const p of parts) {
+    const el = tagEls.get(p.id);
+    if (!el) continue;
+    tmpVec.copy(p.group.position).add(p.centerOffset);
+    tmpVec.project(camera);
+    const visible = tmpVec.z < 1 && tmpVec.z > -1;
+    if (!visible) {
+      el.classList.remove('show');
+      continue;
+    }
+    const x = (tmpVec.x * 0.5 + 0.5) * w;
+    const y = (-tmpVec.y * 0.5 + 0.5) * h;
+    if (x < -60 || x > w + 60 || y < -40 || y > h + 40) {
+      el.classList.remove('show');
+      continue;
+    }
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.classList.add('show');
+  }
+}
+
+function hideAllLabels() {
+  for (const el of tagEls.values()) el.classList.remove('show');
+}
+
+function animate() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const t = clock.elapsedTime;
+
+  // 相机补间
+  if (camTween) {
+    camTween.t += dt / camTween.dur;
+    const k = Math.min(1, camTween.t);
+    const e = easeInOutQuad(k);
+    camera.position.lerpVectors(camTween.fromPos, camTween.toPos, e);
+    controls.target.lerpVectors(camTween.fromTarget, camTween.toTarget, e);
+    if (k >= 1) {
+      camTween = null;
+      controls.enabled = true;
+    }
+  }
+
+  // 爆炸拆解插值
+  if (Math.abs(explodeCurrent - explodeTarget) > 0.0005) {
+    explodeCurrent += (explodeTarget - explodeCurrent) * Math.min(1, dt * 6.5);
+    if (Math.abs(explodeCurrent - explodeTarget) < 0.001) explodeCurrent = explodeTarget;
+  }
+
+  for (const p of parts) {
+    p.group.position.copy(p.basePos).addScaledVector(p.explode, explodeCurrent);
+  }
+
+  // 活塞动画
+  if (engineOn) {
+    for (const piston of pistons) {
+      piston.position.y = piston.userData.baseY + Math.sin(t * 9.2 + piston.userData.phase) * 0.072;
+    }
+    // 引擎轻微振动
+    engineGroup.rotation.z = Math.sin(t * 26) * 0.004;
+  } else {
+    engineGroup.rotation.z *= 0.9;
+  }
+
+  // 车轮转动
+  if (wheelsOn) {
+    for (const w of wheelGroups) {
+      w.rotation.z -= dt * 4.2;
+    }
+  }
+
+  controls.update();
+
+  if (labelsOn) updateLabels();
+  else hideAllLabels();
+
+  renderer.render(scene, camera);
+}
+
+renderer.setAnimationLoop(animate);
+
+/* =========================================================
+   10. 自适应
+   ========================================================= */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => setTimeout(onResize, 120));
+
+// 小屏默认收起讲解面板为可展开状态
+if (window.innerWidth < 620) {
+  // 保持展开，但降低面板高度由 CSS 控制
+}
+</script>
+
+<script src="../prompt-panel.js" data-id="lego-ferrari-deepseek"></script>
+</body>
+</html>

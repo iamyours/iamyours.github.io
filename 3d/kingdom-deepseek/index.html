@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>体素王国 · 城堡与护城河</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #0b1020;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { display: block; width: 100%; height: 100%; }
+
+  #back-link {
+    position: fixed;
+    top: 16px; left: 16px;
+    z-index: 20;
+    display: inline-block;
+    padding: 9px 17px;
+    background: rgba(255, 249, 235, 0.82);
+    color: #4a3b2a;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.2;
+    text-decoration: none;
+    border-radius: 999px;
+    box-shadow: 0 2px 12px rgba(20, 30, 50, 0.18);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: background .18s ease, transform .18s ease, box-shadow .18s ease;
+  }
+  #back-link:hover {
+    background: rgba(255, 252, 244, 1);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 16px rgba(20, 30, 50, 0.24);
+  }
+  #back-link:active { transform: translateY(0); }
+
+  #hint {
+    position: fixed;
+    left: 50%;
+    bottom: 18px;
+    transform: translateX(-50%);
+    z-index: 20;
+    padding: 7px 16px;
+    border-radius: 999px;
+    background: rgba(18, 32, 52, 0.34);
+    color: rgba(255, 255, 255, 0.92);
+    font-size: 12.5px;
+    letter-spacing: .04em;
+    white-space: nowrap;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    pointer-events: none;
+    user-select: none;
+    animation: hintFade 1s ease 4s forwards;
+  }
+  @keyframes hintFade {
+    to { opacity: 0.32; }
+  }
+
+  @media (max-width: 640px) {
+    #back-link { top: 12px; left: 12px; padding: 8px 14px; font-size: 13px; }
+    #hint { font-size: 11.5px; bottom: 14px; padding: 6px 13px; }
+  }
+</style>
+</head>
+<body>
+
+<a id="back-link" href="../">← 返回 3D 作品</a>
+<canvas id="scene"></canvas>
+<div id="hint">拖动旋转 · 滚轮 / 双指缩放</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   0. 工具函数
+   ========================================================= */
+
+let _seed = 20240601;
+function rnd() {
+  _seed = (_seed * 1664525 + 1013904223) >>> 0;
+  return _seed / 4294967296;
+}
+function rndInt(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
+function pick(arr) { return arr[Math.floor(rnd() * arr.length)]; }
+
+/** 给颜色加一点点随机明暗，让体素看起来更自然 */
+function shade(hex, amt) {
+  const r = (hex >> 16) & 255;
+  const g = (hex >> 8) & 255;
+  const b = hex & 255;
+  const d = Math.round((rnd() - 0.5) * amt);
+  const rr = Math.min(255, Math.max(0, r + d));
+  const gg = Math.min(255, Math.max(0, g + d));
+  const bb = Math.min(255, Math.max(0, b + d));
+  return (rr << 16) | (gg << 8) | bb;
+}
+
+/** 平滑噪声（用于地形起伏） */
+function smoothNoise(x, z) {
+  return (
+    Math.sin(x * 0.31 + 1.7) * Math.cos(z * 0.27 - 0.9) * 0.55 +
+    Math.sin(x * 0.13 - 2.3) * Math.cos(z * 0.17 + 1.2) * 0.45
+  );
+}
+
+/* =========================================================
+   1. 渲染器 / 场景 / 相机 / 控制器
+   ========================================================= */
+
+const canvas = document.getElementById('scene');
+
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.18;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xbcdcf0, 125, 305);
+
+const camera = new THREE.PerspectiveCamera(
+  46,
+  window.innerWidth / window.innerHeight,
+  0.5,
+  1200
+);
+camera.position.set(148, 132, 162);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 9, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.055;
+controls.rotateSpeed = 0.78;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.minDistance = 26;
+controls.maxDistance = 250;
+controls.maxPolarAngle = Math.PI * 0.487;
+controls.update();
+
+/* =========================================================
+   2. 天空球
+   ========================================================= */
+
+function makeSkyTexture() {
+  const c = document.createElement('canvas');
+  c.width = 4;
+  c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.00, '#0f4f86');
+  g.addColorStop(0.26, '#2f7cb8');
+  g.addColorStop(0.50, '#6db6e2');
+  g.addColorStop(0.68, '#a8d8f2');
+  g.addColorStop(0.84, '#d3ebfa');
+  g.addColorStop(1.00, '#eff9ff');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 4, 512);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  return tex;
+}
+
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(520, 32, 24),
+  new THREE.MeshBasicMaterial({
+    map: makeSkyTexture(),
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false
+  })
+);
+sky.frustumCulled = false;
+scene.add(sky);
+
+/* =========================================================
+   3. 光照
+   ========================================================= */
+
+const hemi = new THREE.HemisphereLight(0xdcefff, 0x6d8f4a, 0.78);
+scene.add(hemi);
+
+const ambient = new THREE.AmbientLight(0xffffff, 0.22);
+scene.add(ambient);
+
+const sun = new THREE.DirectionalLight(0xfff3d2, 2.15);
+sun.position.set(72, 112, 58);
+sun.castShadow = true;
+sun.shadow.mapSize.width = 2048;
+sun.shadow.mapSize.height = 2048;
+sun.shadow.camera.left = -78;
+sun.shadow.camera.right = 78;
+sun.shadow.camera.top = 78;
+sun.shadow.camera.bottom = -78;
+sun.shadow.camera.near = 20;
+sun.shadow.camera.far = 330;
+sun.shadow.bias = -0.0008;
+sun.shadow.normalBias = 0.07;
+scene.add(sun);
+scene.add(sun.target);
+
+const bounce = new THREE.DirectionalLight(0x9ec8ff, 0.35);
+bounce.position.set(-70, 42, -65);
+scene.add(bounce);
+
+/* =========================================================
+   4. 体素数据容器
+   ========================================================= */
+
+const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+
+const terrainVox = [];
+const structVox = [];
+const waterVox = [];
+const cloudVox = [];
+
+const occupied = new Set();
+
+/**
+ * 压入一个体素
+ * @param {Array} arr 目标数组
+ * @param {number} x,y,z 中心坐标
+ * @param {number} color 十六进制颜色
+ * @param {number} sx,sy,sz 缩放
+ */
+function vox(arr, x, y, z, color, sx = 1, sy = 1, sz = 1) {
+  const k = x + '|' + y + '|' + z;
+  if (occupied.has(k)) return;
+  occupied.add(k);
+  arr.push([x, y, z, color, sx, sy, sz]);
+}
+
+function makeInstancedMesh(data, material, castShadow, receiveShadow) {
+  const mesh = new THREE.InstancedMesh(boxGeo, material, data.length);
+  const dummy = new THREE.Object3D();
+  const col = new THREE.Color();
+
+  for (let i = 0; i < data.length; i++) {
+    const v = data[i];
+    dummy.position.set(v[0], v[1], v[2]);
+    dummy.scale.set(v[4], v[5], v[6]);
+    dummy.rotation.set(0, 0, 0);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+    col.setHex(v[3]);
+    mesh.setColorAt(i, col);
+  }
+
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  mesh.castShadow = castShadow;
+  mesh.receiveShadow = receiveShadow;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
+/* =========================================================
+   5. 地形高度图
+   ========================================================= */
+
+const WORLD_R = 40;
+const cells = new Map();          // 键: "x,z" → 高度
+
+function cellKey(x, z) { return x + ',' + z; }
+function getH(x, z) {
+  const v = cells.get(cellKey(x, z));
+  return v === undefined ? null : v;
+}
+
+// --- 道路 ---
+function roadCenterX(z) {
+  return Math.sin((z - 16) * 0.25) * 4.5;
+}
+function isRoad(x, z) {
+  if (z < 16.5 || z > 35) return false;
+  return Math.abs(x - roadCenterX(z)) < 1.8;
+}
+
+// --- 计算每个格子的高度 ---
+for (let x = -WORLD_R; x <= WORLD_R; x++) {
+  for (let z = -WORLD_R; z <= WORLD_R; z++) {
+    const d = Math.hypot(x, z);
+    if (d > WORLD_R) continue;
+
+    const cd = Math.max(Math.abs(x), Math.abs(z));
+    let h;
+
+    if (cd <= 11) {
+      // 城堡岛
+      h = 1;
+    } else if (cd <= 15) {
+      // 护城河河床
+      h = -3;
+    } else {
+      // 郊野丘陵
+      const t = Math.min(1, (d - 16) / 16);
+      const n = smoothNoise(x * 0.8, z * 0.8) * 0.5 + 0.5;
+      h = Math.round(t * n * 5);
+
+      // 海岸下沉
+      const edge = Math.min(1, Math.max(0, (d - 33) / 9));
+      h = Math.round(h * (1 - edge) + (-3) * edge);
+    }
+
+    cells.set(cellKey(x, z), h);
+  }
+}
+
+/* =========================================================
+   6. 规划村庄位置（先规划，才能避开）
+   ========================================================= */
+
+const houseSpots = [];
+{
+  let attempts = 0;
+  while (houseSpots.length < 15 && attempts < 900) {
+    attempts++;
+    const a = rnd() * Math.PI * 2;
+    const r = 19 + rnd() * 12.5;
+    const cx = Math.round(Math.cos(a) * r);
+    const cz = Math.round(Math.sin(a) * r);
+
+    if (Math.abs(cx) > 34 || Math.abs(cz) > 34) continue;
+
+    let ok = true;
+
+    // 远离道路
+    for (let x = cx - 1; x <= cx + 4 && ok; x++) {
+      for (let z = cz - 1; z <= cz + 4; z++) {
+        if (isRoad(x, z)) { ok = false; break; }
+      }
+    }
+    if (!ok) continue;
+
+    // 远离其他房屋
+    for (const s of houseSpots) {
+      if (Math.hypot(s.cx - cx, s.cz - cz) < 8.5) { ok = false; break; }
+    }
+    if (!ok) continue;
+
+    // 确保地形存在
+    for (let x = cx; x < cx + 4 && ok; x++) {
+      for (let z = cz; z < cz + 4; z++) {
+        if (getH(x, z) === null) { ok = false; break; }
+      }
+    }
+    if (!ok) continue;
+
+    houseSpots.push({ cx, cz });
+  }
+}
+
+/* =========================================================
+   7. 生成地形体素
+   ========================================================= */
+
+const NEIGHBORS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+for (let x = -WORLD_R; x <= WORLD_R; x++) {
+  for (let z = -WORLD_R; z <= WORLD_R; z++) {
+    const h = getH(x, z);
+    if (h === null) continue;
+
+    // 计算需要向下填充到哪一层
+    let fillTo = h - 1;
+    for (const [dx, dz] of NEIGHBORS) {
+      const nh = getH(x + dx, z + dz);
+      if (nh === null) fillTo = Math.min(fillTo, h - 2);
+      else fillTo = Math.min(fillTo, nh - 1);
+    }
+    fillTo = Math.max(fillTo, h - 6);
+
+    // 顶层颜色
+    const d = Math.hypot(x, z);
+    let topColor;
+
+    if (h <= -2) {
+      topColor = shade(0x6d7a52, 16);         // 护城河底淤泥
+    } else if (d > 33) {
+      topColor = shade(0xe6d6a4, 14);         // 沙滩
+    } else if (isRoad(x, z)) {
+      topColor = shade(0xc4a878, 16);         // 道路
+    } else {
+      const k = rnd();
+      topColor = k < 0.34 ? 0x6fbf4a : k < 0.68 ? 0x61b23f : 0x7ccb56;
+      topColor = shade(topColor, 16);
+    }
+
+    vox(terrainVox, x, h, z, topColor);
+
+    // 下方填充
+    for (let y = fillTo; y < h; y++) {
+      const depth = h - y;
+      const c = depth <= 2 ? 0x8d6239 : 0x7d7d7d;
+      vox(terrainVox, x, y, z, shade(c, 14));
+    }
+  }
+}
+
+/* =========================================================
+   8. 护城河水面
+   ========================================================= */
+
+for (let x = -16; x <= 16; x++) {
+  for (let z = -16; z <= 16; z++) {
+    const cd = Math.max(Math.abs(x), Math.abs(z));
+    if (cd < 12 || cd > 15) continue;
+    if (getH(x, z) === null) continue;
+    // 水面从 -2.5 一直到 -0.5
+    vox(waterVox, x, -1.5, z, 0x3fa8dc, 1, 2.0, 1);
+  }
+}
+
+/* =========================================================
+   9. 城堡
+   ========================================================= */
+
+const GY = 2; // 城堡地面层高度
+
+/* ---- 9.1 主塔（Keep） ---- */
+const KEEP_HALF = 3;
+
+for (let x = -KEEP_HALF; x <= KEEP_HALF; x++) {
+  for (let z = -KEEP_HALF; z <= KEEP_HALF; z++) {
+    for (let yo = 0; yo < 18; yo++) {
+      let c = 0xbcc0ca;
+
+      const onXFace = Math.abs(x) === KEEP_HALF;
+      const onZFace = Math.abs(z) === KEEP_HALF;
+
+      if (onXFace || onZFace) {
+        const other = onXFace ? z : x;
+        // 窗户
+        if (Math.abs(other) <= 1 && (yo === 5 || yo === 9 || yo === 13)) {
+          c = 0x5f86b3;
+        }
+      }
+
+      // 主门
+      if (z === KEEP_HALF && Math.abs(x) <= 1 && yo <= 2) {
+        c = 0x6b4423;
+      }
+
+      // 顶部浅色檐口
+      if (yo === 17) c = 0xd6dae2;
+
+      vox(structVox, x, GY + yo, z, shade(c, 9));
+    }
+  }
+}
+
+// 主塔屋顶（阶梯金字塔）
+for (let k = 0; k < 4; k++) {
+  const w = KEEP_HALF - k;
+  if (w < 0) break;
+  for (let x = -w; x <= w; x++) {
+    for (let z = -w; z <= w; z++) {
+      const c = k % 2 === 0 ? 0x2f66a8 : 0x3a76bb;
+      vox(structVox, x, GY + 18 + k, z, shade(c, 12));
+    }
+  }
+}
+
+// 主塔旗帜
+vox(structVox, 0, GY + 22, 0, 0x5f4526);
+vox(structVox, 0, GY + 23, 0, 0x5f4526);
+vox(structVox, 1, GY + 23, 0, 0xe8b53a);
+vox(structVox, 2, GY + 23, 0, 0xe8b53a);
+vox(structVox, 1, GY + 22, 0, 0xf0c65a);
+vox(structVox, 2, GY + 22, 0, 0xf0c65a);
+
+/* ---- 9.2 外墙 ---- */
+const WALL_R = 10;
+
+for (let x = -WALL_R; x <= WALL_R; x++) {
+  for (let z = -WALL_R; z <= WALL_R; z++) {
+    const cd = Math.max(Math.abs(x), Math.abs(z));
+    if (cd !== WALL_R) continue;
+
+    const isGate = (z === WALL_R && Math.abs(x) <= 1);
+
+    for (let yo = 0; yo < 6; yo++) {
+      if (isGate && yo < 3) continue; // 门洞
+      const c = yo >= 4 ? 0xd2d6e0 : 0xb6bbc7;
+      vox(structVox, x, GY + yo, z, shade(c, 9));
+    }
+  }
+}
+
+// 城垛
+for (let x = -WALL_R; x <= WALL_R; x++) {
+  for (let z = -WALL_R; z <= WALL_R; z++) {
+    const cd = Math.max(Math.abs(x), Math.abs(z));
+    if (cd !== WALL_R) continue;
+    if (((x + z) & 1) !== 0) continue;
+    vox(structVox, x, GY + 6, z, shade(0xe2e6ee, 9));
+  }
+}
+
+// 门楼加高
+for (let x = -2; x <= 2; x++) {
+  for (let z = 9; z <= 10; z++) {
+    for (let yo = 6; yo < 9; yo++) {
+      vox(structVox, x, GY + yo, z, shade(0xc6cbd5, 9));
+    }
+  }
+}
+
+// 城门（木门 + 铁条）
+for (let x = -1; x <= 1; x++) {
+  for (let yo = 0; yo < 3; yo++) {
+    const c = yo === 1 ? 0x4a4a55 : 0x6b4423;
+    vox(structVox, x, GY + yo, 10, shade(c, 10));
+  }
+}
+
+/* ---- 9.3 角楼 ---- */
+const towerPositions = [[9, 9], [9, -9], [-9, 9], [-9, -9]];
+
+for (const [tx, tz] of towerPositions) {
+  // 塔身
+  for (let x = tx - 2; x <= tx + 2; x++) {
+    for (let z = tz - 2; z <= tz + 2; z++) {
+      for (let yo = 0; yo < 12; yo++) {
+        let c = yo >= 10 ? 0xd0d4dd : 0xacb2be;
+        // 塔身小窗
+        if (yo === 4 || yo === 8) {
+          const isEdge = Math.abs(x - tx) === 2 || Math.abs(z - tz) === 2;
+          const isCenter = (x === tx) || (z === tz);
+          if (isEdge && isCenter) c = 0x5f86b3;
+        }
+        vox(structVox, x, GY + yo, z, shade(c, 8));
+      }
+    }
+  }
+
+  // 锥形红屋顶
+  for (let k = 0; k < 3; k++) {
+    const w = 2 - k;
+    for (let x = tx - w; x <= tx + w; x++) {
+      for (let z = tz - w; z <= tz + w; z++) {
+        const c = k % 2 === 0 ? 0xb03a2e : 0xc24738;
+        vox(structVox, x, GY + 12 + k, z, shade(c, 11));
+      }
+    }
+  }
+
+  // 旗杆
+  for (let i = 0; i < 3; i++) {
+    vox(structVox, tx, GY + 15 + i, tz, 0x5f4526);
+  }
+  // 旗面
+  for (let i = 1; i <= 2; i++) {
+    vox(structVox, tx + i, GY + 17, tz, 0xe9c341);
+    vox(structVox, tx + i, GY + 16, tz, 0xf3d55e);
+  }
+}
+
+/* ---- 9.4 庭院铺地 ---- */
+for (let x = -11; x <= 11; x++) {
+  for (let z = -11; z <= 11; z++) {
+    const cd = Math.max(Math.abs(x), Math.abs(z));
+    if (cd > 11) continue;
+    const c = ((x + z) & 1) ? 0xc9c4b0 : 0xb2ac98;
+    vox(structVox, x, GY, z, shade(c, 13));
+  }
+}
+
+/* ---- 9.5 庭院点缀（花、木桶、小火把） ---- */
+for (let i = 0; i < 26; i++) {
+  const x = rndInt(-8, 8);
+  const z = rndInt(-8, 8);
+  const cd = Math.max(Math.abs(x), Math.abs(z));
+  if (cd < 5) continue;
+  const c = pick([0xff6b6b, 0xffd93d, 0xc084fc, 0xff9ff3, 0xffffff, 0x66d9e8]);
+  vox(structVox, x, GY + 1, z, c, 0.45, 0.45, 0.45);
+}
+
+// 庭院里的四个火炬柱
+for (const [px, pz] of [[5, 5], [5, -5], [-5, 5], [-5, -5]]) {
+  vox(structVox, px, GY + 1, pz, 0x8a7a5e);
+  vox(structVox, px, GY + 2, pz, 0x8a7a5e);
+  vox(structVox, px, GY + 3, pz, 0xffb703);
+}
+
+/* ---- 9.6 吊桥 ---- */
+for (let x = -1; x <= 1; x++) {
+  for (let z = 12; z <= 17; z++) {
+    const c = (z & 1) ? 0x8a5a2c : 0x9b6a38;
+    vox(structVox, x, GY - 1, z, shade(c, 12));
+  }
+}
+// 桥桩
+for (const z of [13, 16]) {
+  for (let x = -1; x <= 1; x++) {
+    vox(structVox, x, GY - 2, z, 0x6b4423);
+    vox(structVox, x, GY - 3, z, 0x5c3a1c);
+  }
+}
+
+/* =========================================================
+   10. 村庄
+   ========================================================= */
+
+const WALL_COLORS = [0xf2e2c4, 0xe8b98a, 0xc7dcef, 0xe6b8c4, 0xcfe3c0, 0xf0d9a8, 0xdcc7a8];
+const ROOF_COLORS = [0xb5462f, 0x2f6fa8, 0x3d7a4a, 0x6b4a8f, 0xc06a2b, 0x9c3b52];
+
+function buildHouse(cx, cz, w, d, wallCol, roofCol) {
+  // 计算地基高度
+  let maxH = -999;
+  for (let x = cx; x < cx + w; x++) {
+    for (let z = cz; z < cz + d; z++) {
+      const h = getH(x, z);
+      if (h === null) return;
+      if (h > maxH) maxH = h;
+    }
+  }
+
+  const by = maxH + 1;
+
+  // 石砌地基
+  for (let x = cx; x < cx + w; x++) {
+    for (let z = cz; z < cz + d; z++) {
+      const h = getH(x, z);
+      for (let y = h + 1; y < by; y++) {
+        vox(structVox, x, y, z, shade(0x9a958a, 14));
+      }
+    }
+  }
+
+  const wallH = 3;
+  const doorX = Math.floor(w / 2);
+
+  // 墙体
+  for (let y = 0; y < wallH; y++) {
+    for (let x = 0; x < w; x++) {
+      for (let z = 0; z < d; z++) {
+        const edge = (x === 0 || x === w - 1 || z === 0 || z === d - 1);
+        if (!edge) continue;
+
+        // 门
+        if (y === 0 && z === d - 1 && x === doorX) {
+          vox(structVox, cx + x, by + y, cz + z, 0x5c3b1e);
+          continue;
+        }
+
+        let c = wallCol;
+
+        // 窗户
+        if (y === 1) {
+          const isWin =
+            (z === 0 && x === 1 && w >= 4) ||
+            (z === d - 1 && x === w - 2 && w >= 4) ||
+            (x === 0 && z === 1 && d >= 4) ||
+            (x === w - 1 && z === d - 2 && d >= 4);
+          if (isWin) c = 0xffd166;
+        }
+
+        vox(structVox, cx + x, by + y, cz + z, shade(c, 10));
+      }
+    }
+  }
+
+  // 阶梯双坡屋顶
+  const roofSteps = Math.ceil(w / 2);
+  for (let k = 0; k < roofSteps; k++) {
+    const x0 = cx + k;
+    const x1 = cx + w - 1 - k;
+    if (x0 > x1) break;
+    const z0 = (k === 0) ? cz - 1 : cz;
+    const z1 = (k === 0) ? cz + d : cz + d - 1;
+
+    for (let x = x0; x <= x1; x++) {
+      for (let z = z0; z <= z1; z++) {
+        vox(structVox, x, by + wallH + k, z, shade(roofCol, 12));
+      }
+    }
+  }
+
+  // 烟囱
+  const chimX = cx + 1;
+  const chimZ = cz + 1;
+  for (let i = 0; i < 2; i++) {
+    vox(structVox, chimX, by + wallH + roofSteps + i, chimZ, shade(0x8c8378, 12));
+  }
+}
+
+for (const spot of houseSpots) {
+  const w = rndInt(3, 5);
+  const d = rndInt(3, 5);
+  buildHouse(
+    spot.cx,
+    spot.cz,
+    w,
+    d,
+    pick(WALL_COLORS),
+    pick(ROOF_COLORS)
+  );
+}
+
+/* =========================================================
+   11. 树木
+   ========================================================= */
+
+function buildPineTree(bx, bz, by) {
+  const trunkH = rndInt(4, 6);
+
+  for (let i = 0; i < trunkH; i++) {
+    vox(structVox, bx, by + i, bz, shade(0x6b4423, 12));
+  }
+
+  const layers = [
+    { r: 2, y: trunkH - 3 },
+    { r: 2, y: trunkH - 2 },
+    { r: 1, y: trunkH - 1 },
+    { r: 1, y: trunkH },
+    { r: 0, y: trunkH + 1 }
+  ];
+
+  for (const L of layers) {
+    const rr = L.r;
+    for (let dx = -rr; dx <= rr; dx++) {
+      for (let dz = -rr; dz <= rr; dz++) {
+        if (dx * dx + dz * dz > rr * rr + 1) continue;
+        const c = (rr === 0) ? 0x2f7d3f : ((dx + dz) & 1 ? 0x2e8b4a : 0x3aa15a);
+        vox(structVox, bx + dx, by + L.y, bz + dz, shade(c, 14));
+      }
+    }
+  }
+}
+
+function buildRoundTree(bx, bz, by) {
+  const trunkH = rndInt(3, 4);
+
+  for (let i = 0; i < trunkH; i++) {
+    vox(structVox, bx, by + i, bz, shade(0x7a5230, 12));
+  }
+
+  const cy = by + trunkH + 1;
+  const R = 2;
+
+  for (let dx = -R; dx <= R; dx++) {
+    for (let dy = -R; dy <= R; dy++) {
+      for (let dz = -R; dz <= R; dz++) {
+        const dist2 = dx * dx + dy * dy * 1.4 + dz * dz;
+        if (dist2 > R * R + 1.4) continue;
+        const c = ((dx + dy + dz) & 1) ? 0x49b85e : 0x5ccf6f;
+        vox(structVox, bx + dx, cy + dy, bz + dz, shade(c, 14));
+      }
+    }
+  }
+}
+
+const treeSpots = [];
+{
+  let attempts = 0;
+  while (treeSpots.length < 78 && attempts < 3000) {
+    attempts++;
+    const a = rnd() * Math.PI * 2;
+    const r = 17 + rnd() * 22;
+    const x = Math.round(Math.cos(a) * r);
+    const z = Math.round(Math.sin(a) * r);
+
+    if (Math.max(Math.abs(x), Math.abs(z)) < 17) continue;
+
+    const h = getH(x, z);
+    if (h === null || h < -1) continue;
+    if (isRoad(x, z)) continue;
+
+    // 避开房屋
+    let blocked = false;
+    for (const s of houseSpots) {
+      if (Math.abs(s.cx + 2 - x) < 7 && Math.abs(s.cz + 2 - z) < 7) {
+        blocked = true;
+        break;
+      }
+    }
+    if (blocked) continue;
+
+    // 树木间距
+    let tooClose = false;
+    for (const t of treeSpots) {
+      if (Math.hypot(t.x - x, t.z - z) < 4.2) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+
+    treeSpots.push({ x, z, y: h });
+  }
+}
+
+for (const t of treeSpots) {
+  if (rnd() < 0.62) buildPineTree(t.x, t.z, t.y + 1);
+  else buildRoundTree(t.x, t.z, t.y + 1);
+}
+
+/* =========================================================
+   12. 花草点缀
+   ========================================================= */
+
+const FLOWER_COLORS = [0xff6b6b, 0xffd93d, 0xc084fc, 0xff9ff3, 0xffffff, 0x66d9e8, 0xffa94d];
+
+for (let i = 0; i < 620; i++) {
+  const a = rnd() * Math.PI * 2;
+  const r = 16 + rnd() * 21;
+  const x = Math.round(Math.cos(a) * r);
+  const z = Math.round(Math.sin(a) * r);
+
+  const h = getH(x, z);
+  if (h === null || h < 0) continue;
+  if (isRoad(x, z)) continue;
+
+  const c = pick(FLOWER_COLORS);
+  vox(structVox, x, h + 0.78, z, c, 0.42, 0.42, 0.42);
+}
+
+// 零散的小石头
+for (let i = 0; i < 70; i++) {
+  const a = rnd() * Math.PI * 2;
+  const r = 17 + rnd() * 20;
+  const x = Math.round(Math.cos(a) * r);
+  const z = Math.round(Math.sin(a) * r);
+
+  const h = getH(x, z);
+  if (h === null || h < 0) continue;
+  if (isRoad(x, z)) continue;
+
+  vox(structVox, x, h + 0.62, z, shade(0x9a9a9a, 20), 0.62, 0.5, 0.62);
+}
+
+/* =========================================================
+   13. 云朵
+   ========================================================= */
+
+for (let i = 0; i < 14; i++) {
+  const baseX = (rnd() - 0.5) * 190;
+  const baseZ = (rnd() - 0.5) * 190;
+  const baseY = 44 + rnd() * 24;
+
+  const puffs = rndInt(4, 7);
+
+  for (let j = 0; j < puffs; j++) {
+    const px = baseX + (rnd() - 0.5) * 17;
+    const pz = baseZ + (rnd() - 0.5) * 17;
+    const py = baseY + (rnd() - 0.5) * 4.5;
+
+    const sw = 4 + rnd() * 7;
+    const sh = 2 + rnd() * 2.4;
+    const sd = 4 + rnd() * 6;
+
+    vox(cloudVox, px, py, pz, shade(0xffffff, 10), sw, sh, sd);
+  }
+}
+
+/* =========================================================
+   14. 海洋
+   ========================================================= */
+
+const seaMat = new THREE.MeshLambertMaterial({ color: 0x2f86bd });
+const sea = new THREE.Mesh(new THREE.PlaneGeometry(900, 900), seaMat);
+sea.rotation.x = -Math.PI / 2;
+sea.position.y = -0.5;
+sea.receiveShadow = false;
+scene.add(sea);
+
+/* =========================================================
+   15. 组装所有 InstancedMesh
+   ========================================================= */
+
+// 地形
+const terrainMesh = makeInstancedMesh(
+  terrainVox,
+  new THREE.MeshLambertMaterial({ color: 0xffffff }),
+  false,
+  true
+);
+scene.add(terrainMesh);
+
+// 建筑与植被
+const structMesh = makeInstancedMesh(
+  structVox,
+  new THREE.MeshLambertMaterial({ color: 0xffffff }),
+  true,
+  true
+);
+scene.add(structMesh);
+
+// 水面
+const waterMesh = makeInstancedMesh(
+  waterVox,
+  new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.74,
+    depthWrite: false
+  }),
+  false,
+  false
+);
+waterMesh.renderOrder = 2;
+scene.add(waterMesh);
+
+// 云朵
+const cloudMesh = makeInstancedMesh(
+  cloudVox,
+  new THREE.MeshLambertMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.94,
+    depthWrite: false
+  }),
+  false,
+  false
+);
+cloudMesh.renderOrder = 1;
+scene.add(cloudMesh);
+
+/* =========================================================
+   16. 相机入场动画 & 主循环
+   ========================================================= */
+
+const camStart = new THREE.Vector3(158, 142, 172);
+const camEnd = new THREE.Vector3(58, 50, 68);
+const targetStart = new THREE.Vector3(0, 16, 0);
+const targetEnd = new THREE.Vector3(0, 9, 0);
+
+camera.position.copy(camStart);
+controls.target.copy(targetStart);
+
+let introT = 0;
+let introDone = false;
+
+controls.addEventListener('start', () => {
+  if (!introDone) {
+    introT = 1;
+    introDone = true;
+    controls.target.copy(targetEnd);
+    camera.position.copy(camEnd);
+  }
+});
+
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+
+  if (!introDone) {
+    introT = Math.min(1, introT + dt / 2.6);
+    const e = 1 - Math.pow(1 - introT, 3);
+
+    camera.position.lerpVectors(camStart, camEnd, e);
+    controls.target.lerpVectors(targetStart, targetEnd, e);
+
+    if (introT >= 1) {
+      introDone = true;
+      camera.position.copy(camEnd);
+      controls.target.copy(targetEnd);
+    }
+  }
+
+  // 云朵缓慢漂移
+  cloudMesh.rotation.y += dt * 0.006;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+animate();
+
+/* =========================================================
+   17. 响应式
+   ========================================================= */
+
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(onResize, 120);
+});
+
+/* 首次尺寸校准 */
+onResize();
+</script>
+
+<script src="../prompt-panel.js" data-id="kingdom-deepseek"></script>
+</body>
+</html>

@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>星舰 · Starship 3D 展示</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #05070c;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { display: block; }
+
+  #back-link {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 100;
+    padding: 8px 15px;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 13px;
+    line-height: 1.2;
+    font-weight: 500;
+    color: #3b3226;
+    background: rgba(255, 248, 232, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    border-radius: 999px;
+    text-decoration: none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+    transition: background 0.2s ease, transform 0.2s ease;
+    user-select: none;
+  }
+  #back-link:hover {
+    background: rgba(255, 251, 242, 0.97);
+    transform: translateY(-1px);
+  }
+
+  #hint {
+    position: fixed;
+    left: 18px;
+    bottom: 16px;
+    z-index: 100;
+    font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    color: rgba(210, 224, 240, 0.55);
+    pointer-events: none;
+    user-select: none;
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8);
+  }
+  #hint b {
+    color: rgba(235, 244, 255, 0.85);
+    font-weight: 600;
+    letter-spacing: 0.16em;
+  }
+
+  @media (max-width: 600px) {
+    #back-link { top: 12px; left: 12px; font-size: 12px; padding: 7px 13px; }
+    #hint { left: 14px; bottom: 12px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<a id="back-link" href="../">← 返回 3D 作品</a>
+<div id="hint"><b>STARSHIP</b>　拖动旋转 · 滚轮 / 双指缩放</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* =========================================================
+   基础工具
+   ========================================================= */
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  return c;
+}
+function rand(a, b) { return a + Math.random() * (b - a); }
+
+/* =========================================================
+   渲染器 / 场景 / 相机
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const MAX_ANISO = renderer.capabilities.getMaxAnisotropy();
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 4000);
+camera.position.set(55, 48, 72);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 28, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.8;
+controls.zoomSpeed = 0.9;
+controls.minDistance = 40;
+controls.maxDistance = 260;
+controls.minPolarAngle = 0.15;
+controls.maxPolarAngle = Math.PI * 0.86;
+controls.enablePan = false;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+
+/* =========================================================
+   程序化天空 / 环境贴图
+   ========================================================= */
+function createSkyTexture() {
+  const W = 2048, H = 1024;
+  const c = makeCanvas(W, H);
+  const ctx = c.getContext('2d');
+
+  // 深空渐变
+  const g = ctx.createLinearGradient(0, 0, 0, H);
+  g.addColorStop(0.00, '#070b14');
+  g.addColorStop(0.32, '#0b1220');
+  g.addColorStop(0.50, '#17253c');
+  g.addColorStop(0.62, '#1e2e4b');
+  g.addColorStop(0.78, '#0b111c');
+  g.addColorStop(1.00, '#05070c');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, W, H);
+
+  // 主光源（太阳）
+  let sg = ctx.createRadialGradient(W * 0.68, H * 0.28, 0, W * 0.68, H * 0.28, W * 0.30);
+  sg.addColorStop(0.00, 'rgba(215,235,255,0.98)');
+  sg.addColorStop(0.05, 'rgba(160,200,255,0.62)');
+  sg.addColorStop(0.18, 'rgba(90,140,225,0.24)');
+  sg.addColorStop(0.55, 'rgba(40,70,140,0.07)');
+  sg.addColorStop(1.00, 'rgba(0,0,0,0)');
+  ctx.fillStyle = sg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 冷色补光斑
+  let cg = ctx.createRadialGradient(W * 0.18, H * 0.42, 0, W * 0.18, H * 0.42, W * 0.22);
+  cg.addColorStop(0.0, 'rgba(110,170,255,0.22)');
+  cg.addColorStop(0.5, 'rgba(60,110,200,0.07)');
+  cg.addColorStop(1.0, 'rgba(0,0,0,0)');
+  ctx.fillStyle = cg;
+  ctx.fillRect(0, 0, W, H);
+
+  // 底部暖色反照（行星反光）
+  let wg = ctx.createRadialGradient(W * 0.30, H * 0.94, 0, W * 0.30, H * 0.94, W * 0.42);
+  wg.addColorStop(0.00, 'rgba(255,148,68,0.34)');
+  wg.addColorStop(0.34, 'rgba(180,78,36,0.11)');
+  wg.addColorStop(1.00, 'rgba(0,0,0,0)');
+  ctx.fillStyle = wg;
+  ctx.fillRect(0, 0, W, H);
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const skyTex = createSkyTexture();
+scene.background = skyTex;
+scene.environment = skyTex;
+
+/* =========================================================
+   星点背景（Points）
+   ========================================================= */
+function createStarSprite() {
+  const S = 64;
+  const c = makeCanvas(S, S);
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(220,235,255,0.55)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+(function buildStars() {
+  const COUNT = 2600;
+  const pos = new Float32Array(COUNT * 3);
+  const col = new Float32Array(COUNT * 3);
+  const col3 = new THREE.Color();
+
+  for (let i = 0; i < COUNT; i++) {
+    const u = Math.random() * 2 - 1;
+    const theta = Math.random() * Math.PI * 2;
+    const r = rand(700, 1500);
+    const s = Math.sqrt(Math.max(0, 1 - u * u));
+    pos[i * 3 + 0] = r * s * Math.cos(theta);
+    pos[i * 3 + 1] = r * u;
+    pos[i * 3 + 2] = r * s * Math.sin(theta);
+
+    const t = Math.random();
+    if (t < 0.62) col3.setHSL(0.58, 0.15, rand(0.75, 1.0));
+    else if (t < 0.88) col3.setHSL(0.10, 0.35, rand(0.7, 0.95));
+    else col3.setHSL(0.02, 0.55, rand(0.65, 0.9));
+
+    col[i * 3 + 0] = col3.r;
+    col[i * 3 + 1] = col3.g;
+    col[i * 3 + 2] = col3.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 9,
+    map: createStarSprite(),
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    sizeAttenuation: true,
+    opacity: 0.9
+  });
+
+  const stars = new THREE.Points(geo, mat);
+  scene.add(stars);
+})();
+
+/* =========================================================
+   程序化船体贴图（颜色 + 粗糙度）
+   ========================================================= */
+function createHullTextures() {
+  const W = 2048, H = 2048;
+  const cc = makeCanvas(W, H);
+  const ctx = cc.getContext('2d');
+  const rc = makeCanvas(W, H);
+  const rctx = rc.getContext('2d');
+
+  // 底色
+  ctx.fillStyle = '#9ba1a8';
+  ctx.fillRect(0, 0, W, H);
+  rctx.fillStyle = 'rgb(64,64,64)';
+  rctx.fillRect(0, 0, W, H);
+
+  const cols = 8, rows = 14;
+  const cw = W / cols, ch = H / rows;
+
+  // 面板（每块颜色 / 粗糙度略有差异）
+  for (let r = 0; r < rows; r++) {
+    for (let cI = 0; cI < cols; cI++) {
+      const x = cI * cw, y = r * ch;
+      const s = rand(0.88, 1.10);
+      const cr = Math.min(255, Math.round(158 * s));
+      const cg = Math.min(255, Math.round(163 * s));
+      const cb = Math.min(255, Math.round(172 * s));
+      ctx.fillStyle = 'rgb(' + cr + ',' + cg + ',' + cb + ')';
+      ctx.fillRect(x, y, cw, ch);
+
+      // 面板内的细微竖向渐变（拉丝感）
+      const lg = ctx.createLinearGradient(x, 0, x + cw, 0);
+      const a = rand(0.02, 0.07);
+      lg.addColorStop(0, 'rgba(255,255,255,0)');
+      lg.addColorStop(0.5, 'rgba(255,255,255,' + a.toFixed(3) + ')');
+      lg.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = lg;
+      ctx.fillRect(x, y, cw, ch);
+
+      // 细密拉丝线
+      ctx.strokeStyle = 'rgba(255,255,255,' + rand(0.015, 0.045).toFixed(3) + ')';
+      ctx.lineWidth = 1;
+      for (let k = 0; k < 6; k++) {
+        const lx = x + Math.random() * cw;
+        ctx.beginPath();
+        ctx.moveTo(lx, y);
+        ctx.lineTo(lx + rand(-4, 4), y + ch);
+        ctx.stroke();
+      }
+
+      const rv = Math.round(rand(46, 104));
+      rctx.fillStyle = 'rgb(' + rv + ',' + rv + ',' + rv + ')';
+      rctx.fillRect(x, y, cw, ch);
+    }
+  }
+
+  // 面板接缝
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(52,58,66,0.6)';
+  for (let cI = 0; cI <= cols; cI++) {
+    const x = cI * cw;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    const y = r * ch;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // 接缝高光
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = 'rgba(236,242,250,0.22)';
+  for (let cI = 0; cI <= cols; cI++) {
+    const x = cI * cw + 2.5;
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    const y = r * ch + 2.5;
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // 粗糙度贴图上的接缝（略粗糙一点）
+  rctx.lineWidth = 3;
+  rctx.strokeStyle = 'rgba(130,130,130,0.85)';
+  for (let cI = 0; cI <= cols; cI++) {
+    const x = cI * cw;
+    rctx.beginPath(); rctx.moveTo(x, 0); rctx.lineTo(x, H); rctx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    const y = r * ch;
+    rctx.beginPath(); rctx.moveTo(0, y); rctx.lineTo(W, y); rctx.stroke();
+  }
+
+  // 使用痕迹 / 污渍
+  for (let i = 0; i < 70; i++) {
+    const x = Math.random() * W;
+    const y = Math.random() * H;
+    const r = rand(25, 160);
+    const gg = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const a = rand(0.015, 0.075);
+    gg.addColorStop(0, 'rgba(38,42,50,' + a.toFixed(3) + ')');
+    gg.addColorStop(1, 'rgba(38,42,50,0)');
+    ctx.fillStyle = gg;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+
+  // 船体字样
+  ctx.save();
+  ctx.translate(W * 0.5, H * 0.185);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(48,54,62,0.88)';
+  ctx.font = '900 148px "Arial Black", "Helvetica Neue", Arial, sans-serif';
+  ctx.fillText('STARSHIP', 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(W * 0.5, H * 0.185 + 112);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = 'rgba(56,62,70,0.6)';
+  ctx.font = '600 54px "Helvetica Neue", Arial, sans-serif';
+  ctx.fillText('D S - 0 1   ·   O R B I T A L', 0, 0);
+  ctx.restore();
+
+  // 侧向警告条纹
+  ctx.save();
+  ctx.globalAlpha = 0.16;
+  ctx.fillStyle = '#2e343c';
+  for (let i = 0; i < 6; i++) {
+    ctx.save();
+    ctx.translate(W * 0.30 + i * 26, H * 0.80);
+    ctx.rotate(-0.42);
+    ctx.fillRect(0, 0, 10, 150);
+    ctx.restore();
+  }
+  ctx.restore();
+
+  const colTex = new THREE.CanvasTexture(cc);
+  colTex.colorSpace = THREE.SRGBColorSpace;
+  colTex.anisotropy = MAX_ANISO;
+  colTex.wrapS = THREE.RepeatWrapping;
+  colTex.wrapT = THREE.ClampToEdgeWrapping;
+
+  const rghTex = new THREE.CanvasTexture(rc);
+  rghTex.anisotropy = MAX_ANISO;
+  rghTex.wrapS = THREE.RepeatWrapping;
+  rghTex.wrapT = THREE.ClampToEdgeWrapping;
+
+  return { colTex, rghTex };
+}
+
+const hullTex = createHullTextures();
+
+/* =========================================================
+   材质
+   ========================================================= */
+const hullMat = new THREE.MeshStandardMaterial({
+  color: 0xffffff,
+  map: hullTex.colTex,
+  roughnessMap: hullTex.rghTex,
+  metalness: 0.95,
+  roughness: 1.0,
+  envMapIntensity: 1.7,
+  side: THREE.DoubleSide
+});
+
+const darkMetalMat = new THREE.MeshStandardMaterial({
+  color: 0x4e555e,
+  metalness: 1.0,
+  roughness: 0.36,
+  envMapIntensity: 1.4
+});
+
+const tileMat = new THREE.MeshStandardMaterial({
+  color: 0x1c2026,
+  metalness: 0.55,
+  roughness: 0.72,
+  envMapIntensity: 0.85,
+  side: THREE.DoubleSide
+});
+
+const engineMat = new THREE.MeshStandardMaterial({
+  color: 0x4a4f57,
+  metalness: 0.95,
+  roughness: 0.42,
+  envMapIntensity: 1.2,
+  side: THREE.DoubleSide
+});
+
+const pipeMat = new THREE.MeshStandardMaterial({
+  color: 0x99a0a9,
+  metalness: 1.0,
+  roughness: 0.26,
+  envMapIntensity: 1.5
+});
+
+/* =========================================================
+   星舰主体
+   ========================================================= */
+const ship = new THREE.Group();
+scene.add(ship);
+
+const SHIP_R = 4.5;
+const CYL_H = 42;
+const NOSE_H = 20;
+
+/* --- 箭体圆柱 --- */
+const bodyGeo = new THREE.CylinderGeometry(SHIP_R, SHIP_R, CYL_H, 128, 1, true);
+const body = new THREE.Mesh(bodyGeo, hullMat);
+body.position.y = CYL_H / 2;
+ship.add(body);
+
+/* --- 头锥（Lathe） --- */
+(function buildNose() {
+  const pts = [];
+  const SEG = 64;
+  for (let i = 0; i <= SEG; i++) {
+    const t = i / SEG;
+    const y = CYL_H + t * NOSE_H;
+    const r = SHIP_R * Math.sqrt(Math.max(0, 1 - Math.pow(t, 3)));
+    pts.push(new THREE.Vector2(Math.max(r, 0.008), y));
+  }
+  const geo = new THREE.LatheGeometry(pts, 128);
+  const nose = new THREE.Mesh(geo, hullMat);
+  ship.add(nose);
+})();
+
+/* --- 底部封板 --- */
+(function buildBottom() {
+  const cap = new THREE.Mesh(new THREE.CircleGeometry(SHIP_R - 0.02, 64), darkMetalMat);
+  cap.rotation.x = Math.PI / 2;
+  cap.position.y = 0.4;
+  ship.add(cap);
+})();
+
+/* --- 环形加强箍 --- */
+(function buildBands() {
+  const ys = [9.5, 20.5, 31.5, 41.6];
+  ys.forEach((y, i) => {
+    const radius = (i === 3) ? SHIP_R - 0.01 : SHIP_R;
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(radius + 0.02, i === 3 ? 0.11 : 0.075, 8, 160),
+      darkMetalMat
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = y;
+    ship.add(ring);
+  });
+})();
+
+/* --- 纵向导管 --- */
+(function buildPipes() {
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2 + Math.PI / 4;
+    const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 28, 8), pipeMat);
+    pipe.position.set(
+      Math.cos(a) * (SHIP_R + 0.06),
+      21,
+      Math.sin(a) * (SHIP_R + 0.06)
+    );
+    ship.add(pipe);
+
+    // 固定卡箍
+    for (let k = 0; k < 4; k++) {
+      const y = 10 + k * 7;
+      const clamp = new THREE.Mesh(
+        new THREE.TorusGeometry(0.17, 0.045, 6, 12),
+        darkMetalMat
+      );
+      clamp.rotation.x = Math.PI / 2;
+      clamp.position.set(
+        Math.cos(a) * (SHIP_R + 0.06),
+        y,
+        Math.sin(a) * (SHIP_R + 0.06)
+      );
+      ship.add(clamp);
+    }
+  }
+})();
+
+/* --- 襟翼 --- */
+function flapShape(w, h, taper) {
+  const hw = w / 2;
+  const s = new THREE.Shape();
+  s.moveTo(-hw, 0);
+  s.lineTo(hw, 0);
+  s.quadraticCurveTo(hw * 1.06, 0, hw * 1.02, h * 0.07);
+  s.lineTo(hw * taper, h * 0.93);
+  s.quadraticCurveTo(hw * taper * 0.97, h, hw * taper * 0.82, h);
+  s.lineTo(-hw * taper * 0.82, h);
+  s.quadraticCurveTo(-hw * taper * 0.97, h, -hw * taper, h * 0.93);
+  s.lineTo(-hw * 1.02, h * 0.07);
+  s.quadraticCurveTo(-hw * 1.06, 0, -hw, 0);
+  return s;
+}
+
+function makeFlap(w, h, taper, thickness) {
+  const geo = new THREE.ExtrudeGeometry(flapShape(w, h, taper), {
+    depth: thickness,
+    bevelEnabled: true,
+    bevelSize: 0.055,
+    bevelThickness: 0.055,
+    bevelSegments: 2,
+    curveSegments: 10,
+    steps: 1
+  });
+  geo.center();
+  return geo;
+}
+
+function addFlap(x, y, z, w, h, taper, thickness, sideSign) {
+  const g = new THREE.Group();
+  g.position.set(x, y, z);
+  g.rotation.y = sideSign * Math.PI / 2;
+
+  const mesh = new THREE.Mesh(makeFlap(w, h, taper, thickness), tileMat);
+  g.add(mesh);
+
+  // 铰链
+  const hingeGeo = new THREE.CylinderGeometry(0.16, 0.16, w * 0.85, 12);
+  const hinge = new THREE.Mesh(hingeGeo, darkMetalMat);
+  hinge.rotation.z = Math.PI / 2;
+  hinge.rotation.y = Math.PI / 2;
+  hinge.position.set(0, -h * 0.5 + 0.35, -0.16);
+  g.add(hinge);
+
+  ship.add(g);
+  return g;
+}
+
+// 前襟翼（头锥两侧）
+addFlap(SHIP_R - 0.10, 49.5, 0, 2.6, 8.2, 0.72, 0.30, 1);
+addFlap(-(SHIP_R - 0.10), 49.5, 0, 2.6, 8.2, 0.72, 0.30, -1);
+
+// 后襟翼（尾部两侧，更大）
+addFlap(SHIP_R - 0.08, 9.0, 0, 3.3, 11.0, 0.86, 0.34, 1);
+addFlap(-(SHIP_R - 0.08), 9.0, 0, 3.3, 11.0, 0.86, 0.34, -1);
+
+/* --- 顶部传感器 --- */
+(function buildAntenna() {
+  const tipY = CYL_H + NOSE_H;
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.20, 16, 12), darkMetalMat);
+  ball.position.y = tipY - 0.35;
+  ship.add(ball);
+})();
+
+/* =========================================================
+   发动机
+   ========================================================= */
+const engineGroup = new THREE.Group();
+engineGroup.position.y = 0.6;
+ship.add(engineGroup);
+
+const glowMeshes = [];
+
+function makeNozzleGeometry(exitR, throatR, len) {
+  const pts = [];
+  const N = 22;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const y = -len + t * len;
+    const r = throatR + (exitR - throatR) * Math.pow(1 - t, 0.72);
+    pts.push(new THREE.Vector2(Math.max(r, 0.02), y));
+  }
+  return new THREE.LatheGeometry(pts, 36);
+}
+
+const glowDiscMat = new THREE.MeshBasicMaterial({
+  color: 0x9ed4ff,
+  transparent: true,
+  opacity: 0.85,
+  blending: THREE.AdditiveBlending,
+  depthWrite: false,
+  side: THREE.DoubleSide
+});
+
+function createEngine(px, pz, exitR, throatR, len) {
+  const geo = makeNozzleGeometry(exitR, throatR, len);
+  const nozzle = new THREE.Mesh(geo, engineMat);
+  nozzle.position.set(px, 0, pz);
+  engineGroup.add(nozzle);
+
+  // 喷口发光盘
+  const discMat = glowDiscMat.clone();
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(exitR * 0.9, 24), discMat);
+  disc.rotation.x = Math.PI / 2;
+  disc.position.set(px, -len + 0.25, pz);
+  engineGroup.add(disc);
+  glowMeshes.push(disc);
+
+  // 外部蓝色光晕
+  const haloMat = new THREE.SpriteMaterial({
+    map: glowSprite,
+    color: 0x7fc4ff,
+    transparent: true,
+    opacity: 0.55,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false
+  });
+  const halo = new THREE.Sprite(haloMat);
+  halo.scale.set(exitR * 5.5, exitR * 5.5, 1);
+  halo.position.set(px, -len - 0.2, pz);
+  engineGroup.add(halo);
+  glowMeshes.push(halo);
+}
+
+// 光晕精灵贴图
+const glowSprite = (function () {
+  const S = 256;
+  const c = makeCanvas(S, S);
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+  g.addColorStop(0.00, 'rgba(255,255,255,1)');
+  g.addColorStop(0.16, 'rgba(200,230,255,0.72)');
+  g.addColorStop(0.42, 'rgba(90,160,255,0.24)');
+  g.addColorStop(1.00, 'rgba(20,60,160,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, S, S);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+})();
+
+// 外环 9 台
+(function () {
+  const COUNT = 9;
+  const RING = 3.05;
+  for (let i = 0; i < COUNT; i++) {
+    const a = (i / COUNT) * Math.PI * 2;
+    createEngine(Math.cos(a) * RING, Math.sin(a) * RING, 0.78, 0.33, 3.0);
+  }
+})();
+
+// 内环 3 台
+(function () {
+  const COUNT = 3;
+  const RING = 1.15;
+  for (let i = 0; i < COUNT; i++) {
+    const a = (i / COUNT) * Math.PI * 2 + 0.55;
+    createEngine(Math.cos(a) * RING, Math.sin(a) * RING, 0.62, 0.28, 2.4);
+  }
+})();
+
+/* =========================================================
+   灯光
+   ========================================================= */
+const keyLight = new THREE.DirectionalLight(0xfff1dd, 3.0);
+keyLight.position.set(70, 95, 55);
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x6fb6ff, 3.4);
+rimLight.position.set(-75, 35, -60);
+scene.add(rimLight);
+
+const fillLight = new THREE.DirectionalLight(0xffffff, 0.9);
+fillLight.position.set(-25, -25, 45);
+scene.add(fillLight);
+
+const bottomWarm = new THREE.PointLight(0xff8a3c, 260, 90, 2);
+bottomWarm.position.set(0, -10, 0);
+scene.add(bottomWarm);
+
+const engineLight = new THREE.PointLight(0x5aa8ff, 420, 70, 2);
+engineLight.position.set(0, -5, 0);
+scene.add(engineLight);
+
+const engineLight2 = new THREE.PointLight(0x9fd0ff, 220, 55, 2);
+engineLight2.position.set(0, -12, 0);
+scene.add(engineLight2);
+
+const hemi = new THREE.HemisphereLight(0x8ab4ff, 0x1a1006, 0.55);
+scene.add(hemi);
+
+/* =========================================================
+   后期处理
+   ========================================================= */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  0.55,   // strength
+  0.65,   // radius
+  0.86    // threshold
+);
+composer.addPass(bloomPass);
+composer.addPass(new OutputPass());
+
+/* =========================================================
+   响应式
+   ========================================================= */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  bloomPass.setSize(w, h);
+}
+window.addEventListener('resize', onResize, { passive: true });
+window.addEventListener('orientationchange', () => setTimeout(onResize, 120), { passive: true });
+
+/* =========================================================
+   动画循环
+   ========================================================= */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const t = clock.getElapsedTime();
+
+  // 引擎辉光呼吸
+  for (let i = 0; i < glowMeshes.length; i++) {
+    const m = glowMeshes[i];
+    const p = 0.72 + Math.sin(t * 3.6 + i * 1.35) * 0.16 + Math.sin(t * 9.1 + i * 0.7) * 0.06;
+    m.material.opacity = Math.max(0.2, p * (m.isSprite ? 0.75 : 1.0));
+  }
+
+  // 引擎灯光脉动
+  const pulse = 1.0 + Math.sin(t * 3.2) * 0.10 + Math.sin(t * 7.7) * 0.05;
+  engineLight.intensity = 420 * pulse;
+  engineLight2.intensity = 220 * pulse;
+  bottomWarm.intensity = 260 * (0.94 + Math.sin(t * 2.1) * 0.08);
+
+  // 整舰轻微悬浮
+  ship.position.y = Math.sin(t * 0.55) * 0.35;
+
+  controls.update();
+  composer.render();
+}
+
+animate();
+</script>
+
+<script src="../prompt-panel.js" data-id="starship-deepseek"></script>
+</body>
+</html>

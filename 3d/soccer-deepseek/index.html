@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>体素足球 · 一条龙破门</title>
+<style>
+  html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#9fc8ea;
+    font-family:system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;}
+  canvas{display:block;touch-action:none;}
+  #back{position:fixed;top:14px;left:14px;z-index:20;display:inline-block;padding:8px 14px;
+    border-radius:999px;background:rgba(255,249,230,.8);color:#3c3220;text-decoration:none;
+    font-size:13px;font-weight:600;letter-spacing:.2px;border:1px solid rgba(255,255,255,.7);
+    box-shadow:0 3px 12px rgba(20,40,80,.18);
+    -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+    transition:background .2s, transform .2s;}
+  #back:hover{background:rgba(255,249,230,.98);transform:translateY(-1px);}
+  #fade{position:fixed;inset:0;background:#dcefff;pointer-events:none;opacity:0;z-index:10;}
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<a id="back" href="../">← 返回 3D 作品</a>
+<div id="fade"></div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ========================= 工具函数 ========================= */
+const clamp01 = v => v < 0 ? 0 : (v > 1 ? 1 : v);
+const lerp = (a, b, t) => a + (b - a) * t;
+const easeInOut = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+
+/* ========================= 渲染器 ========================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+/* ========================= 场景 / 相机 ========================= */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x9fc8ea);
+scene.fog = new THREE.Fog(0x9fc8ea, 95, 210);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.5, 500);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(2, 1.6, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.minDistance = 14;
+controls.maxDistance = 150;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.enablePan = false;
+controls.rotateSpeed = 0.72;
+controls.zoomSpeed = 0.9;
+
+const FIT_DIR = new THREE.Vector3(0.10, 0.62, 0.78).normalize();
+
+function fitCamera(keepDir) {
+  const aspect = Math.max(0.35, window.innerWidth / window.innerHeight);
+  camera.aspect = aspect;
+  camera.fov = aspect < 1 ? 66 : 50;
+  camera.updateProjectionMatrix();
+
+  const vFov = THREE.MathUtils.degToRad(camera.fov);
+  const halfH = 17.5;
+  const halfW = 25.5;
+  const dV = halfH / Math.tan(vFov / 2);
+  const dH = halfW / (Math.tan(vFov / 2) * aspect);
+  const dist = Math.max(dV, dH) * 1.02;
+
+  let dir = FIT_DIR.clone();
+  if (keepDir) {
+    const tmp = camera.position.clone().sub(controls.target);
+    if (tmp.lengthSq() > 0.001) dir = tmp.normalize();
+  }
+  camera.position.copy(controls.target).addScaledVector(dir, dist);
+}
+fitCamera(false);
+
+/* ========================= 灯光 ========================= */
+scene.add(new THREE.HemisphereLight(0xdcefff, 0x35652f, 1.15));
+
+const sun = new THREE.DirectionalLight(0xfff3da, 2.1);
+sun.position.set(26, 42, 22);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -36;
+sun.shadow.camera.right = 36;
+sun.shadow.camera.top = 36;
+sun.shadow.camera.bottom = -36;
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 140;
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.02;
+scene.add(sun);
+
+const fillLight = new THREE.DirectionalLight(0xbcd8ff, 0.55);
+fillLight.position.set(-24, 18, -26);
+scene.add(fillLight);
+
+/* ========================= 球场贴图（程序化生成） ========================= */
+function createPitchTexture() {
+  const W = 2048;
+  const H = Math.round(W * 24 / 40);
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+
+  ctx.fillStyle = '#2b8a45';
+  ctx.fillRect(0, 0, W, H);
+
+  const stripes = 14;
+  for (let i = 0; i < stripes; i++) {
+    ctx.fillStyle = (i % 2 === 0) ? '#2f9b4d' : '#27803f';
+    ctx.fillRect(Math.round(i * W / stripes), 0, Math.ceil(W / stripes) + 1, H);
+  }
+
+  const px = x => (x + 20) / 40 * W;
+  const pz = z => (z + 12) / 24 * H;
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.93)';
+  ctx.lineWidth = 6;
+  ctx.lineCap = 'round';
+  ctx.fillStyle = 'rgba(255,255,255,0.93)';
+
+  const line = (x1, z1, x2, z2) => {
+    ctx.beginPath();
+    ctx.moveTo(px(x1), pz(z1));
+    ctx.lineTo(px(x2), pz(z2));
+    ctx.stroke();
+  };
+  const rect = (x1, z1, x2, z2) => {
+    ctx.beginPath();
+    ctx.rect(px(x1), pz(z1), px(x2) - px(x1), pz(z2) - pz(z1));
+    ctx.stroke();
+  };
+  const arc = (x, z, r, a0, a1) => {
+    ctx.beginPath();
+    ctx.arc(px(x), pz(z), (r / 40) * W, a0, a1);
+    ctx.stroke();
+  };
+  const dot = (x, z, r) => {
+    ctx.beginPath();
+    ctx.arc(px(x), pz(z), r, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  rect(-19.6, -11.6, 19.6, 11.6);
+  line(0, -11.6, 0, 11.6);
+
+  ctx.beginPath();
+  ctx.arc(px(0), pz(0), (3.6 / 40) * W, 0, Math.PI * 2);
+  ctx.stroke();
+  dot(0, 0, 9);
+
+  rect(-19.6, -7.5, -13.4, 7.5);
+  rect(13.4, -7.5, 19.6, 7.5);
+  rect(-19.6, -3.6, -16.2, 3.6);
+  rect(16.2, -3.6, 19.6, 3.6);
+
+  dot(-14.6, 0, 9);
+  dot(14.6, 0, 9);
+
+  arc(-14.6, 0, 3.4, -0.95, 0.95);
+  arc(14.6, 0, 3.4, Math.PI - 0.95, Math.PI + 0.95);
+
+  arc(-19.6, -11.6, 1.0, 0, Math.PI / 2);
+  arc(19.6, -11.6, 1.0, Math.PI / 2, Math.PI);
+  arc(19.6, 11.6, 1.0, Math.PI, Math.PI * 1.5);
+  arc(-19.6, 11.6, 1.0, Math.PI * 1.5, Math.PI * 2);
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return tex;
+}
+
+/* ========================= 地面 & 球场 ========================= */
+const ground = new THREE.Mesh(
+  new THREE.PlaneGeometry(160, 160),
+  new THREE.MeshLambertMaterial({ color: 0x1d5c34 })
+);
+ground.rotation.x = -Math.PI / 2;
+ground.position.y = -0.06;
+ground.receiveShadow = true;
+scene.add(ground);
+
+const pitch = new THREE.Mesh(
+  new THREE.PlaneGeometry(40, 24),
+  new THREE.MeshLambertMaterial({ map: createPitchTexture() })
+);
+pitch.rotation.x = -Math.PI / 2;
+pitch.receiveShadow = true;
+scene.add(pitch);
+
+/* ========================= 看台 & 观众 ========================= */
+function addBox(w, h, d, color, x, y, z, cast) {
+  const m = new THREE.Mesh(
+    new THREE.BoxGeometry(w, h, d),
+    new THREE.MeshLambertMaterial({ color })
+  );
+  m.position.set(x, y, z);
+  m.castShadow = cast !== false;
+  m.receiveShadow = true;
+  scene.add(m);
+  return m;
+}
+
+// 看台基座
+addBox(52, 3.6, 6.6, 0x2a3550, 0, 1.8, -16.2, false);
+addBox(52, 3.6, 6.6, 0x2a3550, 0, 1.8, 16.2, false);
+addBox(6.6, 3.6, 28, 0x2a3550, -25.0, 1.8, 0, false);
+addBox(6.6, 3.6, 28, 0x2a3550, 25.0, 1.8, 0, false);
+
+// 观众（InstancedMesh）
+const seatPositions = [];
+for (const side of [-1, 1]) {
+  for (let r = 0; r < 5; r++) {
+    const z = side * (13.9 + r * 1.05);
+    const y = 0.62 + r * 0.62;
+    for (let x = -24; x <= 24; x += 1.0) {
+      seatPositions.push([x + (Math.random() - 0.5) * 0.14, y, z + (Math.random() - 0.5) * 0.14]);
+    }
+  }
+}
+for (const side of [-1, 1]) {
+  for (let r = 0; r < 5; r++) {
+    const x = side * (22.6 + r * 1.05);
+    const y = 0.62 + r * 0.62;
+    for (let z = -13; z <= 13; z += 1.0) {
+      seatPositions.push([x + (Math.random() - 0.5) * 0.14, y, z + (Math.random() - 0.5) * 0.14]);
+    }
+  }
+}
+
+const crowdGeo = new THREE.BoxGeometry(0.72, 0.72, 0.72);
+const crowdMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+const crowd = new THREE.InstancedMesh(crowdGeo, crowdMat, seatPositions.length);
+crowd.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+const dummy = new THREE.Object3D();
+const tmpColor = new THREE.Color();
+for (let i = 0; i < seatPositions.length; i++) {
+  const s = seatPositions[i];
+  dummy.position.set(s[0], s[1], s[2]);
+  dummy.rotation.set(0, Math.random() * 0.9, 0);
+  dummy.updateMatrix();
+  crowd.setMatrixAt(i, dummy.matrix);
+  tmpColor.setHSL(Math.random(), 0.78, 0.52 + Math.random() * 0.22);
+  crowd.setColorAt(i, tmpColor);
+}
+crowd.instanceMatrix.needsUpdate = true;
+if (crowd.instanceColor) crowd.instanceColor.needsUpdate = true;
+crowd.castShadow = false;
+crowd.receiveShadow = false;
+scene.add(crowd);
+
+// 广告牌
+const adColors = [0xff4d6d, 0xffd166, 0x06d6a0, 0x118ab2, 0xef476f, 0xf78c6b];
+for (let i = 0; i < 17; i++) {
+  const x = -22.4 + i * 2.8;
+  addBox(2.6, 0.85, 0.22, adColors[i % adColors.length], x, 0.42, -12.75, false);
+  addBox(2.6, 0.85, 0.22, adColors[(i + 3) % adColors.length], x, 0.42, 12.75, false);
+}
+
+/* ========================= 球门 ========================= */
+function buildGoal(sideSign) {
+  const gx = 19.7 * sideSign;   // 球门线与门柱位置
+  const backX = 21.2 * sideSign;
+  const halfW = 3.5;
+  const barY = 2.6;
+
+  const postMat = new THREE.MeshLambertMaterial({ color: 0xffffff });
+  const addPost = (w, h, d, x, y, z) => {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), postMat);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    scene.add(m);
+  };
+
+  addPost(0.22, barY, 0.22, gx, barY / 2, -halfW);
+  addPost(0.22, barY, 0.22, gx, barY / 2, halfW);
+  addPost(0.22, 0.22, halfW * 2 + 0.22, gx, barY, 0);
+
+  const verts = [];
+  const pushLine = (x1, y1, z1, x2, y2, z2) => {
+    verts.push(x1, y1, z1, x2, y2, z2);
+  };
+
+  // 后网
+  for (let z = -halfW; z <= halfW + 0.001; z += 0.5) {
+    pushLine(backX, 0, z, backX, barY, z);
+  }
+  for (let y = 0; y <= barY + 0.001; y += 0.4) {
+    pushLine(backX, y, -halfW, backX, y, halfW);
+  }
+  // 侧网
+  for (const z of [-halfW, halfW]) {
+    for (let x = gx; x <= backX + 0.001; x += 0.5) {
+      pushLine(x, 0, z, x, barY, z);
+    }
+    for (let y = 0; y <= barY + 0.001; y += 0.4) {
+      pushLine(gx, y, z, backX, y, z);
+    }
+  }
+  // 顶网
+  for (let z = -halfW; z <= halfW + 0.001; z += 0.5) {
+    pushLine(gx, barY, z, backX, barY, z);
+  }
+  for (let x = gx; x <= backX + 0.001; x += 0.5) {
+    pushLine(x, barY, -halfW, x, barY, halfW);
+  }
+
+  const netGeo = new THREE.BufferGeometry();
+  netGeo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  const net = new THREE.LineSegments(
+    netGeo,
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.34 })
+  );
+  scene.add(net);
+}
+buildGoal(1);
+buildGoal(-1);
+
+/* ========================= 球员（体素） ========================= */
+function createPlayer(colors) {
+  const g = new THREE.Group();
+  const mats = {
+    shirt: new THREE.MeshLambertMaterial({ color: colors.shirt }),
+    shorts: new THREE.MeshLambertMaterial({ color: colors.shorts }),
+    skin: new THREE.MeshLambertMaterial({ color: colors.skin }),
+    hair: new THREE.MeshLambertMaterial({ color: colors.hair }),
+    shoe: new THREE.MeshLambertMaterial({ color: 0x181818 })
+  };
+  const mk = (geo, mat) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    return m;
+  };
+
+  // 腿
+  const legGeo = new THREE.BoxGeometry(0.26, 0.62, 0.26);
+  const shoeGeo = new THREE.BoxGeometry(0.30, 0.14, 0.44);
+  const legs = [];
+  for (const s of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.17 * s, 0.76, 0);
+    const leg = mk(legGeo, mats.skin);
+    leg.position.y = -0.31;
+    pivot.add(leg);
+    const shoe = mk(shoeGeo, mats.shoe);
+    shoe.position.set(0, -0.69, 0.07);
+    pivot.add(shoe);
+    g.add(pivot);
+    legs.push(pivot);
+  }
+
+  // 短裤
+  const shorts = mk(new THREE.BoxGeometry(0.62, 0.28, 0.44), mats.shorts);
+  shorts.position.set(0, 0.72, 0);
+  g.add(shorts);
+
+  // 躯干
+  const torso = mk(new THREE.BoxGeometry(0.72, 0.62, 0.42), mats.shirt);
+  torso.position.set(0, 1.07, 0);
+  g.add(torso);
+
+  // 头
+  const head = mk(new THREE.BoxGeometry(0.46, 0.44, 0.44), mats.skin);
+  head.position.set(0, 1.60, 0);
+  g.add(head);
+
+  // 头发
+  const hair = mk(new THREE.BoxGeometry(0.50, 0.16, 0.48), mats.hair);
+  hair.position.set(0, 1.80, 0);
+  g.add(hair);
+
+  // 手臂
+  const armGeo = new THREE.BoxGeometry(0.18, 0.58, 0.18);
+  const sleeveGeo = new THREE.BoxGeometry(0.22, 0.20, 0.22);
+  const arms = [];
+  for (const s of [-1, 1]) {
+    const pivot = new THREE.Group();
+    pivot.position.set(0.45 * s, 1.32, 0);
+    const arm = mk(armGeo, mats.skin);
+    arm.position.y = -0.28;
+    pivot.add(arm);
+    const sleeve = mk(sleeveGeo, mats.shirt);
+    sleeve.position.y = -0.05;
+    pivot.add(sleeve);
+    g.add(pivot);
+    arms.push(pivot);
+  }
+
+  return { group: g, legL: legs[0], legR: legs[1], armL: arms[0], armR: arms[1] };
+}
+
+const hero = createPlayer({ shirt: 0xe63946, shorts: 0xffffff, skin: 0xf2c49b, hair: 0x2b2118 });
+scene.add(hero.group);
+
+const def1 = createPlayer({ shirt: 0x2a9d8f, shorts: 0x16324a, skin: 0xe0ac69, hair: 0x121212 });
+scene.add(def1.group);
+
+const def2 = createPlayer({ shirt: 0x2a9d8f, shorts: 0x16324a, skin: 0x8d5524, hair: 0x0e0e0e });
+scene.add(def2.group);
+
+const gk = createPlayer({ shirt: 0xffd60a, shorts: 0x2b2b2b, skin: 0xf2c49b, hair: 0x3a2a18 });
+gk.group.rotation.y = -Math.PI / 2;
+const gkPivot = new THREE.Group();
+gkPivot.position.set(18.6, 0, 0);
+gkPivot.add(gk.group);
+scene.add(gkPivot);
+
+/* ========================= 足球 ========================= */
+function createBallTexture() {
+  const S = 256;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const ctx = cv.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, S, S);
+
+  ctx.fillStyle = '#1b1b1b';
+  const spots = [
+    [40, 44, 22], [126, 32, 18], [208, 60, 24], [30, 130, 20],
+    [108, 118, 26], [190, 150, 20], [66, 206, 22], [156, 216, 18], [228, 200, 16],
+    [12, 232, 14], [244, 120, 14], [100, 240, 16]
+  ];
+  for (const [x, y, r] of spots) {
+    ctx.beginPath();
+    for (let k = 0; k < 5; k++) {
+      const a = (k / 5) * Math.PI * 2 - Math.PI / 2;
+      const px = x + Math.cos(a) * r;
+      const py = y + Math.sin(a) * r;
+      if (k === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const BALL_R = 0.28;
+const ball = new THREE.Mesh(
+  new THREE.SphereGeometry(BALL_R, 18, 14),
+  new THREE.MeshLambertMaterial({ map: createBallTexture() })
+);
+ball.castShadow = true;
+ball.position.set(-13.4, BALL_R, 0);
+scene.add(ball);
+
+/* ========================= 庆祝粒子 ========================= */
+const PCOUNT = 420;
+const pPositions = new Float32Array(PCOUNT * 3);
+const pColors = new Float32Array(PCOUNT * 3);
+const pSizes = new Float32Array(PCOUNT);
+const pAlphas = new Float32Array(PCOUNT);
+const pVel = new Float32Array(PCOUNT * 3);
+const pLife = new Float32Array(PCOUNT);
+
+for (let i = 0; i < PCOUNT; i++) {
+  pPositions[i * 3 + 1] = -100;
+  pSizes[i] = 0;
+  pAlphas[i] = 0;
+}
+
+const particleGeo = new THREE.BufferGeometry();
+particleGeo.setAttribute('position', new THREE.BufferAttribute(pPositions, 3));
+particleGeo.setAttribute('aColor', new THREE.BufferAttribute(pColors, 3));
+particleGeo.setAttribute('aSize', new THREE.BufferAttribute(pSizes, 1));
+particleGeo.setAttribute('aAlpha', new THREE.BufferAttribute(pAlphas, 1));
+
+const particleMat = new THREE.ShaderMaterial({
+  vertexShader: `
+    attribute vec3 aColor;
+    attribute float aSize;
+    attribute float aAlpha;
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main() {
+      vColor = aColor;
+      vAlpha = aAlpha;
+      vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+      gl_PointSize = aSize * (820.0 / max(1.0, -mvPosition.z));
+      gl_Position = projectionMatrix * mvPosition;
+    }
+  `,
+  fragmentShader: `
+    varying vec3 vColor;
+    varying float vAlpha;
+    void main() {
+      vec2 d = gl_PointCoord - vec2(0.5);
+      float r = length(d);
+      if (r > 0.5) discard;
+      float a = smoothstep(0.5, 0.05, r) * vAlpha;
+      if (a < 0.01) discard;
+      gl_FragColor = vec4(vColor, a);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+
+const particles = new THREE.Points(particleGeo, particleMat);
+particles.frustumCulled = false;
+scene.add(particles);
+
+function spawnBurst(n, ox, oy, oz) {
+  let made = 0;
+  for (let i = 0; i < PCOUNT && made < n; i++) {
+    if (pLife[i] > 0) continue;
+    made++;
+    const i3 = i * 3;
+
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const speed = 4 + Math.random() * 10;
+
+    pVel[i3] = Math.sin(phi) * Math.cos(theta) * speed;
+    pVel[i3 + 1] = Math.abs(Math.cos(phi)) * speed * 1.25 + 3.5;
+    pVel[i3 + 2] = Math.sin(phi) * Math.sin(theta) * speed;
+
+    pPositions[i3] = ox + (Math.random() - 0.5) * 2.2;
+    pPositions[i3 + 1] = oy + (Math.random() - 0.5) * 2.2;
+    pPositions[i3 + 2] = oz + (Math.random() - 0.5) * 2.2;
+
+    tmpColor.setHSL(Math.random(), 0.95, 0.6);
+    pColors[i3] = tmpColor.r;
+    pColors[i3 + 1] = tmpColor.g;
+    pColors[i3 + 2] = tmpColor.b;
+
+    pSizes[i] = 0.5 + Math.random() * 1.1;
+    pLife[i] = 1.4 + Math.random() * 1.4;
+    pAlphas[i] = 1;
+  }
+  particleGeo.attributes.position.needsUpdate = true;
+  particleGeo.attributes.aColor.needsUpdate = true;
+  particleGeo.attributes.aSize.needsUpdate = true;
+  particleGeo.attributes.aAlpha.needsUpdate = true;
+}
+
+function updateParticles(dt) {
+  let dirty = false;
+  for (let i = 0; i < PCOUNT; i++) {
+    if (pLife[i] <= 0) {
+      if (pAlphas[i] !== 0) { pAlphas[i] = 0; dirty = true; }
+      continue;
+    }
+    dirty = true;
+    pLife[i] -= dt;
+    const i3 = i * 3;
+
+    if (pLife[i] <= 0) { pAlphas[i] = 0; continue; }
+
+    pVel[i3 + 1] -= 14 * dt;
+    pPositions[i3] += pVel[i3] * dt;
+    pPositions[i3 + 1] += pVel[i3 + 1] * dt;
+    pPositions[i3 + 2] += pVel[i3 + 2] * dt;
+
+    if (pPositions[i3 + 1] < 0.1) {
+      pPositions[i3 + 1] = 0.1;
+      pVel[i3 + 1] *= -0.35;
+      pVel[i3] *= 0.72;
+      pVel[i3 + 2] *= 0.72;
+    }
+
+    pAlphas[i] = Math.min(1, pLife[i] / 0.6);
+  }
+  if (dirty) {
+    particleGeo.attributes.position.needsUpdate = true;
+    particleGeo.attributes.aAlpha.needsUpdate = true;
+  }
+}
+
+function clearParticles() {
+  for (let i = 0; i < PCOUNT; i++) {
+    pLife[i] = 0;
+    pAlphas[i] = 0;
+  }
+  particleGeo.attributes.aAlpha.needsUpdate = true;
+}
+
+/* ========================= 动画时间轴 ========================= */
+const CYCLE = 9.5;
+const T_RUN_END = 3.8;
+const T_KICK = 4.0;
+const T_FLY = 0.75;
+const T_GOAL = T_KICK + T_FLY;
+const HERO_END_X = 3.4;
+const BALL_END = new THREE.Vector3(20.4, 1.1, -2.4);
+
+const fadeEl = document.getElementById('fade');
+
+function animateRun(pl, phase, amt) {
+  const sw = Math.sin(phase) * 0.78 * amt;
+  pl.legL.rotation.x = sw;
+  pl.legR.rotation.x = -sw;
+  pl.armL.rotation.x = -sw * 0.82;
+  pl.armR.rotation.x = sw * 0.82;
+  pl.group.position.y = Math.abs(Math.sin(phase)) * 0.06 * amt;
+}
+
+function updateWorld(p, dt, time) {
+  /* ---------- 主角 ---------- */
+  let px = HERO_END_X;
+  let pz = 0;
+  let rotY = Math.PI / 2;
+
+  if (p < T_RUN_END) {
+    const r = p / T_RUN_END;
+    const e = easeInOut(r);
+    px = -14 + (HERO_END_X + 14) * e;
+    pz = Math.sin(r * Math.PI * 2) * 0.7;
+    rotY = Math.PI / 2 + Math.cos(r * Math.PI * 2) * 0.28;
+  }
+
+  hero.legL.rotation.set(0, 0, 0);
+  hero.legR.rotation.set(0, 0, 0);
+  hero.armL.rotation.set(0, 0, 0);
+  hero.armR.rotation.set(0, 0, 0);
+
+  let bob = 0;
+
+  if (p < T_RUN_END) {
+    const phase = p * 13;
+    const sw = Math.sin(phase) * 0.8;
+    hero.legL.rotation.x = sw;
+    hero.legR.rotation.x = -sw;
+    hero.armL.rotation.x = -sw * 0.85;
+    hero.armR.rotation.x = sw * 0.85;
+    bob = Math.abs(Math.sin(phase)) * 0.07;
+  } else if (p < T_KICK) {
+    const k = (p - T_RUN_END) / (T_KICK - T_RUN_END);
+    hero.legR.rotation.x = -1.05 * k;
+    hero.legL.rotation.x = 0.2 * k;
+    hero.armL.rotation.x = 0.85 * k;
+    hero.armR.rotation.x = -0.75 * k;
+  } else if (p < T_GOAL) {
+    const k = Math.min(1, (p - T_KICK) / 0.28);
+    hero.legR.rotation.x = -1.05 + 2.2 * k;
+    hero.legL.rotation.x = 0.2 * (1 - k);
+    hero.armL.rotation.x = 0.85 - 0.85 * k;
+    hero.armR.rotation.x = -0.75 + 0.75 * k;
+  } else {
+    const ct = p - T_GOAL;
+    bob = Math.abs(Math.sin(ct * 7)) * 0.45;
+    hero.legL.rotation.x = Math.sin(ct * 7) * 0.35;
+    hero.legR.rotation.x = -Math.sin(ct * 7) * 0.35;
+    hero.armL.rotation.z = -2.4 + Math.sin(ct * 9) * 0.22;
+    hero.armR.rotation.z = 2.4 - Math.sin(ct * 9) * 0.22;
+    rotY = Math.PI / 2 + Math.sin(ct * 4.5) * 0.55;
+  }
+
+  hero.group.position.set(px, bob, pz);
+  hero.group.rotation.y = rotY;
+
+  /* ---------- 足球 ---------- */
+  if (p < T_KICK) {
+    const fx = Math.sin(rotY);
+    const fz = Math.cos(rotY);
+    const kb = Math.min(p, T_RUN_END);
+    const bounce = Math.abs(Math.sin(kb * 12)) * 0.1;
+    ball.position.set(px + fx * 0.62, BALL_R + bounce, pz + fz * 0.62);
+    ball.rotation.z -= dt * 9;
+    ball.rotation.x += dt * 2;
+  } else if (p < T_GOAL) {
+    const u = (p - T_KICK) / T_FLY;
+    const sx = HERO_END_X + 0.62;
+    ball.position.x = lerp(sx, BALL_END.x, u);
+    ball.position.z = lerp(0, BALL_END.z, u);
+    ball.position.y = lerp(BALL_R, BALL_END.y, u) + Math.sin(u * Math.PI) * 1.0;
+    ball.rotation.z -= dt * 24;
+    ball.rotation.x += dt * 5;
+  } else {
+    ball.position.copy(BALL_END);
+    ball.rotation.z -= dt * 3;
+  }
+
+  /* ---------- 防守球员 1 ---------- */
+  const chase1 = clamp01((px + 11) / 13);
+  const e1 = easeInOut(chase1);
+  def1.group.position.set(-3.5 + 6.2 * e1, 0, -3.2 + 1.95 * e1);
+  def1.group.rotation.y = Math.PI / 2 + 0.25 * (1 - e1);
+  animateRun(def1, time * 9.5 + 1.2, p < T_GOAL ? 1 : 0.25);
+
+  /* ---------- 防守球员 2 ---------- */
+  const chase2 = clamp01((px + 8) / 12);
+  const e2 = easeInOut(chase2);
+  def2.group.position.set(1.0 + 3.6 * e2, 0, 3.4 - 2.2 * e2);
+  def2.group.rotation.y = Math.PI / 2 - 0.25 * (1 - e2);
+  animateRun(def2, time * 8.8 + 3.4, p < T_GOAL ? 1 : 0.25);
+
+  /* ---------- 守门员 ---------- */
+  const gkBase = Math.sin(Math.min(p, T_KICK) * 1.6) * 0.85;
+  let gkZ = gkBase;
+  let gkTilt = 0;
+
+  if (p >= T_KICK) {
+    const k = clamp01((p - T_KICK) / 0.45);
+    const e = easeOut(k);
+    gkZ = lerp(gkBase, 2.7, e);
+    gkTilt = e * 0.95;
+  }
+
+  gkPivot.position.set(18.6, 0, gkZ);
+  gkPivot.rotation.x = gkTilt;
+
+  gk.legL.rotation.x = Math.sin(time * 6) * 0.25;
+  gk.legR.rotation.x = -Math.sin(time * 6) * 0.25;
+  gk.armL.rotation.z = -0.5 - Math.abs(Math.sin(time * 3)) * 0.3;
+  gk.armR.rotation.z = 0.5 + Math.abs(Math.sin(time * 3 + 1)) * 0.3;
+}
+
+/* ========================= 主循环 ========================= */
+const clock = new THREE.Clock();
+let prevP = 0;
+let started = false;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.06);
+  const time = clock.elapsedTime;
+  const p = time % CYCLE;
+
+  if (started && p < prevP) {
+    clearParticles();
+  }
+  started = true;
+
+  if (prevP < T_GOAL && p >= T_GOAL) {
+    spawnBurst(170, 20.4, 1.6, -2.4);
+    spawnBurst(70, 19.2, 3.0, -1.0);
+  }
+  prevP = p;
+
+  updateWorld(p, dt, time);
+  updateParticles(dt);
+
+  // 衔接淡入淡出
+  let fade = 0;
+  if (p < 0.45) fade = 1 - p / 0.45;
+  else if (p > CYCLE - 0.45) fade = (p - (CYCLE - 0.45)) / 0.45;
+  fadeEl.style.opacity = (fade * fade).toFixed(3);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ========================= 自适应 ========================= */
+let resizeTimer = null;
+window.addEventListener('resize', () => {
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => fitCamera(true), 120);
+  camera.aspect = Math.max(0.35, window.innerWidth / window.innerHeight);
+  camera.updateProjectionMatrix();
+});
+
+animate();
+</script>
+
+<script src="../prompt-panel.js" data-id="soccer-deepseek"></script>
+</body>
+</html>

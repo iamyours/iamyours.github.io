@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>擎天柱 · 极简机械变形</title>
+<style>
+  :root{
+    --cream: rgba(255, 250, 238, 0.82);
+    --ink: #3b3630;
+    --ink-2: #7b7268;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html, body{
+    width:100%; height:100%; overflow:hidden;
+    background:#e2ddd4;
+  }
+  body{
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas{ display:block; }
+
+  /* 返回按钮 */
+  #back{
+    position: fixed; top: 16px; left: 16px; z-index: 30;
+    padding: 8px 15px; border-radius: 999px;
+    background: var(--cream);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    color: #4a4238; font-size: 13px; font-weight: 600; letter-spacing: .3px;
+    text-decoration: none;
+    box-shadow: 0 2px 12px rgba(80,60,30,.12), inset 0 1px 0 rgba(255,255,255,.6);
+    transition: transform .18s ease, background .18s ease;
+    white-space: nowrap;
+  }
+  #back:hover{ transform: translateY(-1px); background: rgba(255,250,238,.98); }
+
+  /* 底部状态面板 */
+  #panel{
+    position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%);
+    z-index: 20; text-align: center; pointer-events: none;
+    padding: 10px 22px; border-radius: 16px;
+    background: rgba(255,250,238,.74);
+    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 18px rgba(80,60,30,.10), inset 0 1px 0 rgba(255,255,255,.55);
+    min-width: 250px;
+    transition: opacity .3s ease;
+  }
+  #mode{
+    font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: .6px;
+  }
+  #hint{
+    margin-top: 5px; font-size: 11.5px; color: var(--ink-2); letter-spacing: .5px;
+  }
+
+  /* 变形按钮 */
+  #morphBtn{
+    position: fixed; right: 20px; bottom: 22px; z-index: 25;
+    padding: 13px 22px; border: none; border-radius: 999px; cursor: pointer;
+    background: linear-gradient(140deg, #cf3a33 0%, #b0312c 45%, #2b5da6 100%);
+    color: #fff; font-size: 13px; font-weight: 700; letter-spacing: 1px;
+    font-family: inherit;
+    box-shadow: 0 6px 20px rgba(120,40,30,.28), inset 0 1px 0 rgba(255,255,255,.28);
+    transition: transform .15s ease, box-shadow .15s ease, filter .15s ease;
+    white-space: nowrap;
+  }
+  #morphBtn:hover{ transform: translateY(-2px); box-shadow: 0 10px 26px rgba(120,40,30,.34), inset 0 1px 0 rgba(255,255,255,.3); }
+  #morphBtn:active{ transform: translateY(0) scale(.97); }
+  #morphBtn:disabled{ filter: grayscale(.55) brightness(.9); cursor: default; transform:none; }
+
+  @media (max-width: 620px){
+    #back{ top: 12px; left: 12px; font-size: 12px; padding: 7px 12px; }
+    #panel{ bottom: 84px; min-width: 0; padding: 8px 16px; }
+    #mode{ font-size: 12.5px; }
+    #hint{ font-size: 10.5px; }
+    #morphBtn{
+      right: 50%; transform: translateX(50%);
+      bottom: 18px; padding: 12px 26px; font-size: 12.5px;
+    }
+    #morphBtn:hover{ transform: translateX(50%) translateY(-2px); }
+    #morphBtn:active{ transform: translateX(50%) scale(.97); }
+  }
+</style>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (min-width:621px){#morphBtn{bottom:76px}}</style>
+</head>
+<body>
+
+<a id="back" href="../">← 返回 3D 作品</a>
+
+<div id="panel">
+  <div id="mode">🚚 卡车形态</div>
+  <div id="hint">W A S D 行驶 · 拖动旋转视角 · 滚轮缩放 · T 变形</div>
+</div>
+
+<button id="morphBtn">⚙ T · 变形</button>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* =========================================================
+   常量与工具
+   ========================================================= */
+const DEG = Math.PI / 180;
+const UP = new THREE.Vector3(0, 1, 0);
+
+function easeInOutQuart(x){
+  return x < 0.5 ? 8 * x * x * x * x : 1 - Math.pow(-2 * x + 2, 4) / 2;
+}
+
+/** 构造一个变换描述（位置 / 缩放 / 欧拉角，角度用度） */
+function X(px, py, pz, sx, sy, sz, rx = 0, ry = 0, rz = 0){
+  return {
+    p: new THREE.Vector3(px, py, pz),
+    s: new THREE.Vector3(sx, sy, sz),
+    r: new THREE.Euler(rx * DEG, ry * DEG, rz * DEG)
+  };
+}
+
+/* =========================================================
+   渲染器
+   ========================================================= */
+const renderer = new THREE.WebGLRenderer({
+  antialias: true,
+  powerPreference: 'high-performance',
+  alpha: false
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+/* =========================================================
+   场景 & 相机
+   ========================================================= */
+const scene = new THREE.Scene();
+
+/* 程序化渐变天空 */
+(function buildSky(){
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 256;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0.00, '#b4cade');
+  g.addColorStop(0.42, '#d6e2ec');
+  g.addColorStop(0.74, '#e8e4dc');
+  g.addColorStop(1.00, '#dcd6cc');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 4, 256);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  scene.background = tex;
+})();
+
+scene.fog = new THREE.Fog(0xded9d0, 42, 130);
+
+const camera = new THREE.PerspectiveCamera(
+  45, window.innerWidth / window.innerHeight, 0.1, 600
+);
+camera.position.set(6.0, 4.8, -10.0);
+
+/* =========================================================
+   环境光照（柔和自然）
+   ========================================================= */
+const pmrem = new THREE.PMREMGenerator(renderer);
+pmrem.compileCubemapShader();
+const roomEnv = new RoomEnvironment();
+scene.environment = pmrem.fromScene(roomEnv, 0.05).texture;
+
+const hemi = new THREE.HemisphereLight(0xdcecff, 0x9a8d7c, 0.85);
+scene.add(hemi);
+
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.15);
+sun.position.set(9, 16, 7);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.near = 1;
+sun.shadow.camera.far = 80;
+sun.shadow.camera.left = -16;
+sun.shadow.camera.right = 16;
+sun.shadow.camera.top = 16;
+sun.shadow.camera.bottom = -16;
+sun.shadow.bias = -0.0008;
+sun.shadow.normalBias = 0.035;
+sun.shadow.camera.updateProjectionMatrix();
+scene.add(sun);
+scene.add(sun.target);
+
+const fillLight = new THREE.DirectionalLight(0x9ec4ff, 0.42);
+fillLight.position.set(-11, 8, -10);
+scene.add(fillLight);
+
+/* =========================================================
+   地面与点缀
+   ========================================================= */
+const groundGeo = new THREE.CircleGeometry(140, 72);
+groundGeo.rotateX(-Math.PI / 2);
+const groundMat = new THREE.MeshStandardMaterial({
+  color: 0xe3ded4, roughness: 0.97, metalness: 0.0
+});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.receiveShadow = true;
+scene.add(ground);
+
+const grid = new THREE.GridHelper(180, 90, 0xc7c1b5, 0xd5cfc3);
+grid.position.y = 0.012;
+grid.material.opacity = 0.42;
+grid.material.transparent = true;
+grid.material.depthWrite = false;
+scene.add(grid);
+
+/* 极简场景装饰 */
+(function buildProps(){
+  const mats = [
+    new THREE.MeshStandardMaterial({ color: 0xcfc9bd, roughness: 0.92, metalness: 0.05 }),
+    new THREE.MeshStandardMaterial({ color: 0xb9b3a7, roughness: 0.9, metalness: 0.05 }),
+    new THREE.MeshStandardMaterial({ color: 0xc4beb2, roughness: 0.88, metalness: 0.12 })
+  ];
+  let seed = 20240611;
+  const rnd = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const group = new THREE.Group();
+  for (let i = 0; i < 16; i++){
+    const a = rnd() * Math.PI * 2;
+    const d = 18 + rnd() * 48;
+    const w = 0.8 + rnd() * 2.4;
+    const h = 0.5 + rnd() * 3.6;
+    const geo = new THREE.BoxGeometry(w, h, w);
+    const m = new THREE.Mesh(geo, mats[i % mats.length]);
+    m.position.set(Math.cos(a) * d, h / 2, Math.sin(a) * d);
+    m.rotation.y = rnd() * Math.PI;
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+  }
+  scene.add(group);
+})();
+
+/* =========================================================
+   材质 & 几何体
+   ========================================================= */
+const M = {
+  red:    new THREE.MeshStandardMaterial({ color: 0xc3302c, metalness: 0.42, roughness: 0.34 }),
+  blue:   new THREE.MeshStandardMaterial({ color: 0x2b5da6, metalness: 0.50, roughness: 0.30 }),
+  silver: new THREE.MeshStandardMaterial({ color: 0xb6bec6, metalness: 0.95, roughness: 0.26 }),
+  dark:   new THREE.MeshStandardMaterial({ color: 0x2c3138, metalness: 0.62, roughness: 0.46 }),
+  glass:  new THREE.MeshStandardMaterial({
+    color: 0x16232f, metalness: 0.88, roughness: 0.12,
+    emissive: 0x123b57, emissiveIntensity: 0.55
+  }),
+  tire:   new THREE.MeshStandardMaterial({ color: 0x1a1c1f, metalness: 0.15, roughness: 0.88 })
+};
+
+const GEO_BOX = new THREE.BoxGeometry(1, 1, 1);
+const GEO_CYL = new THREE.CylinderGeometry(0.5, 0.5, 1, 24);
+
+const GEO_WHEEL = new THREE.CylinderGeometry(0.5, 0.5, 1, 28);
+GEO_WHEEL.rotateZ(Math.PI / 2);
+
+const GEO_HUB = new THREE.CylinderGeometry(0.31, 0.31, 1.06, 18);
+GEO_HUB.rotateZ(Math.PI / 2);
+
+/* =========================================================
+   机械体骨架
+   ========================================================= */
+const mech = new THREE.Group();
+scene.add(mech);
+
+const body = new THREE.Group();   // 用于行走晃动
+mech.add(body);
+
+const PARTS = [];    // 参与变形的部件
+const WHEELS = [];   // 车轮的旋转子节点
+
+/** 添加一个普通部件 */
+function addPart(geo, mat, truck, robot, cfg){
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.position.copy(truck.p);
+  mesh.scale.copy(truck.s);
+  mesh.rotation.copy(truck.r);
+  body.add(mesh);
+
+  PARTS.push(Object.assign({
+    obj: mesh,
+    truck,
+    robot,
+    delay: 0.2,
+    dur: 0.55,
+    arc: 0.45
+  }, cfg || {}));
+
+  return mesh;
+}
+
+/** 添加一个车轮（外壳负责变形，内层负责滚动） */
+function addWheel(truck, robot, cfg){
+  const pivot = new THREE.Group();
+  pivot.position.copy(truck.p);
+  pivot.scale.copy(truck.s);
+  pivot.rotation.copy(truck.r);
+  body.add(pivot);
+
+  const spin = new THREE.Group();
+  pivot.add(spin);
+
+  const tire = new THREE.Mesh(GEO_WHEEL, M.tire);
+  tire.castShadow = true;
+  tire.receiveShadow = true;
+  spin.add(tire);
+
+  const hub = new THREE.Mesh(GEO_HUB, M.silver);
+  hub.castShadow = true;
+  spin.add(hub);
+
+  PARTS.push(Object.assign({
+    obj: pivot,
+    truck,
+    robot,
+    delay: 0.04,
+    dur: 0.52,
+    arc: 0.85
+  }, cfg || {}));
+
+  WHEELS.push(spin);
+  return pivot;
+}
+
+/* ---------------------------------------------------------
+   卡车形态布局：车头朝向 +Z
+   --------------------------------------------------------- */
+
+/* 1. 驾驶室 → 躯干 */
+addPart(GEO_BOX, M.red,
+  X(0, 2.00, 0.05, 1.90, 1.50, 1.90),
+  X(0, 2.16, 0.00, 1.26, 1.16, 0.86),
+  { delay: 0.22, dur: 0.56, arc: 0.45 });
+
+/* 2. 车顶 → 头部 */
+addPart(GEO_BOX, M.blue,
+  X(0, 2.86, -0.10, 1.86, 0.44, 1.80),
+  X(0, 3.06, 0.02, 0.66, 0.62, 0.62),
+  { delay: 0.36, dur: 0.55, arc: 0.62 });
+
+/* 3. 引擎盖 → 胸甲 */
+addPart(GEO_BOX, M.red,
+  X(0, 1.68, 1.72, 1.55, 0.80, 1.45),
+  X(0, 2.44, 0.46, 1.10, 0.70, 0.22, -7),
+  { delay: 0.28, dur: 0.56, arc: 0.52 });
+
+/* 4. 进气格栅 → 面罩 */
+addPart(GEO_BOX, M.silver,
+  X(0, 1.62, 2.47, 1.40, 0.80, 0.10),
+  X(0, 2.96, 0.34, 0.46, 0.15, 0.10),
+  { delay: 0.45, dur: 0.50, arc: 0.72 });
+
+/* 5. 前保险杠 → 骨盆 */
+addPart(GEO_BOX, M.silver,
+  X(0, 1.05, 2.52, 1.80, 0.38, 0.22),
+  X(0, 1.66, 0.00, 0.98, 0.52, 0.74),
+  { delay: 0.34, dur: 0.55, arc: 0.62 });
+
+/* 6. 挡风玻璃 → 护目镜 */
+addPart(GEO_BOX, M.glass,
+  X(0, 2.40, 1.03, 1.62, 0.62, 0.09, -8),
+  X(0, 3.16, 0.32, 0.48, 0.13, 0.09),
+  { delay: 0.48, dur: 0.48, arc: 0.78 });
+
+/* 7/8. 排气管 → 双臂 */
+addPart(GEO_CYL, M.silver,
+  X(-1.02, 2.15, 0.90, 0.22, 1.90, 0.22),
+  X(-0.92, 2.02, 0.02, 0.30, 1.20, 0.30, 0, 0, -5),
+  { delay: 0.15, dur: 0.56, arc: 0.40 });
+
+addPart(GEO_CYL, M.silver,
+  X(1.02, 2.15, 0.90, 0.22, 1.90, 0.22),
+  X(0.92, 2.02, 0.02, 0.30, 1.20, 0.30, 0, 0, 5),
+  { delay: 0.15, dur: 0.56, arc: 0.40 });
+
+/* 9/10. 前轮 → 肩甲 */
+addWheel(X(-0.98, 0.62, 1.60, 0.36, 1.24, 1.24),
+         X(-1.02, 2.52, 0.00, 0.32, 0.88, 0.88),
+         { delay: 0.05, dur: 0.52, arc: 1.00 });
+
+addWheel(X(0.98, 0.62, 1.60, 0.36, 1.24, 1.24),
+         X(1.02, 2.52, 0.00, 0.32, 0.88, 0.88),
+         { delay: 0.05, dur: 0.52, arc: 1.00 });
+
+/* 11/12. 后轮 → 髋关节盘 */
+addWheel(X(-0.98, 0.62, -1.30, 0.42, 1.24, 1.24),
+         X(-0.52, 1.62, 0.00, 0.26, 0.56, 0.56),
+         { delay: 0.02, dur: 0.50, arc: 0.82 });
+
+addWheel(X(0.98, 0.62, -1.30, 0.42, 1.24, 1.24),
+         X(0.52, 1.62, 0.00, 0.26, 0.56, 0.56),
+         { delay: 0.02, dur: 0.50, arc: 0.82 });
+
+/* 13/14. 车架纵梁 → 大腿 */
+addPart(GEO_BOX, M.dark,
+  X(-0.58, 0.90, -0.30, 0.28, 1.10, 2.90),
+  X(-0.42, 1.15, 0.00, 0.46, 0.90, 0.56),
+  { delay: 0.12, dur: 0.55, arc: 0.45 });
+
+addPart(GEO_BOX, M.dark,
+  X(0.58, 0.90, -0.30, 0.28, 1.10, 2.90),
+  X(0.42, 1.15, 0.00, 0.46, 0.90, 0.56),
+  { delay: 0.12, dur: 0.55, arc: 0.45 });
+
+/* 15/16. 油箱 → 小腿 */
+addPart(GEO_CYL, M.blue,
+  X(-0.95, 0.88, 0.00, 0.56, 1.30, 0.56, 90),
+  X(-0.42, 0.48, 0.00, 0.40, 0.88, 0.40),
+  { delay: 0.10, dur: 0.55, arc: 0.36 });
+
+addPart(GEO_CYL, M.blue,
+  X(0.95, 0.88, 0.00, 0.56, 1.30, 0.56, 90),
+  X(0.42, 0.48, 0.00, 0.40, 0.88, 0.40),
+  { delay: 0.10, dur: 0.55, arc: 0.36 });
+
+/* 17/18. 踏板 → 双脚 */
+addPart(GEO_BOX, M.dark,
+  X(-0.86, 0.10, -2.10, 0.42, 0.18, 0.55),
+  X(-0.42, 0.09, 0.16, 0.46, 0.18, 0.86),
+  { delay: 0.00, dur: 0.45, arc: 0.55 });
+
+addPart(GEO_BOX, M.dark,
+  X(0.86, 0.10, -2.10, 0.42, 0.18, 0.55),
+  X(0.42, 0.09, 0.16, 0.46, 0.18, 0.86),
+  { delay: 0.00, dur: 0.45, arc: 0.55 });
+
+/* =========================================================
+   变形系统
+   ========================================================= */
+let morphT = 0;            // 0 = 卡车, 1 = 人形
+let morphing = false;
+let morphFrom = 0;
+let morphTo = 0;
+let morphTimer = 0;
+const MORPH_TIME = 5.0;    // 5 秒
+
+/** 把某个部件按进度 k (0..1) 从卡车形态插值到人形形态 */
+function applyPart(part, k){
+  const { obj, truck, robot } = part;
+
+  obj.position.lerpVectors(truck.p, robot.p, k);
+  obj.scale.lerpVectors(truck.s, robot.s, k);
+  obj.rotation.set(
+    truck.r.x + (robot.r.x - truck.r.x) * k,
+    truck.r.y + (robot.r.y - truck.r.y) * k,
+    truck.r.z + (robot.r.z - truck.r.z) * k
+  );
+
+  // 飞行弧线，让变形更"炫"
+  const arc = (part.arc || 0) * Math.sin(Math.PI * k);
+  if (arc !== 0) obj.position.y += arc;
+}
+
+function updateMorph(t){
+  for (let i = 0; i < PARTS.length; i++){
+    const p = PARTS[i];
+    let k = (t - p.delay) / p.dur;
+    if (k < 0) k = 0;
+    else if (k > 1) k = 1;
+    applyPart(p, easeInOutQuart(k));
+  }
+}
+
+function triggerMorph(){
+  if (morphing) return;
+  morphFrom = morphT;
+  morphTo = morphT < 0.5 ? 1 : 0;
+  morphTimer = 0;
+  morphing = true;
+  updateMorphUI();
+}
+
+/* =========================================================
+   控制器 & 输入
+   ========================================================= */
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 1.65, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.085;
+controls.enablePan = false;
+controls.minDistance = 4;
+controls.maxDistance = 34;
+controls.minPolarAngle = 0.12;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.update();
+
+let dragging = false;
+controls.addEventListener('start', () => { dragging = true; });
+controls.addEventListener('end',   () => { dragging = false; });
+
+const keys = Object.create(null);
+
+window.addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (['w','a','s','d','arrowup','arrowdown','arrowleft','arrowright',' '].includes(k)){
+    e.preventDefault();
+  }
+  if (k === 't' && !e.repeat) triggerMorph();
+  keys[k] = true;
+}, { passive: false });
+
+window.addEventListener('keyup', (e) => {
+  keys[e.key.toLowerCase()] = false;
+});
+
+window.addEventListener('blur', () => {
+  for (const k in keys) keys[k] = false;
+});
+
+document.getElementById('morphBtn').addEventListener('click', () => {
+  triggerMorph();
+});
+
+/* =========================================================
+   运动逻辑
+   ========================================================= */
+let speed = 0;          // 卡车沿朝向的速度
+let heading = 0;        // 朝向角（Y 轴旋转）
+let robotSpeed = 0;     // 人形行走速度
+let walkPhase = 0;
+
+const _camDir = new THREE.Vector3();
+const _camRight = new THREE.Vector3();
+const _moveDir = new THREE.Vector3();
+const _tmpA = new THREE.Vector3();
+const _tmpB = new THREE.Vector3();
+const camTarget = new THREE.Vector3(0, 1.65, 0);
+
+function clampPosition(){
+  const r = Math.hypot(mech.position.x, mech.position.z);
+  const MAX_R = 72;
+  if (r > MAX_R){
+    const s = MAX_R / r;
+    mech.position.x *= s;
+    mech.position.z *= s;
+  }
+}
+
+function updateTruck(dt, locked){
+  const fwd   = !locked && (keys['w'] || keys['arrowup']);
+  const back  = !locked && (keys['s'] || keys['arrowdown']);
+  const left  = !locked && (keys['a'] || keys['arrowleft']);
+  const right = !locked && (keys['d'] || keys['arrowright']);
+
+  // 油门 / 惯性
+  if (fwd)       speed += 17 * dt;
+  else if (back) speed -= 17 * dt;
+  else           speed -= speed * Math.min(1, dt * 3.0);
+
+  speed = Math.max(-7, Math.min(15, speed));
+
+  // 转向（与速度相关，倒车方向自然反转）
+  const steer = (left ? 1 : 0) - (right ? 1 : 0);
+  if (steer !== 0 && Math.abs(speed) > 0.05){
+    const factor = Math.min(Math.abs(speed) / 4, 1);
+    heading += steer * Math.sign(speed) * factor * 1.55 * dt;
+  }
+
+  // 位移
+  mech.position.x += Math.sin(heading) * speed * dt;
+  mech.position.z += Math.cos(heading) * speed * dt;
+  mech.rotation.y = heading;
+  clampPosition();
+
+  // 车轮滚动
+  const roll = (speed * dt) / 0.62;
+  for (let i = 0; i < WHEELS.length; i++){
+    WHEELS[i].rotation.x -= roll;
+  }
+
+  // 车身归位
+  const ease = Math.min(1, dt * 10);
+  body.position.y += (0 - body.position.y) * ease;
+  body.rotation.z += (0 - body.rotation.z) * ease;
+}
+
+function updateRobot(dt, locked){
+  const ix = ((!locked && (keys['d'] || keys['arrowright'])) ? 1 : 0)
+           - ((!locked && (keys['a'] || keys['arrowleft']))  ? 1 : 0);
+  const iz = ((!locked && (keys['w'] || keys['arrowup']))   ? 1 : 0)
+           - ((!locked && (keys['s'] || keys['arrowdown'])) ? 1 : 0);
+
+  // 相机朝向（水平投影）
+  camera.getWorldDirection(_camDir);
+  _camDir.y = 0;
+  if (_camDir.lengthSq() < 1e-6) _camDir.set(0, 0, 1);
+  _camDir.normalize();
+
+  _camRight.crossVectors(_camDir, UP).normalize();
+
+  _moveDir.set(0, 0, 0);
+  _moveDir.addScaledVector(_camDir, iz);
+  _moveDir.addScaledVector(_camRight, ix);
+
+  const moving = _moveDir.lengthSq() > 1e-4;
+
+  if (moving){
+    _moveDir.normalize();
+    const targetHeading = Math.atan2(_moveDir.x, _moveDir.z);
+    let d = targetHeading - heading;
+    d = Math.atan2(Math.sin(d), Math.cos(d));
+    heading += d * Math.min(1, dt * 9);
+  }
+
+  const targetSpeed = moving ? 4.4 : 0;
+  robotSpeed += (targetSpeed - robotSpeed) * Math.min(1, dt * 7);
+
+  mech.position.x += Math.sin(heading) * robotSpeed * dt;
+  mech.position.z += Math.cos(heading) * robotSpeed * dt;
+  mech.rotation.y = heading;
+  clampPosition();
+
+  // 行走上下起伏
+  if (robotSpeed > 0.15) walkPhase += dt * robotSpeed * 3.3;
+
+  const amp = Math.min(robotSpeed / 4, 1);
+  const bob = Math.abs(Math.sin(walkPhase)) * 0.055 * amp;
+  const roll = Math.sin(walkPhase * 2) * 0.014 * amp;
+
+  const ease = Math.min(1, dt * 12);
+  body.position.y += (bob - body.position.y) * ease;
+  body.rotation.z += (roll - body.rotation.z) * ease;
+}
+
+/* =========================================================
+   相机跟随
+   ========================================================= */
+function updateCamera(dt, morph){
+  const targetH = 1.62 + morph * 0.56;
+
+  camTarget.set(mech.position.x, targetH, mech.position.z);
+
+  const k = 1 - Math.pow(0.0002, dt);
+  _tmpA.copy(camTarget).sub(controls.target).multiplyScalar(k);
+
+  controls.target.add(_tmpA);
+  camera.position.add(_tmpA);
+
+  // 卡车行驶时，镜头缓缓绕到车尾
+  if (!dragging && !morphing && morph < 0.5 && Math.abs(speed) > 1.2){
+    const off = _tmpB.copy(camera.position).sub(controls.target);
+    const rXZ = Math.hypot(off.x, off.z);
+    if (rXZ > 1.0){
+      let az = Math.atan2(off.x, off.z);
+      const want = heading + Math.PI;
+      let d = want - az;
+      d = Math.atan2(Math.sin(d), Math.cos(d));
+      az += d * Math.min(1, dt * 1.5);
+
+      camera.position.x = controls.target.x + Math.sin(az) * rXZ;
+      camera.position.z = controls.target.z + Math.cos(az) * rXZ;
+    }
+  }
+}
+
+/* =========================================================
+   UI
+   ========================================================= */
+const modeEl = document.getElementById('mode');
+const morphBtnEl = document.getElementById('morphBtn');
+let lastModeText = '';
+
+function updateMorphUI(){
+  let text;
+  if (morphing){
+    const span = morphTo - morphFrom;
+    const raw = span === 0 ? 1 : (morphT - morphFrom) / span;
+    const pct = Math.round(Math.max(0, Math.min(1, raw)) * 100);
+    text = `⚙ 变形中 ${pct}%`;
+  } else {
+    text = morphT > 0.5 ? '🤖 人形形态' : '🚚 卡车形态';
+  }
+
+  if (text !== lastModeText){
+    modeEl.textContent = text;
+    lastModeText = text;
+  }
+
+  morphBtnEl.disabled = morphing;
+}
+
+/* =========================================================
+   主循环
+   ========================================================= */
+const clock = new THREE.Clock();
+
+function step(dt){
+  /* ---- 变形进度 ---- */
+  if (morphing){
+    morphTimer += dt;
+    const u = Math.min(1, morphTimer / MORPH_TIME);
+    morphT = morphFrom + (morphTo - morphFrom) * u;
+    if (u >= 1){
+      morphT = morphTo;
+      morphing = false;
+    }
+    updateMorphUI();
+  }
+
+  updateMorph(morphT);
+
+  const isRobot = morphT > 0.5;
+
+  /* ---- 行为更新 ---- */
+  if (isRobot){
+    updateRobot(dt, morphing);
+  } else {
+    updateTruck(dt, morphing);
+  }
+
+  /* ---- 光照跟随机械体 ---- */
+  sun.position.set(mech.position.x + 9, 16, mech.position.z + 7);
+  sun.target.position.copy(mech.position);
+  sun.target.updateMatrixWorld();
+
+  /* ---- 相机 ---- */
+  updateCamera(dt, morphT);
+  controls.update();
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  step(dt);
+  renderer.render(scene, camera);
+}
+
+/* 初始化状态 */
+updateMorph(0);
+updateMorphUI();
+controls.update();
+
+animate();
+
+/* =========================================================
+   窗口响应
+   ========================================================= */
+let resizeTimer = null;
+
+function onResize(){
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+
+window.addEventListener('resize', () => {
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(onResize, 80);
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(onResize, 220);
+});
+</script>
+
+<script src="../prompt-panel.js" data-id="optimus-deepseek"></script>
+</body>
+</html>

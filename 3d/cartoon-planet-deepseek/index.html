@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>卡通星球 · 生机勃勃的 3D 世界</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: radial-gradient(circle at 50% 38%, #1d2f5c 0%, #0c1330 45%, #04060f 100%);
+    -webkit-tap-highlight-color: transparent;
+  }
+  canvas { display: block; position: fixed; inset: 0; }
+  #back-link {
+    position: fixed; top: 16px; left: 16px; z-index: 10;
+    display: inline-block; padding: 8px 15px; border-radius: 999px;
+    background: rgba(255, 248, 224, 0.78); color: #3a2a12;
+    font: 500 14px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    text-decoration: none; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.28);
+    transition: background .2s ease, transform .2s ease;
+  }
+  #back-link:hover { background: rgba(255, 248, 224, 0.96); transform: translateY(-1px); }
+  #hint {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10;
+    color: rgba(255, 255, 255, 0.78);
+    font: 400 13px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: rgba(10, 18, 40, 0.45); padding: 7px 16px; border-radius: 999px;
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    white-space: nowrap; pointer-events: none;
+  }
+  #loading {
+    position: fixed; inset: 0; z-index: 20; display: flex;
+    align-items: center; justify-content: center;
+    color: #cfe4ff; letter-spacing: 1px;
+    font: 500 15px/1 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #05060f; transition: opacity .6s ease;
+  }
+  #loading.hide { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+<a id="back-link" href="../">← 返回 3D 作品</a>
+<div id="hint">拖动旋转 · 滚轮 / 双指缩放</div>
+<div id="loading">正在生成星球…</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* =========================================================
+   基础常量 & 渲染器
+   ========================================================= */
+const R = 10;                                  // 星球半径
+const UP = new THREE.Vector3(0, 1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.05, 5000);
+camera.position.set(13, 10.5, 19);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.rotateSpeed = 0.65;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.minDistance = R + 1.15;
+controls.maxDistance = 58;
+controls.target.set(0, 0, 0);
+
+/* =========================================================
+   光照
+   ========================================================= */
+scene.add(new THREE.AmbientLight(0xffffff, 0.62));
+
+const sun = new THREE.DirectionalLight(0xfff4d6, 1.65);
+sun.position.set(20, 17, 15);
+scene.add(sun);
+
+const rim = new THREE.DirectionalLight(0x82b6ff, 0.55);
+rim.position.set(-18, -8, -14);
+scene.add(rim);
+
+/* =========================================================
+   卡通色阶
+   ========================================================= */
+function makeGradientMap(steps) {
+  const data = new Uint8Array(steps);
+  for (let i = 0; i < steps; i++) data[i] = Math.round(90 + (165 * i) / (steps - 1));
+  const tex = new THREE.DataTexture(data, steps, 1, THREE.RedFormat);
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+const GRADIENT = makeGradientMap(4);
+
+/* =========================================================
+   程序化噪声（3D 值噪声 + fBm）
+   ========================================================= */
+function hash3(i, j, k) {
+  let n = Math.imul(i, 374761393) ^ Math.imul(j, 668265263) ^ Math.imul(k, 1274126177);
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  n = n ^ (n >>> 16);
+  return (n >>> 0) / 4294967296;
+}
+function smootherstep(t) { return t * t * (3 - 2 * t); }
+
+function valueNoise3(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = smootherstep(xf), v = smootherstep(yf), w = smootherstep(zf);
+
+  const c000 = hash3(xi, yi, zi);
+  const c100 = hash3(xi + 1, yi, zi);
+  const c010 = hash3(xi, yi + 1, zi);
+  const c110 = hash3(xi + 1, yi + 1, zi);
+  const c001 = hash3(xi, yi, zi + 1);
+  const c101 = hash3(xi + 1, yi, zi + 1);
+  const c011 = hash3(xi, yi + 1, zi + 1);
+  const c111 = hash3(xi + 1, yi + 1, zi + 1);
+
+  const x00 = c000 + (c100 - c000) * u;
+  const x10 = c010 + (c110 - c010) * u;
+  const x01 = c001 + (c101 - c001) * u;
+  const x11 = c011 + (c111 - c011) * u;
+  const y0 = x00 + (x10 - x00) * v;
+  const y1 = x01 + (x11 - x01) * v;
+  return y0 + (y1 - y0) * w;
+}
+
+function fbm(x, y, z, oct) {
+  let amp = 0.5, freq = 1, sum = 0, norm = 0;
+  for (let i = 0; i < oct; i++) {
+    sum += amp * valueNoise3(x * freq, y * freq, z * freq);
+    norm += amp;
+    amp *= 0.5;
+    freq *= 2.03;
+  }
+  return sum / norm;
+}
+
+/** 与贴图完全一致的地形高度（0~1） */
+function elevationAt(x, y, z) {
+  return fbm(x * 2.0 + 11.3, y * 2.0 - 4.7, z * 2.0 + 8.1, 4);
+}
+
+/* =========================================================
+   工具函数
+   ========================================================= */
+function randomDir() {
+  const u = Math.random() * 2 - 1;
+  const th = Math.random() * Math.PI * 2;
+  const s = Math.sqrt(Math.max(0, 1 - u * u));
+  return new THREE.Vector3(s * Math.cos(th), u, s * Math.sin(th));
+}
+
+function tangentBasis(n) {
+  const ref = Math.abs(n.y) > 0.95 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
+  const u = new THREE.Vector3().crossVectors(ref, n).normalize();
+  const v = new THREE.Vector3().crossVectors(n, u).normalize();
+  return { u, v };
+}
+
+/** 把物体贴到球面：dir 方向，距球心 dist 距离，+Y 朝向法线 */
+function placeAt(obj, dir, dist) {
+  const n = dir.clone().normalize();
+  obj.position.copy(n).multiplyScalar(dist);
+  obj.quaternion.setFromUnitVectors(UP, n);
+  return obj;
+}
+
+/* =========================================================
+   星球贴图（Canvas 程序化绘制）
+   ========================================================= */
+function buildPlanetTexture() {
+  const W = 1024, H = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  const data = img.data;
+
+  const C_DEEP    = [24, 92, 178];
+  const C_MID     = [40, 140, 212];
+  const C_SHALLOW = [92, 202, 234];
+  const C_SAND    = [242, 223, 158];
+  const C_GRASS   = [116, 202, 96];
+  const C_FOREST  = [58, 158, 82];
+  const C_ROCK    = [142, 154, 108];
+  const C_SNOW    = [244, 250, 255];
+
+  let p = 0;
+  for (let y = 0; y < H; y++) {
+    const lat = (0.5 - (y + 0.5) / H) * Math.PI;
+    const cl = Math.cos(lat), sl = Math.sin(lat);
+    for (let x = 0; x < W; x++) {
+      const lon = ((x + 0.5) / W) * Math.PI * 2;
+      const nx = cl * Math.cos(lon), ny = sl, nz = cl * Math.sin(lon);
+      const e = elevationAt(nx, ny, nz);
+      const absLat = Math.abs(lat);
+
+      let col;
+      if (absLat > 1.24 + (e - 0.5) * 0.35) {
+        col = C_SNOW;
+      } else if (e > 0.545) {
+        if (e < 0.567)      col = C_SAND;
+        else if (e < 0.645) col = C_GRASS;
+        else if (e < 0.710) col = C_FOREST;
+        else                col = C_ROCK;
+      } else if (e > 0.490) {
+        col = C_SHALLOW;
+      } else if (e > 0.400) {
+        col = C_MID;
+      } else {
+        col = C_DEEP;
+      }
+
+      const v = 1 + (Math.random() - 0.5) * 0.05;
+      data[p++] = Math.min(255, col[0] * v);
+      data[p++] = Math.min(255, col[1] * v);
+      data[p++] = Math.min(255, col[2] * v);
+      data[p++] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+}
+
+const planetTex = buildPlanetTexture();
+
+/* =========================================================
+   星球本体
+   ========================================================= */
+const planet = new THREE.Mesh(
+  new THREE.SphereGeometry(R, 96, 64),
+  new THREE.MeshToonMaterial({ map: planetTex, gradientMap: GRADIENT })
+);
+scene.add(planet);
+
+/* =========================================================
+   大气辉光
+   ========================================================= */
+const atmoMat = new THREE.ShaderMaterial({
+  uniforms: { uColor: { value: new THREE.Color(0x5fa8ff) } },
+  vertexShader: /* glsl */`
+    varying vec3 vN;
+    varying vec3 vW;
+    void main() {
+      vec4 wp = modelMatrix * vec4(position, 1.0);
+      vW = wp.xyz;
+      vN = normalize(mat3(modelMatrix) * normal);
+      gl_Position = projectionMatrix * viewMatrix * wp;
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform vec3 uColor;
+    varying vec3 vN;
+    varying vec3 vW;
+    void main() {
+      vec3 viewDir = normalize(cameraPosition - vW);
+      float f = 1.0 - abs(dot(normalize(vN), viewDir));
+      float glow = pow(f, 2.5) * 0.9;
+      gl_FragColor = vec4(uColor * glow, 1.0);
+    }
+  `,
+  side: THREE.FrontSide,
+  blending: THREE.AdditiveBlending,
+  transparent: true,
+  depthWrite: false
+});
+const atmosphere = new THREE.Mesh(new THREE.SphereGeometry(R * 1.16, 64, 48), atmoMat);
+scene.add(atmosphere);
+
+/* =========================================================
+   星空
+   ========================================================= */
+function makeStarTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+  g.addColorStop(0.0, 'rgba(255,255,255,1)');
+  g.addColorStop(0.35, 'rgba(255,255,255,0.85)');
+  g.addColorStop(1.0, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 32, 32);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+(function createStars() {
+  const COUNT = 1600;
+  const positions = new Float32Array(COUNT * 3);
+  const colors = new Float32Array(COUNT * 3);
+  const c = new THREE.Color();
+  for (let i = 0; i < COUNT; i++) {
+    const d = randomDir().multiplyScalar(420 + Math.random() * 520);
+    positions[i * 3] = d.x;
+    positions[i * 3 + 1] = d.y;
+    positions[i * 3 + 2] = d.z;
+    c.setHSL(0.55 + Math.random() * 0.12, 0.45, 0.72 + Math.random() * 0.22);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 4.2,
+    sizeAttenuation: false,
+    map: makeStarTexture(),
+    vertexColors: true,
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending
+  });
+  scene.add(new THREE.Points(geo, mat));
+})();
+
+/* =========================================================
+   窗户贴图 & 城市
+   ========================================================= */
+function makeWindowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 64, 64);
+  ctx.fillStyle = 'rgba(48, 78, 118, 0.85)';
+  for (let y = 8; y < 58; y += 14) {
+    for (let x = 8; x < 58; x += 14) {
+      ctx.fillRect(x, y, 8, 9);
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return t;
+}
+const windowTex = makeWindowTexture();
+
+const cityDir = new THREE.Vector3(0.6, 0.38, 0.71).normalize();
+const cityBasis = tangentBasis(cityDir);
+const C_U = cityBasis.u;
+const C_V = cityBasis.v;
+
+(function buildCity() {
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const palette = [0xfff2d8, 0xffd6b8, 0xd6ecff, 0xe8daff, 0xffc8c8, 0xd4ffe4, 0xffe9a8];
+  const mats = palette.map(col =>
+    new THREE.MeshToonMaterial({ map: windowTex, color: col, gradientMap: GRADIENT })
+  );
+
+  for (let i = -3; i <= 3; i++) {
+    for (let j = -3; j <= 3; j++) {
+      const a = i * 0.255 + (Math.random() - 0.5) * 0.05;
+      const b = j * 0.255 + (Math.random() - 0.5) * 0.05;
+      const d = Math.hypot(a, b);
+      if (d > 0.86) continue;
+      if (d > 0.50 && Math.random() < 0.25) continue;
+
+      const dir = cityDir.clone().addScaledVector(C_U, a).addScaledVector(C_V, b).normalize();
+      const w = 0.10 + Math.random() * 0.07;
+      const h = 0.14 + Math.random() * 0.62 * (1.0 - d / 1.05);
+
+      const mesh = new THREE.Mesh(boxGeo, mats[(Math.random() * mats.length) | 0]);
+      placeAt(mesh, dir, R + h / 2 - 0.02);
+      mesh.scale.set(w, h, w);
+      mesh.rotateY(Math.random() * Math.PI);
+      scene.add(mesh);
+    }
+  }
+})();
+
+/* =========================================================
+   山脉
+   ========================================================= */
+(function buildMountains() {
+  const rockMat = new THREE.MeshToonMaterial({ color: 0x9d8f7c, gradientMap: GRADIENT, flatShading: true });
+  const rockMat2 = new THREE.MeshToonMaterial({ color: 0x8a7a6a, gradientMap: GRADIENT, flatShading: true });
+  const snowMat = new THREE.MeshToonMaterial({ color: 0xf6fbff, gradientMap: GRADIENT, flatShading: true });
+
+  const rangeCount = 16;
+  for (let r = 0; r < rangeCount; r++) {
+    const center = randomDir();
+    if (Math.abs(center.y) > 0.82) continue;                 // 避开极地
+    if (center.angleTo(cityDir) < 0.34) continue;            // 避开城市
+
+    const { u, v } = tangentBasis(center);
+    const peaks = 2 + Math.floor(Math.random() * 4);
+
+    for (let i = 0; i < peaks; i++) {
+      const a = (Math.random() - 0.5) * 0.95;
+      const b = (Math.random() - 0.5) * 0.95;
+      const dir = center.clone().addScaledVector(u, a).addScaledVector(v, b).normalize();
+
+      const h = 0.45 + Math.random() * 1.05;
+      const rad = 0.28 + Math.random() * 0.38;
+      const seg = 5 + Math.floor(Math.random() * 3);
+
+      const geo = new THREE.ConeGeometry(rad, h, seg);
+      geo.translate(0, h / 2, 0);
+
+      const mesh = new THREE.Mesh(geo, Math.random() < 0.5 ? rockMat : rockMat2);
+      placeAt(mesh, dir, R - 0.06);
+      scene.add(mesh);
+
+      if (h > 0.85) {
+        const capH = h * 0.34;
+        const capGeo = new THREE.ConeGeometry(rad * 0.36, capH, seg);
+        capGeo.translate(0, capH / 2, 0);
+        const cap = new THREE.Mesh(capGeo, snowMat);
+        cap.position.y = h - capH * 0.98;
+        mesh.add(cap);
+      }
+    }
+  }
+})();
+
+/* =========================================================
+   树木（InstancedMesh）
+   ========================================================= */
+(function buildTrees() {
+  const treeColors = [0x6ad46a, 0x4fb85c, 0x38996a];
+  const perField = 210;
+  const dummy = new THREE.Object3D();
+
+  for (const col of treeColors) {
+    const geo = new THREE.ConeGeometry(0.055, 0.16, 5);
+    geo.translate(0, 0.08, 0);
+    const mat = new THREE.MeshToonMaterial({ color: col, gradientMap: GRADIENT, flatShading: true });
+    const mesh = new THREE.InstancedMesh(geo, mat, perField);
+
+    let placed = 0, guard = 0;
+    while (placed < perField && guard < perField * 25) {
+      guard++;
+      const dir = randomDir();
+      if (Math.abs(dir.y) > 0.90) continue;
+      if (dir.angleTo(cityDir) < 0.17) continue;
+      const e = elevationAt(dir.x, dir.y, dir.z);
+      if (e < 0.565 || e > 0.705) continue;
+
+      dummy.position.copy(dir).multiplyScalar(R - 0.005);
+      dummy.quaternion.setFromUnitVectors(UP, dir);
+      const s = 0.75 + Math.random() * 0.85;
+      dummy.scale.set(s, s * (0.8 + Math.random() * 0.7), s);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(placed, dummy.matrix);
+      placed++;
+    }
+    mesh.count = placed;
+    mesh.instanceMatrix.needsUpdate = true;
+    scene.add(mesh);
+  }
+})();
+
+/* =========================================================
+   云层
+   ========================================================= */
+const cloudGroup = new THREE.Group();
+scene.add(cloudGroup);
+
+(function buildClouds() {
+  const cloudMat = new THREE.MeshToonMaterial({ color: 0xf3f9ff, gradientMap: GRADIENT });
+  const puffGeo = new THREE.SphereGeometry(1, 12, 9);
+
+  for (let i = 0; i < 16; i++) {
+    const g = new THREE.Group();
+    const dir = randomDir();
+    placeAt(g, dir, R * 1.055 + Math.random() * 0.75);
+
+    const puffs = 3 + Math.floor(Math.random() * 4);
+    for (let p = 0; p < puffs; p++) {
+      const puff = new THREE.Mesh(puffGeo, cloudMat);
+      const sx = 0.45 + Math.random() * 0.85;
+      puff.position.set(
+        (Math.random() - 0.5) * 1.6,
+        (Math.random() - 0.2) * 0.3,
+        (Math.random() - 0.5) * 1.1
+      );
+      puff.scale.set(sx, sx * (0.42 + Math.random() * 0.22), sx);
+      g.add(puff);
+    }
+    g.rotateY(Math.random() * Math.PI * 2);
+    cloudGroup.add(g);
+  }
+})();
+
+/* =========================================================
+   汽车
+   ========================================================= */
+const carBodyGeo = new THREE.BoxGeometry(0.09, 0.055, 0.17);
+const carTopGeo = new THREE.BoxGeometry(0.075, 0.05, 0.085);
+const carColors = [0xff5a5a, 0xffd93d, 0x4dd2ff, 0xa06bff, 0x35e08a, 0xff9a3d];
+const cars = [];
+
+(function buildCars() {
+  const darkMat = new THREE.MeshToonMaterial({ color: 0x33405e, gradientMap: GRADIENT });
+  for (let i = 0; i < 7; i++) {
+    const g = new THREE.Group();
+    const mat = new THREE.MeshToonMaterial({ color: carColors[i % carColors.length], gradientMap: GRADIENT });
+
+    const body = new THREE.Mesh(carBodyGeo, mat);
+    body.position.y = 0.032;
+
+    const top = new THREE.Mesh(carTopGeo, darkMat);
+    top.position.set(0, 0.078, -0.012);
+
+    g.add(body, top);
+    scene.add(g);
+
+    cars.push({
+      mesh: g,
+      radius: 0.98 + (i % 2) * 0.16 + Math.random() * 0.05,
+      angle: Math.random() * Math.PI * 2,
+      speed: (0.45 + Math.random() * 0.35) * (i % 2 === 0 ? 1 : -1)
+    });
+  }
+})();
+
+const _tmpRight = new THREE.Vector3();
+const _tmpUp = new THREE.Vector3();
+const _tmpMat4 = new THREE.Matrix4();
+
+function updateCars(dt) {
+  for (const car of cars) {
+    car.angle += car.speed * dt;
+    const ang = car.angle;
+
+    const dir = cityDir.clone()
+      .addScaledVector(C_U, Math.cos(ang) * car.radius)
+      .addScaledVector(C_V, Math.sin(ang) * car.radius)
+      .normalize();
+
+    car.mesh.position.copy(dir).multiplyScalar(R + 0.005);
+
+    const ang2 = ang + Math.sign(car.speed) * 0.02;
+    const dir2 = cityDir.clone()
+      .addScaledVector(C_U, Math.cos(ang2) * car.radius)
+      .addScaledVector(C_V, Math.sin(ang2) * car.radius)
+      .normalize();
+
+    const fwd = dir2.sub(dir);
+    if (fwd.lengthSq() < 1e-9) continue;
+    fwd.normalize();
+
+    _tmpRight.crossVectors(dir, fwd).normalize();
+    _tmpUp.crossVectors(fwd, _tmpRight).normalize();
+    _tmpMat4.makeBasis(_tmpRight, _tmpUp, fwd);
+    car.mesh.quaternion.setFromRotationMatrix(_tmpMat4);
+  }
+}
+
+/* =========================================================
+   飞机
+   ========================================================= */
+const plane = new THREE.Group();
+let propeller = null;
+
+(function buildPlane() {
+  const whiteMat = new THREE.MeshToonMaterial({ color: 0xffffff, gradientMap: GRADIENT });
+  const redMat   = new THREE.MeshToonMaterial({ color: 0xff5a5a, gradientMap: GRADIENT });
+  const blueMat  = new THREE.MeshToonMaterial({ color: 0x3d6bd6, gradientMap: GRADIENT });
+  const darkMat  = new THREE.MeshToonMaterial({ color: 0x2a3550, gradientMap: GRADIENT });
+
+  // 机身（沿 +Z 为前方）
+  const bodyGeo = new THREE.CapsuleGeometry(0.085, 0.46, 4, 10);
+  bodyGeo.rotateX(Math.PI / 2);
+  const body = new THREE.Mesh(bodyGeo, whiteMat);
+  plane.add(body);
+
+  // 机翼
+  const wing = new THREE.Mesh(new THREE.BoxGeometry(1.05, 0.035, 0.20), redMat);
+  wing.position.set(0, -0.01, 0.03);
+  plane.add(wing);
+
+  // 尾翼
+  const fin = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.22, 0.16), blueMat);
+  fin.position.set(0, 0.11, -0.28);
+  plane.add(fin);
+
+  const stab = new THREE.Mesh(new THREE.BoxGeometry(0.40, 0.028, 0.11), redMat);
+  stab.position.set(0, 0.02, -0.28);
+  plane.add(stab);
+
+  // 驾驶舱
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.062, 10, 8), blueMat);
+  cockpit.position.set(0, 0.06, 0.08);
+  cockpit.scale.set(1, 0.8, 1.25);
+  plane.add(cockpit);
+
+  // 螺旋桨
+  propeller = new THREE.Mesh(new THREE.BoxGeometry(0.028, 0.24, 0.018), darkMat);
+  propeller.position.set(0, 0, 0.335);
+  plane.add(propeller);
+
+  scene.add(plane);
+})();
+
+// 飞行大圆路径
+const planeAxisA = cityDir.clone().normalize();
+const planeAxisB = new THREE.Vector3().crossVectors(planeAxisA, new THREE.Vector3(0.3, 1, 0.2)).normalize();
+
+const _pDir = new THREE.Vector3();
+const _pVel = new THREE.Vector3();
+
+function updatePlane(time, dt) {
+  const ang = time * 0.22;
+  const cosA = Math.cos(ang), sinA = Math.sin(ang);
+
+  _pDir.copy(planeAxisA).multiplyScalar(cosA).addScaledVector(planeAxisB, sinA).normalize();
+  plane.position.copy(_pDir).multiplyScalar(R + 2.1);
+
+  _pVel.copy(planeAxisA).multiplyScalar(-sinA).addScaledVector(planeAxisB, cosA).normalize();
+
+  _tmpRight.crossVectors(_pDir, _pVel).normalize();
+  _tmpUp.crossVectors(_pVel, _tmpRight).normalize();
+  _tmpMat4.makeBasis(_tmpRight, _tmpUp, _pVel);
+  plane.quaternion.setFromRotationMatrix(_tmpMat4);
+  plane.rotateZ(Math.sin(time * 0.9) * 0.12);
+
+  if (propeller) propeller.rotation.z += dt * 32;
+}
+
+/* =========================================================
+   动画循环
+   ========================================================= */
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+
+  cloudGroup.rotation.y += dt * 0.035;
+  updateCars(dt);
+  updatePlane(elapsed, dt);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* =========================================================
+   尺寸自适应
+   ========================================================= */
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+/* =========================================================
+   启动
+   ========================================================= */
+animate();
+
+const loadingEl = document.getElementById('loading');
+setTimeout(() => { loadingEl.classList.add('hide'); }, 120);
+setTimeout(() => { loadingEl.remove(); }, 900);
+</script>
+
+<script src="../prompt-panel.js" data-id="cartoon-planet-deepseek"></script>
+</body>
+</html>

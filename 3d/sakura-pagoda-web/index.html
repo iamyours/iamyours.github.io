@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>樱庭五重塔 · 体素微缩景观</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #1a1626;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      inset: 0;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+    /* 左上角固定返回按钮（半透明奶油色圆角小按钮样式） */
+    .back-btn {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 15px;
+      background: rgba(255, 248, 235, 0.84);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #4a3525;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: 0 4px 16px rgba(45, 25, 15, 0.14);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+    .back-btn:hover {
+      background: rgba(255, 252, 245, 0.96);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(45, 25, 15, 0.2);
+    }
+    .back-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 顶部右侧标题卡片 */
+    .title-card {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 90;
+      padding: 10px 16px;
+      background: rgba(255, 248, 238, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 6px 24px rgba(35, 20, 30, 0.14);
+      color: #3d2822;
+      text-align: right;
+      pointer-events: none;
+    }
+    .title-card h1 {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #8c2230;
+    }
+    .title-card p {
+      font-size: 11.5px;
+      color: #6b5248;
+      margin-top: 2px;
+    }
+
+    /* 底部交互控制栏 */
+    .control-bar {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255, 248, 238, 0.82);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      box-shadow: 0 8px 28px rgba(30, 15, 25, 0.18);
+      max-width: calc(100vw - 24px);
+    }
+    .ctrl-group {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ctrl-divider {
+      width: 1px;
+      height: 20px;
+      background: rgba(120, 85, 70, 0.22);
+      margin: 0 4px;
+    }
+    .ctrl-btn {
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 6px 12px;
+      border-radius: 999px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #543b30;
+      background: rgba(255, 255, 255, 0.55);
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .ctrl-btn:hover {
+      background: rgba(255, 255, 255, 0.92);
+      color: #9e2336;
+    }
+    .ctrl-btn.active {
+      background: #b8293d;
+      color: #fff9f5;
+      box-shadow: 0 2px 10px rgba(184, 41, 61, 0.38);
+    }
+
+    @media (max-width: 640px) {
+      .title-card {
+        top: 60px;
+        left: 16px;
+        right: auto;
+        text-align: left;
+        padding: 7px 12px;
+      }
+      .title-card h1 {
+        font-size: 14px;
+      }
+      .ctrl-divider {
+        display: none;
+      }
+      .control-bar {
+        bottom: 12px;
+        border-radius: 18px;
+        padding: 7px 9px;
+        gap: 6px;
+      }
+      .ctrl-btn {
+        padding: 5px 10px;
+        font-size: 11.5px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div class="title-card">
+    <h1>樱庭五重塔 · 体素庭院</h1>
+    <p id="voxel-stats">正在构筑体素世界…</p>
+  </div>
+
+  <div class="control-bar">
+    <div class="ctrl-group" id="time-group">
+      <button class="ctrl-btn active" data-mode="spring">🌸 春日晴空</button>
+      <button class="ctrl-btn" data-mode="sunset">🌇 落日余晖</button>
+      <button class="ctrl-btn" data-mode="night">🏮 月夜樱灯</button>
+    </div>
+    <div class="ctrl-divider"></div>
+    <div class="ctrl-group" id="cam-group">
+      <button class="ctrl-btn" data-cam="overview">全景</button>
+      <button class="ctrl-btn" data-cam="pagoda">仰望古塔</button>
+      <button class="ctrl-btn" data-cam="bridge">太鼓桥与锦鲤</button>
+      <button class="ctrl-btn" data-cam="tea">竹林茶席</button>
+      <button class="ctrl-btn active" id="btn-rotate">↻ 自动环绕</button>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ==========================================
+    // 1. 初始化场景、相机、渲染器
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      40,
+      window.innerWidth / window.innerHeight,
+      0.5,
+      400
+    );
+    camera.position.set(58, 44, 62);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 12, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.minDistance = 20;
+    controls.maxDistance = 150;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.55;
+
+    // ==========================================
+    // 2. 程序化生成天空穹顶 & 体素纹理贴图
+    // ==========================================
+    const skyGeo = new THREE.SphereGeometry(220, 32, 24);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        topColor: { value: new THREE.Color('#74b4f5') },
+        midColor: { value: new THREE.Color('#ffd6e4') },
+        bottomColor: { value: new THREE.Color('#fff2e2') }
+      },
+      vertexShader: `
+        varying vec3 vWorldPosition;
+        void main() {
+          vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPosition.xyz;
+          gl_Position = projectionMatrix * viewMatrix * worldPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 topColor;
+        uniform vec3 midColor;
+        uniform vec3 bottomColor;
+        varying vec3 vWorldPosition;
+        void main() {
+          float h = normalize(vWorldPosition).y;
+          vec3 col = mix(bottomColor, midColor, smoothstep(-0.15, 0.18, h));
+          col = mix(col, topColor, smoothstep(0.15, 0.75, h));
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `
+    });
+    const skyMesh = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyMesh);
+    scene.fog = new THREE.FogExp2('#ffe8ed', 0.0042);
+
+    // 程序化生成体素微边框+质感贴图（让每个体素颗粒分明、富有立体触感）
+    function createVoxelBevelTexture() {
+      const size = 128;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+
+      // 基底纯白
+      ctx.fillStyle = '#f8f8f8';
+      ctx.fillRect(0, 0, size, size);
+
+      // 中心微暖渐变高光
+      const grad = ctx.createRadialGradient(size * 0.5, size * 0.5, size * 0.08, size * 0.5, size * 0.5, size * 0.68);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#eae6e3');
+      ctx.fillStyle = grad;
+      ctx.fillRect(6, 6, size - 12, size - 12);
+
+      // 细腻杂色颗粒
+      for (let i = 0; i < 450; i++) {
+        const x = Math.random() * size;
+        const y = Math.random() * size;
+        const a = Math.random() * 0.035;
+        ctx.fillStyle = Math.random() > 0.5 ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`;
+        ctx.fillRect(x, y, 2, 2);
+      }
+
+      // 体素边缘高光与暗角立体线
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.lineWidth = 4;
+      ctx.strokeRect(4, 4, size - 8, size - 8);
+
+      ctx.strokeStyle = 'rgba(35, 25, 30, 0.18)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1.5, 1.5, size - 3, size - 3);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      tex.anisotropy = 4;
+      return tex;
+    }
+
+    const voxelTexture = createVoxelBevelTexture();
+
+    // ==========================================
+    // 3. 灯光系统
+    // ==========================================
+    const ambientLight = new THREE.HemisphereLight('#fff4f8', '#685060', 0.95);
+    scene.add(ambientLight);
+
+    const sunLight = new THREE.DirectionalLight('#fff2df', 2.2);
+    sunLight.position.set(55, 78, 45);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 190;
+    const d = 48;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    const fillLight = new THREE.DirectionalLight('#ffb8d2', 0.55);
+    fillLight.position.set(-48, 30, -40);
+    scene.add(fillLight);
+
+    // 庭院与古塔暖光点光源组
+    const lanternPointLights = [];
+    function addWarmLight(x, y, z, intensity = 1.8, distance = 18) {
+      const pl = new THREE.PointLight('#ff9c42', intensity, distance, 1.6);
+      pl.position.set(x, y, z);
+      scene.add(pl);
+      lanternPointLights.push({ light: pl, baseIntensity: intensity, phase: Math.random() * Math.PI * 2 });
+    }
+
+    // ==========================================
+    // 4. 体素收集器与调色板
+    // ==========================================
+    // 用 Map 去重，避免任何重叠体素并提升性能
+    const solidVoxels = new Map();
+    const emissiveVoxels = new Map();
+    const waterVoxels = new Map();
+
+    // 确定性伪随机函数
+    function hash3(x, y, z) {
+      let n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453123;
+      return n - Math.floor(n);
+    }
+
+    function noise2D(x, z) {
+      const xi = Math.floor(x);
+      const zi = Math.floor(z);
+      const xf = x - xi;
+      const zf = z - zi;
+      const u = xf * xf * (3 - 2 * xf);
+      const v = zf * zf * (3 - 2 * zf);
+      const a = hash3(xi, 0, zi);
+      const b = hash3(xi + 1, 0, zi);
+      const c = hash3(xi, 0, zi + 1);
+      const d = hash3(xi + 1, 0, zi + 1);
+      return (a * (1 - u) + b * u) * (1 - v) + (c * (1 - u) + d * u) * v;
+    }
+
+    const tempColor = new THREE.Color();
+    function varyColor(hex, variance = 0.03, seed = 0.5) {
+      tempColor.set(hex);
+      const delta = (seed - 0.5) * 2 * variance;
+      tempColor.offsetHSL(delta * 0.25, delta * 0.4, delta);
+      return tempColor.getHex();
+    }
+
+    function setVoxel(x, y, z, hexColor, type = 'solid', variance = 0.035) {
+      const ix = Math.round(x);
+      const iy = Math.round(y);
+      const iz = Math.round(z);
+      const key = `${ix},${iy},${iz}`;
+      const seed = hash3(ix, iy, iz);
+      const col = variance > 0 ? varyColor(hexColor, variance, seed) : new THREE.Color(hexColor).getHex();
+
+      if (type === 'emissive') {
+        solidVoxels.delete(key);
+        waterVoxels.delete(key);
+        emissiveVoxels.set(key, { x: ix, y: iy, z: iz, color: col });
+      } else if (type === 'water') {
+        if (!solidVoxels.has(key) && !emissiveVoxels.has(key)) {
+          waterVoxels.set(key, { x: ix, y: iy, z: iz, color: col });
+        }
+      } else {
+        waterVoxels.delete(key);
+        emissiveVoxels.delete(key);
+        solidVoxels.set(key, { x: ix, y: iy, z: iz, color: col });
+      }
+    }
+
+    function removeVoxel(x, y, z) {
+      const key = `${Math.round(x)},${Math.round(y)},${Math.round(z)}`;
+      solidVoxels.delete(key);
+      emissiveVoxels.delete(key);
+      waterVoxels.delete(key);
+    }
+
+    function fillBox(x1, y1, z1, x2, y2, z2, hexColor, type = 'solid', variance = 0.035) {
+      const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+      const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+      const minZ = Math.min(z1, z2), maxZ = Math.max(z1, z2);
+      for (let x = minX; x <= maxX; x++) {
+        for (let y = minY; y <= maxY; y++) {
+          for (let z = minZ; z <= maxZ; z++) {
+            setVoxel(x, y, z, hexColor, type, variance);
+          }
+        }
+      }
+    }
+
+    // 丰富调色板
+    const PALETTE = {
+      grass: ['#6db85b', '#7ec868', '#5da64e', '#8cd472', '#64b054'],
+      moss: ['#4a8542', '#3d7238', '#5b994e'],
+      rock: ['#6c6975', '#5a5763', '#7d7a87', '#4b4852'],
+      earth: ['#6e4e3e', '#593e30', '#7d5a47'],
+      stoneBase: ['#b8b4bd', '#a39fa8', '#cbc7d0', '#8f8b94'],
+      darkTile: ['#2b2d3c', '#353849', '#222430', '#3f4356'],
+      vermilion: ['#d1342f', '#e03e38', '#ba2b27'],
+      darkWood: ['#47281e', '#381f17', '#593327'],
+      warmWood: ['#8c5336', '#9e6040', '#78452b'],
+      plasterWhite: ['#fbf7f0', '#f2ece1', '#fffdf9'],
+      gold: ['#f5c242', '#ffcf54', '#e0ab2b'],
+      sakura: ['#ffb7c5', '#ff9ebb', '#ffd1dc', '#ff82a9', '#fff0f5', '#f7a1c4'],
+      bamboo: ['#54a847', '#68bd59', '#3f8c35'],
+      water: ['#38b6d9', '#4cc6e8', '#2da1c4', '#66d6f2'],
+      waterFoam: ['#e8fbff', '#ffffff', '#c7f4ff'],
+      lanternGlow: ['#ffdf78', '#ffbe4f', '#fff3b8']
+    };
+
+    function pick(arr, x, y, z) {
+      const idx = Math.floor(hash3(x, y, z) * arr.length);
+      return arr[Math.min(idx, arr.length - 1)];
+    }
+
+    // ==========================================
+    // 5. 构建浮空微缩庭院岛屿、河道与瀑布
+    // ==========================================
+    const ISLAND_RADIUS = 34;
+
+    // 计算蜿蜒锦鲤河道的中心 X 坐标（随 Z 变化）
+    function getRiverCenterX(z) {
+      return 7.5 + Math.sin(z * 0.11) * 5.5 + Math.cos(z * 0.06) * 2.5;
+    }
+
+    function getRiverWidth(z) {
+      // 在东南侧加宽成锦鲤池塘
+      if (z > -4 && z < 14) {
+        return 5.2 + Math.sin((z + 4) * 0.17) * 2.2;
+      }
+      return 3.8 + Math.sin(z * 0.15) * 0.8;
+    }
+
+    function buildFloatingIslandAndRiver() {
+      for (let x = -ISLAND_RADIUS; x <= ISLAND_RADIUS; x++) {
+        for (let z = -ISLAND_RADIUS; z <= ISLAND_RADIUS; z++) {
+          const angle = Math.atan2(z, x);
+          const edgeNoise = noise2D(x * 0.12 + 10, z * 0.12 + 10) * 4.5 + Math.sin(angle * 5) * 1.6;
+          const dist = Math.hypot(x, z);
+          const maxR = ISLAND_RADIUS - 2 + edgeNoise;
+
+          if (dist > maxR) continue;
+
+          // 底部倒锥形岩壁深浅
+          const normalizedDist = dist / maxR;
+          const bottomDepth = -Math.floor((1 - Math.pow(normalizedDist, 1.85)) * 15 + noise2D(x * 0.22, z * 0.22) * 4.5) - 2;
+
+          // 地表高度：西北部（五重塔区域）抬高为双层庭院台地
+          let surfaceY = 0;
+          const distToPagoda = Math.hypot(x + 9, z + 8);
+          if (distToPagoda < 18) {
+            surfaceY = 1;
+          }
+          // 后方假山隆起
+          const distToHill = Math.hypot(x - 14, z + 18);
+          if (distToHill < 11) {
+            surfaceY = Math.max(surfaceY, Math.floor((1 - distToHill / 11) * 7 + noise2D(x * 0.3, z * 0.3) * 2));
+          }
+
+          // 判断是否在锦鲤河道内
+          const rCenterX = getRiverCenterX(z);
+          const rWidth = getRiverWidth(z);
+          const distToRiver = Math.abs(x - rCenterX);
+
+          const isRiver = distToRiver < rWidth && z > -26;
+          const isRiverBank = !isRiver && distToRiver < rWidth + 1.6 && z > -27;
+
+          if (isRiver) {
+            const riverBedY = -3;
+            for (let y = bottomDepth; y <= riverBedY; y++) {
+              const col = y === riverBedY ? pick(PALETTE.stoneBase, x, y, z) : pick(PALETTE.rock, x, y, z);
+              setVoxel(x, y, z, col);
+            }
+            // 填充水体（高度 -2 到 -1）
+            for (let wy = -2; wy <= -1; wy++) {
+              const isWaterfallEdge = z >= maxR - 2.2;
+              const wCol = isWaterfallEdge ? pick(PALETTE.waterFoam, x, wy, z) : pick(PALETTE.water, x, wy, z);
+              setVoxel(x, wy, z, wCol, 'water', 0.02);
+            }
+          } else {
+            const topY = isRiverBank ? 0 : surfaceY;
+            for (let y = bottomDepth; y <= topY; y++) {
+              if (y === topY) {
+                if (isRiverBank && hash3(x, y, z) > 0.35) {
+                  setVoxel(x, y, z, pick(PALETTE.stoneBase, x, y, z));
+                } else {
+                  setVoxel(x, y, z, pick(PALETTE.grass, x, y, z));
+                }
+              } else if (y >= topY - 2) {
+                setVoxel(x, y, z, pick(PALETTE.earth, x, y, z));
+              } else {
+                setVoxel(x, y, z, pick(PALETTE.rock, x, y, z));
+              }
+            }
+
+            // 地表散落樱花花瓣与春花
+            if (!isRiverBank && topY <= 2) {
+              const r = hash3(x, 99, z);
+              if (r < 0.045) {
+                // 散落草地的樱花瓣
+                setVoxel(x, topY + 1, z, pick(PALETTE.sakura, x, 1, z));
+              } else if (r > 0.975) {
+                // 庭院小野花
+                const flowerCols = ['#ffe359', '#d28cff', '#ff7eb6', '#ffffff'];
+                setVoxel(x, topY + 1, z, pick(flowerCols, x, 2, z));
+              }
+            }
+          }
+
+          // 岛屿边缘垂挂藤蔓与青苔
+          if (dist > maxR - 1.6 && hash3(x, 12, z) > 0.45) {
+            const vineLen = Math.floor(hash3(x, 33, z) * 5) + 2;
+            for (let vy = 0; vy > -vineLen; vy--) {
+              setVoxel(x, vy, z, pick(PALETTE.moss, x, vy, z));
+            }
+          }
+        }
+      }
+
+      // 构建假山源头与岛屿边缘飞流瀑布
+      // 1) 假山泉眼小瀑布（x=13..16, z=-22..-17）
+      for (let z = -22; z <= -18; z++) {
+        for (let x = 11; x <= 14; x++) {
+          const h = Math.max(0, Math.floor((-18 - z) * 1.3));
+          for (let y = -1; y <= h; y++) {
+            setVoxel(x, y, z, y === h ? pick(PALETTE.waterFoam, x, y, z) : pick(PALETTE.water, x, y, z), 'water', 0.02);
+          }
+        }
+      }
+
+      // 2) 南侧悬崖边缘垂落瀑布与水雾泡沫
+      for (let x = 8; x <= 14; x++) {
+        for (let z = 25; z <= 32; z++) {
+          const rCenterX = getRiverCenterX(z);
+          if (Math.abs(x - rCenterX) < 3.6) {
+            const keyCheck = `${x},-2,${z}`;
+            const nextKey = `${x},-2,${z + 1}`;
+            if (waterVoxels.has(keyCheck) && !waterVoxels.has(nextKey) && !solidVoxels.has(nextKey)) {
+              // 悬崖边缘向下倾泻的瀑布水流
+              const dropLen = 11 + Math.floor(hash3(x, 0, z) * 4);
+              for (let dy = -1; dy >= -dropLen; dy--) {
+                const isFoam = dy === -1 || dy <= -dropLen + 2 || hash3(x, dy, z) > 0.65;
+                setVoxel(x, dy, z + 1, isFoam ? '#effdff' : '#4cc6e8', 'water', 0.02);
+              }
+            }
+          }
+        }
+      }
+
+      // 池塘睡莲与粉荷花
+      const lotusSpots = [
+        [8, 2], [11, 5], [13, 0], [9, 9], [14, 7], [6, -6], [10, -11]
+      ];
+      for (const [lx, lz] of lotusSpots) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            if (Math.abs(dx) + Math.abs(dz) <= 1 && !(dx === 1 && dz === 0)) {
+              setVoxel(lx + dx, -1, lz + dz, '#499e4c');
+            }
+          }
+        }
+        setVoxel(lx, 0, lz, '#ff85b3');
+      }
+
+      // 河面漂浮祈福水灯 (Tōrō Nagashi)
+      const waterLanterns = [
+        [10, 3], [12, 8], [8, -3], [9, -14], [11, 14]
+      ];
+      for (const [wx, wz] of waterLanterns) {
+        setVoxel(wx, -1, wz, '#593327');
+        setVoxel(wx, 0, wz, '#ffdf78', 'emissive', 0.01);
+      }
+    }
+
+    // ==========================================
+    // 6. 构建宏伟的五重塔 (Gojū-no-tō)
+    // ==========================================
+    const PAGODA_X = -10;
+    const PAGODA_Z = -8;
+    const PAGODA_BASE_Y = 2;
+
+    // 建造单层传统飞檐翘角屋顶
+    function buildPagodaRoof(cx, baseY, cz, wallRadius, overhang) {
+      const outerR = wallRadius + overhang;
+
+      // 屋檐底部朱红与描金斗拱椽木 (Taruki)
+      for (let x = -wallRadius - 2; x <= wallRadius + 2; x++) {
+        for (let z = -wallRadius - 2; z <= wallRadius + 2; z++) {
+          const maxCheb = Math.max(Math.abs(x), Math.abs(z));
+          if (maxCheb >= wallRadius && maxCheb <= wallRadius + 2) {
+            const isGold = (x + z) % 2 === 0 && maxCheb === wallRadius + 2;
+            setVoxel(cx + x, baseY, cz + z, isGold ? pick(PALETTE.gold, x, baseY, z) : pick(PALETTE.vermilion, x, baseY, z));
+          }
+        }
+      }
+
+      // 四面坡瓦屋顶 + 四角飞檐微翘
+      const roofHeight = 4;
+      for (let ry = 0; ry < roofHeight; ry++) {
+        const curR = outerR - ry * 1.25;
+        const rInt = Math.ceil(curR);
+        for (let x = -rInt - 1; x <= rInt + 1; x++) {
+          for (let z = -rInt - 1; z <= rInt + 1; z++) {
+            const ax = Math.abs(x);
+            const az = Math.abs(z);
+            const maxD = Math.max(ax, az);
+            const minD = Math.min(ax, az);
+
+            if (maxD <= curR) {
+              // 四角飞檐翘起计算
+              const cornerFactor = (ax > curR - 2.2 && az > curR - 2.2) ? 1 : 0;
+              const yOffset = (ry === 0 && cornerFactor) ? 1 : 0;
+              const vx = cx + x;
+              const vy = baseY + 1 + ry + yOffset;
+              const vz = cz + z;
+
+              // 对角线屋脊装饰与瓦垄纹理
+              const isDiagonalRidge = Math.abs(ax - az) <= 1 && maxD >= wallRadius - 1;
+              const isEdge = maxD >= curR - 0.9;
+
+              if (isDiagonalRidge && ax === az && maxD >= curR - 1.2) {
+                // 飞檐金饰
+                setVoxel(vx, vy, vz, pick(PALETTE.gold, vx, vy, vz));
+              } else if (isDiagonalRidge) {
+                setVoxel(vx, vy, vz, '#474b61');
+              } else if (isEdge && (minD % 2 === 0)) {
+                // 瓦当滴水纹
+                setVoxel(vx, vy, vz, '#3d4154');
+              } else {
+                // 瓦垄深浅交替
+                const tileCol = (minD % 2 === 0) ? '#272938' : '#333647';
+                setVoxel(vx, vy, vz, tileCol);
+              }
+            }
+          }
+        }
+      }
+
+      // 四角悬挂金色风铃 (Fūrin)
+      const cornerPos = Math.round(outerR);
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const fx = cx + sx * cornerPos;
+          const fz = cz + sz * cornerPos;
+          setVoxel(fx, baseY + 2, fz, pick(PALETTE.gold, fx, baseY, fz));
+          setVoxel(fx, baseY, fz, '#ffdf78', 'emissive', 0.01);
+        }
+      }
+    }
+
+    function buildFiveStoryPagoda() {
+      const cx = PAGODA_X;
+      const cz = PAGODA_Z;
+      let curY = PAGODA_BASE_Y;
+
+      // 1. 石造基坛 (Kidan)
+      const baseR = 11;
+      for (let x = -baseR; x <= baseR; x++) {
+        for (let z = -baseR; z <= baseR; z++) {
+          for (let y = 0; y <= curY + 2; y++) {
+            const isBorder = Math.abs(x) === baseR || Math.abs(z) === baseR;
+            const isTopEdge = y === curY + 2 && isBorder;
+            if (isTopEdge) {
+              setVoxel(cx + x, y, cz + z, '#5a5763');
+            } else if (isBorder) {
+              setVoxel(cx + x, y, cz + z, (x + z) % 3 === 0 ? '#7d7a87' : '#aba7b3');
+            } else {
+              setVoxel(cx + x, y, cz + z, pick(PALETTE.stoneBase, x, y, z));
+            }
+          }
+        }
+      }
+
+      // 正面（东侧与南侧）石阶
+      for (let step = 0; step < 4; step++) {
+        const sy = curY + 2 - step;
+        // 东侧台阶 (朝向太鼓桥方向 +X)
+        for (let z = -2; z <= 2; z++) {
+          setVoxel(cx + baseR + 1 + step, sy, cz + z, '#b8b4bd');
+          if (Math.abs(z) === 2) {
+            setVoxel(cx + baseR + 1 + step, sy + 1, cz + z, '#6c6975');
+          }
+        }
+        // 南侧台阶 (+Z)
+        for (let x = -2; x <= 2; x++) {
+          setVoxel(cx + x, sy, cz + baseR + 1 + step, '#b8b4bd');
+          if (Math.abs(x) === 2) {
+            setVoxel(cx + x, sy + 1, cz + baseR + 1 + step, '#6c6975');
+          }
+        }
+      }
+
+      curY += 3;
+
+      // 首层外围朱红回廊栏杆
+      const railR = 9;
+      for (let i = -railR; i <= railR; i++) {
+        // 留出东、南台阶入口
+        const skipEast = Math.abs(i) <= 1;
+        const skipSouth = Math.abs(i) <= 1;
+
+        if (!skipSouth) {
+          setVoxel(cx + i, curY, cz + railR, '#d1342f');
+          if (i % 3 === 0) setVoxel(cx + i, curY + 1, cz + railR, '#f5c242');
+        }
+        setVoxel(cx + i, curY, cz - railR, '#d1342f');
+        if (i % 3 === 0) setVoxel(cx + i, curY + 1, cz - railR, '#f5c242');
+
+        if (!skipEast) {
+          setVoxel(cx + railR, curY, cz + i, '#d1342f');
+          if (i % 3 === 0) setVoxel(cx + railR, curY + 1, cz + i, '#f5c242');
+        }
+        setVoxel(cx - railR, curY, cz + i, '#d1342f');
+        if (i % 3 === 0) setVoxel(cx - railR, curY + 1, cz + i, '#f5c242');
+      }
+
+      // 2. 逐层建造五重塔身与飞檐
+      const tiers = [
+        { wallR: 7, wallH: 5, overhang: 5 },
+        { wallR: 6, wallH: 4, overhang: 4.5 },
+        { wallR: 5, wallH: 4, overhang: 4 },
+        { wallR: 4, wallH: 4, overhang: 3.5 },
+        { wallR: 3, wallH: 4, overhang: 3.2 }
+      ];
+
+      for (let t = 0; t < tiers.length; t++) {
+        const { wallR, wallH, overhang } = tiers[t];
+
+        // 每一层高于首层的朱红平座栏杆 (Balcony)
+        if (t > 0) {
+          const balR = wallR + 1;
+          for (let i = -balR; i <= balR; i++) {
+            setVoxel(cx + i, curY, cz + balR, '#d1342f');
+            setVoxel(cx + i, curY, cz - balR, '#d1342f');
+            setVoxel(cx + balR, curY, cz + i, '#d1342f');
+            setVoxel(cx - balR, curY, cz + i, '#d1342f');
+          }
+          for (const sx of [-1, 1]) {
+            for (const sz of [-1, 1]) {
+              setVoxel(cx + sx * balR, curY + 1, cz + sz * balR, '#f5c242');
+            }
+          }
+        }
+
+        // 墙体、朱红柱与发光障子窗
+        for (let wy = 0; wy < wallH; wy++) {
+          const y = curY + wy;
+          for (let x = -wallR; x <= wallR; x++) {
+            for (let z = -wallR; z <= wallR; z++) {
+              const ax = Math.abs(x);
+              const az = Math.abs(z);
+              if (Math.max(ax, az) !== wallR) continue;
+
+              const isCorner = ax === wallR && az === wallR;
+              const isPillar = (ax % 3 === 0 && az === wallR) || (az % 3 === 0 && ax === wallR);
+              const isBeam = wy === 0 || wy === wallH - 1;
+              const isCenterDoor = (Math.min(ax, az) <= 1) && wy >= 1 && wy <= wallH - 2;
+              const isSideWindow = (Math.min(ax, az) === 2 || Math.min(ax, az) === 4) && wy >= 1 && wy <= wallH - 2 && wallR >= 5;
+
+              if (isCorner || isPillar || isBeam) {
+                setVoxel(cx + x, y, cz + z, pick(PALETTE.vermilion, cx + x, y, cz + z));
+              } else if (isCenterDoor || isSideWindow) {
+                // 温暖发光的和纸格栅窗
+                setVoxel(cx + x, y, cz + z, pick(PALETTE.lanternGlow, cx + x, y, cz + z), 'emissive', 0.02);
+              } else {
+                setVoxel(cx + x, y, cz + z, pick(PALETTE.plasterWhite, cx + x, y, cz + z));
+              }
+            }
+          }
+        }
+
+        // 为首层与三层、五层内部添加温暖光源
+        if (t === 0 || t === 2 || t === 4) {
+          addWarmLight(cx, curY + 2, cz, 1.5, 16);
+        }
+
+        curY += wallH;
+        buildPagodaRoof(cx, curY, cz, wallR, overhang);
+        curY += 4;
+      }
+
+      // 3. 塔顶黄金相轮 (Sōrin) 刹柱与九轮宝珠
+      // 露盘 (Roban) 与伏钵
+      fillBox(cx - 2, curY, cz - 2, cx + 2, curY + 1, cz + 2, '#353849');
+      fillBox(cx - 1, curY + 2, cz - 1, cx + 1, curY + 3, cz + 1, '#f5c242');
+
+      // 九轮黄金环与刹竿
+      const spireH = 12;
+      for (let sy = 4; sy < 4 + spireH; sy++) {
+        const y = curY + sy;
+        setVoxel(cx, y, cz, '#ffcf54');
+        if (sy % 2 === 0 && sy <= 12) {
+          setVoxel(cx + 1, y, cz, '#e0ab2b');
+          setVoxel(cx - 1, y, cz, '#e0ab2b');
+          setVoxel(cx, y, cz + 1, '#e0ab2b');
+          setVoxel(cx, y, cz - 1, '#e0ab2b');
+        }
+      }
+      // 顶部水烟与发光摩尼宝珠
+      const topY = curY + 4 + spireH;
+      setVoxel(cx, topY, cz, '#fff3b8', 'emissive', 0.01);
+      setVoxel(cx, topY + 1, cz, '#ffdf78', 'emissive', 0.01);
+    }
+
+    // ==========================================
+    // 7. 构建太鼓桥 (Taiko Bridge)、朱红鸟居、石灯笼与竹林茶席
+    // ==========================================
+    function buildTaikoBridge() {
+      // 横跨河道的朱红拱桥：连接西岸五重塔步道与东岸鸟居入口
+      const bridgeZ = 4;
+      const startX = 2;
+      const endX = 18;
+      const midX = (startX + endX) / 2;
+      const halfSpan = (endX - startX) / 2;
+
+      for (let x = startX; x <= endX; x++) {
+        const norm = (x - midX) / halfSpan;
+        const archY = Math.round((1 - norm * norm) * 4.2);
+
+        for (let z = bridgeZ - 2; z <= bridgeZ + 2; z++) {
+          const isRail = Math.abs(z - bridgeZ) === 2;
+          // 桥底深色木拱梁
+          setVoxel(x, archY - 1, z, pick(PALETTE.darkWood, x, archY, z));
+
+          if (!isRail) {
+            // 桥面木板
+            const plankCol = x % 2 === 0 ? '#8c5336' : '#78452b';
+            setVoxel(x, archY, z, plankCol);
+          } else {
+            // 朱红桥栏
+            setVoxel(x, archY, z, '#d1342f');
+            setVoxel(x, archY + 1, z, '#e03e38');
+            // 栏杆立柱与拟宝珠金顶 (Giboshi)
+            if (x === startX || x === endX || x === midX || (x - startX) % 4 === 0) {
+              setVoxel(x, archY + 2, z, '#d1342f');
+              setVoxel(x, archY + 3, z, '#f5c242');
+            }
+          }
+        }
+      }
+
+      // 水中桥墩
+      for (const px of [startX + 2, endX - 2]) {
+        for (const pz of [bridgeZ - 2, bridgeZ + 2]) {
+          for (let y = -3; y <= 1; y++) {
+            setVoxel(px, y, pz, '#47281e');
+          }
+        }
+      }
+    }
+
+    function buildToriiGate(cx, baseY, cz) {
+      // 朝向东侧入口的经典明神鸟居
+      const pillarZ1 = cz - 4;
+      const pillarZ2 = cz + 4;
+      const height = 11;
+
+      // 黑色柱础 (Kamebara)
+      fillBox(cx - 1, baseY, pillarZ1 - 1, cx + 1, baseY + 1, pillarZ1 + 1, '#2b2d3c');
+      fillBox(cx - 1, baseY, pillarZ2 - 1, cx + 1, baseY + 1, pillarZ2 + 1, '#2b2d3c');
+
+      // 双侧朱红立柱
+      for (let y = baseY + 2; y <= baseY + height; y++) {
+        setVoxel(cx, y, pillarZ1, '#d1342f');
+        setVoxel(cx, y, pillarZ2, '#d1342f');
+      }
+
+      // 贯木 (Nuki)
+      const nukiY = baseY + height - 2;
+      for (let z = pillarZ1 - 2; z <= pillarZ2 + 2; z++) {
+        setVoxel(cx, nukiY, z, '#d1342f');
+      }
+
+      // 岛木与笠木 (Kasagi - 微翘顶梁)
+      const topY = baseY + height;
+      for (let z = pillarZ1 - 3; z <= pillarZ2 + 3; z++) {
+        const wingLift = Math.abs(z - cz) >= 6 ? 1 : 0;
+        setVoxel(cx, topY + wingLift, z, '#d1342f');
+        for (let dx = -1; dx <= 1; dx++) {
+          setVoxel(cx + dx, topY + 1 + wingLift, z, '#2b2d3c');
+        }
+      }
+
+      // 中央额束与金色匾额 (Gakuzuka)
+      setVoxel(cx, nukiY + 1, cz, '#d1342f');
+      setVoxel(cx, nukiY + 1, cz - 1, '#2b2d3c');
+      setVoxel(cx, nukiY + 1, cz + 1, '#2b2d3c');
+      setVoxel(cx + 1, nukiY + 1, cz, '#f5c242');
+    }
+
+    function buildStoneLantern(x, baseY, z, withPointLight = false) {
+      // 传统石灯笼 (Ishi-dōrō)
+      fillBox(x - 1, baseY, z - 1, x + 1, baseY, z + 1, '#8f8b94');
+      setVoxel(x, baseY + 1, z, '#a39fa8');
+      setVoxel(x, baseY + 2, z, '#b8b4bd');
+      // 火袋（发光体素）
+      setVoxel(x, baseY + 3, z, '#ffdf78', 'emissive', 0.01);
+      // 笠（伞盖）
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          setVoxel(x + dx, baseY + 4, z + dz, '#7d7a87');
+        }
+      }
+      setVoxel(x, baseY + 5, z, '#a39fa8');
+
+      if (withPointLight) {
+        addWarmLight(x, baseY + 3.5, z, 1.4, 14);
+      }
+    }
+
+    function buildSteppingStonesAndTeaCorner() {
+      // 从东侧鸟居 (25, 4) 经太鼓桥通往五重塔的石板路
+      const pathPoints = [
+        [24, 4], [22, 4], [20, 4],
+        [0, 4], [-2, 4], [-5, 4], [-8, 4], [-10, 5]
+      ];
+      for (const [px, pz] of pathPoints) {
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            if (Math.abs(dx) + Math.abs(dz) <= 1) {
+              const py = Math.hypot(px + 9, pz + 8) < 18 ? 1 : 0;
+              setVoxel(px + dx, py, pz + dz, pick(PALETTE.stoneBase, px + dx, py, pz + dz));
+            }
+          }
+        }
+      }
+
+      // 布置庭院石灯笼
+      buildStoneLantern(21, 1, 0, true);
+      buildStoneLantern(21, 1, 8, false);
+      buildStoneLantern(0, 1, 0, false);
+      buildStoneLantern(0, 1, 8, true);
+      buildStoneLantern(-2, 2, -2, true);
+      buildStoneLantern(-10, 2, 8, false);
+      buildStoneLantern(-18, 2, 4, true);
+
+      // 东侧朱红迎宾鸟居
+      buildToriiGate(25, 1, 4);
+
+      // 西南角野点茶席（红毡长椅、抹茶茶碗与和伞）
+      const teaX = -15, teaZ = 14, teaY = 1;
+      // 红色毛毡茶席长凳 (shōgi)
+      fillBox(teaX - 2, teaY, teaZ - 1, teaX + 2, teaY, teaZ + 1, '#381f17');
+      fillBox(teaX - 2, teaY + 1, teaZ - 1, teaX + 2, teaY + 1, teaZ + 1, '#d1342f');
+      // 托盘与抹茶碗、三色团子
+      setVoxel(teaX, teaY + 2, teaZ, '#54a847'); // 抹茶碗
+      setVoxel(teaX + 1, teaY + 2, teaZ, '#ffb7c5'); // 樱色和果子
+
+      // 大型朱红和伞 (Nodate-gasa)
+      const umbX = teaX - 2, umbZ = teaZ - 2;
+      for (let y = teaY; y <= teaY + 7; y++) {
+        setVoxel(umbX, y, umbZ, '#593327');
+      }
+      for (let dx = -4; dx <= 4; dx++) {
+        for (let dz = -4; dz <= 4; dz++) {
+          const r = Math.hypot(dx, dz);
+          if (r <= 4.3) {
+            const drop = r > 2.6 ? 0 : 1;
+            const col = Math.abs(dx) <= 1 || Math.abs(dz) <= 1 ? '#fbf7f0' : '#d1342f';
+            setVoxel(umbX + dx, teaY + 6 + drop, umbZ + dz, col);
+          }
+        }
+      }
+
+      // 北侧翠竹林 (Bamboo Grove)
+      const bambooSpots = [
+        [-22, -16, 14], [-24, -14, 17], [-20, -19, 15], [-25, -18, 19],
+        [-18, -22, 13], [-22, -21, 16], [-15, -24, 15], [-26, -11, 14],
+        [4, -22, 14], [7, -24, 16], [2, -25, 13]
+      ];
+      for (const [bx, bz, bh] of bambooSpots) {
+        for (let y = 1; y <= bh; y++) {
+          const isNode = y % 3 === 0;
+          setVoxel(bx, y, bz, isNode ? '#327329' : pick(PALETTE.bamboo, bx, y, bz));
+          // 竹叶簇
+          if (y > bh - 5 && y % 2 === 0) {
+            for (let lx = -2; lx <= 2; lx++) {
+              for (let lz = -2; lz <= 2; lz++) {
+                if (Math.abs(lx) + Math.abs(lz) <= 2 && hash3(bx + lx, y, bz + lz) > 0.35) {
+                  setVoxel(bx + lx, y, bz + lz, '#68bd59');
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ==========================================
+    // 8. 构建繁花盛开的樱花树群 (Sakura Trees)
+    // ==========================================
+    const canopyCenters = []; // 记录树冠中心用于生成飘落花瓣
+
+    function buildSakuraBranch(x0, y0, z0, x1, y1, z1, thickness = 1) {
+      const steps = Math.ceil(Math.hypot(x1 - x0, y1 - y0, z1 - z0) * 2);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        // 加入自然弯曲弧度
+        const curve = Math.sin(t * Math.PI) * 1.1;
+        const cx = x0 + (x1 - x0) * t + curve * 0.4;
+        const cy = y0 + (y1 - y0) * t + curve * 0.5;
+        const cz = z0 + (z1 - z0) * t;
+        for (let dx = -thickness; dx <= thickness; dx++) {
+          for (let dy = -thickness; dy <= thickness; dy++) {
+            for (let dz = -thickness; dz <= thickness; dz++) {
+              if (dx * dx + dy * dy + dz * dz <= thickness * thickness + 0.5) {
+                setVoxel(cx + dx, cy + dy, cz + dz, pick(PALETTE.darkWood, cx + dx, cy + dy, cz + dz));
+              }
+            }
+          }
+        }
+      }
+    }
+
+    function buildSakuraCanopyCluster(cx, cy, cz, rx, ry, rz) {
+      canopyCenters.push({ x: cx, y: cy, z: cz, r: rx });
+      for (let x = -rx - 1; x <= rx + 1; x++) {
+        for (let y = -ry - 1; y <= ry + 1; y++) {
+          for (let z = -rz - 1; z <= rz + 1; z++) {
+            const nx = x / rx;
+            const ny = y / ry;
+            const nz = z / rz;
+            const d = nx * nx + ny * ny + nz * nz;
+            const n = hash3(cx + x, cy + y, cz + z);
+            if (d <= 0.85 + n * 0.38) {
+              // 顶部受光偏粉白，下部偏深樱红
+              const isTop = y >= ry * 0.35;
+              const col = isTop
+                ? (n > 0.45 ? '#fff0f5' : '#ffd1dc')
+                : pick(PALETTE.sakura, cx + x, cy + y, cz + z);
+              setVoxel(cx + x, cy + y, cz + z, col, 'solid', 0.03);
+            }
+          }
+        }
+      }
+
+      // 垂挂的樱花花枝流苏 (Shidare-zakura tendrils)
+      for (let x = -rx + 1; x <= rx - 1; x += 2) {
+        for (let z = -rz + 1; z <= rz - 1; z += 2) {
+          if (hash3(cx + x, 77, cz + z) > 0.58 && (x * x) / (rx * rx) + (z * z) / (rz * rz) < 0.8) {
+            const hangLen = 2 + Math.floor(hash3(cx + x, 88, cz + z) * 3);
+            for (let hy = 1; hy <= hangLen; hy++) {
+              setVoxel(cx + x, cy - ry - hy + 1, cz + z, pick(PALETTE.sakura, cx + x, hy, cz + z));
+            }
+          }
+        }
+      }
+    }
+
+    function buildSakuraTree(rootX, rootY, rootZ, scale = 1.0, seedOffset = 0) {
+      // 树根抓地
+      for (let a = 0; a < 4; a++) {
+        const ang = a * (Math.PI / 2) + seedOffset;
+        const rx = rootX + Math.cos(ang) * 2.5;
+        const rz = rootZ + Math.sin(ang) * 2.5;
+        buildSakuraBranch(rootX, rootY + 1, rootZ, rx, rootY, rz, 0.8);
+      }
+
+      const trunkTopX = rootX + Math.sin(seedOffset) * 2.2 * scale;
+      const trunkTopY = rootY + Math.round(7.5 * scale);
+      const trunkTopZ = rootZ + Math.cos(seedOffset) * 2.2 * scale;
+
+      buildSakuraBranch(rootX, rootY, rootZ, trunkTopX, trunkTopY, trunkTopZ, scale >= 1.1 ? 1.3 : 1.0);
+
+      // 分叉主枝与层次丰富的樱花树冠团簇
+      const branchCount = 5;
+      for (let i = 0; i < branchCount; i++) {
+        const angle = (i / branchCount) * Math.PI * 2 + seedOffset * 1.7;
+        const spread = (4.5 + (i % 2) * 1.8) * scale;
+        const bx = trunkTopX + Math.cos(angle) * spread;
+        const by = trunkTopY + Math.round((3.2 + (i % 3) * 1.3) * scale);
+        const bz = trunkTopZ + Math.sin(angle) * spread;
+
+        buildSakuraBranch(trunkTopX, trunkTopY - 1, trunkTopZ, bx, by, bz, 0.7);
+        buildSakuraCanopyCluster(
+          Math.round(bx),
+          Math.round(by + 1),
+          Math.round(bz),
+          Math.round(4.6 * scale),
+          Math.round(2.8 * scale),
+          Math.round(4.6 * scale)
+        );
+      }
+
+      // 中央主树冠
+      buildSakuraCanopyCluster(
+        Math.round(trunkTopX),
+        Math.round(trunkTopY + 5 * scale),
+        Math.round(trunkTopZ),
+        Math.round(5.6 * scale),
+        Math.round(3.4 * scale),
+        Math.round(5.6 * scale)
+      );
+
+      // 树上悬挂小巧暖色纸灯笼
+      const lx = Math.round(trunkTopX + Math.cos(seedOffset) * 3.5 * scale);
+      const ly = Math.round(trunkTopY + 1);
+      const lz = Math.round(trunkTopZ + Math.sin(seedOffset) * 3.5 * scale);
+      setVoxel(lx, ly + 1, lz, '#381f17');
+      setVoxel(lx, ly, lz, '#ffdf78', 'emissive', 0.01);
+    }
+
+    // 执行全部场景体素构建
+    buildFloatingIslandAndRiver();
+    buildFiveStoryPagoda();
+    buildTaikoBridge();
+    buildSteppingStonesAndTeaCorner();
+
+    // 环绕古塔与池畔的5棵姿态各异樱花树
+    buildSakuraTree(4, 1, -7, 1.18, 0.4);    // 池畔与太鼓桥北侧主樱树（枝干探向水面）
+    buildSakuraTree(-22, 2, -3, 1.12, 1.8);  // 五重塔西侧大樱树
+    buildSakuraTree(-5, 1, 15, 1.05, 3.1);   // 茶席与池塘南岸樱树
+    buildSakuraTree(19, 1, -10, 0.95, 4.2);  // 东岸假山旁樱树
+    buildSakuraTree(18, 1, 15, 0.88, 5.5);   // 东南瀑布岸边樱树
+
+    // ==========================================
+    // 9. 将体素数据合批生成高性能 InstancedMesh
+    // ==========================================
+    const voxelGeo = new THREE.BoxGeometry(1, 1, 1);
+    const dummy = new THREE.Object3D();
+    const colorHelper = new THREE.Color();
+
+    function createInstancedVoxelLayer(voxelMap, material, receiveShadow = true, castShadow = true) {
+      const count = voxelMap.size;
+      const mesh = new THREE.InstancedMesh(voxelGeo, material, count);
+      mesh.castShadow = castShadow;
+      mesh.receiveShadow = receiveShadow;
+
+      let idx = 0;
+      for (const v of voxelMap.values()) {
+        dummy.position.set(v.x, v.y, v.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(idx, dummy.matrix);
+        colorHelper.setHex(v.color);
+        mesh.setColorAt(idx, colorHelper);
+        idx++;
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    const solidMat = new THREE.MeshStandardMaterial({
+      map: voxelTexture,
+      roughness: 0.78,
+      metalness: 0.06
+    });
+
+    const emissiveMat = new THREE.MeshStandardMaterial({
+      map: voxelTexture,
+      color: '#ffffff',
+      emissive: '#ffaa33',
+      emissiveIntensity: 1.4,
+      roughness: 0.3
+    });
+
+    const waterMat = new THREE.MeshStandardMaterial({
+      map: voxelTexture,
+      roughness: 0.16,
+      metalness: 0.12,
+      transparent: true,
+      opacity: 0.84
+    });
+
+    const solidInstancedMesh = createInstancedVoxelLayer(solidVoxels, solidMat, true, true);
+    const emissiveInstancedMesh = createInstancedVoxelLayer(emissiveVoxels, emissiveMat, false, false);
+    const waterInstancedMesh = createInstancedVoxelLayer(waterVoxels, waterMat, true, false);
+
+    // 保留水体初始坐标以便做波光起伏动画
+    const waterVoxelList = Array.from(waterVoxels.values());
+
+    // 更新右上角体素统计
+    const totalVoxels = solidVoxels.size + emissiveVoxels.size + waterVoxels.size;
+    document.getElementById('voxel-stats').textContent =
+      `共 ${totalVoxels.toLocaleString()} 枚程序化体素 · 拖动旋转 / 滚轮缩放`;
+
+    // ==========================================
+    // 10. 动态生灵：飘落樱花瓣、池中锦鲤、流萤微光
+    // ==========================================
+    // 10.1 飘落樱花花瓣 (420 枚体素花瓣)
+    const PETAL_COUNT = 420;
+    const petalGeo = new THREE.BoxGeometry(0.32, 0.1, 0.32);
+    const petalMat = new THREE.MeshStandardMaterial({
+      roughness: 0.5,
+      metalness: 0.05
+    });
+    const petalMesh = new THREE.InstancedMesh(petalGeo, petalMat, PETAL_COUNT);
+    petalMesh.castShadow = true;
+    scene.add(petalMesh);
+
+    const petals = [];
+    for (let i = 0; i < PETAL_COUNT; i++) {
+      const src = canopyCenters[i % canopyCenters.length] || { x: 0, y: 18, z: 0, r: 8 };
+      const p = {
+        x: src.x + (Math.random() - 0.5) * 26,
+        y: Math.random() * 28 + 1,
+        z: src.z + (Math.random() - 0.5) * 26,
+        vy: 1.4 + Math.random() * 1.4,
+        vx: 0.8 + Math.random() * 0.9,
+        vz: 0.4 + Math.random() * 0.7,
+        phase: Math.random() * Math.PI * 2,
+        rotSpeedX: (Math.random() - 0.5) * 3,
+        rotSpeedZ: (Math.random() - 0.5) * 3
+      };
+      petals.push(p);
+      colorHelper.set(PALETTE.sakura[i % PALETTE.sakura.length]);
+      petalMesh.setColorAt(i, colorHelper);
+    }
+    petalMesh.instanceColor.needsUpdate = true;
+
+    // 10.2 池中游动体素锦鲤 (Koi Fish)
+    const koiGroup = new THREE.Group();
+    scene.add(koiGroup);
+    const koiList = [];
+
+    function createVoxelKoi(headCol, bodyCol, tailCol, centerZ, radiusX, radiusZ, speed, phase) {
+      const fish = new THREE.Group();
+      const segGeo = new THREE.BoxGeometry(0.42, 0.32, 0.48);
+      const colors = [headCol, bodyCol, tailCol];
+      const segments = [];
+      for (let s = 0; s < 3; s++) {
+        const m = new THREE.Mesh(
+          segGeo,
+          new THREE.MeshStandardMaterial({ color: colors[s], roughness: 0.3 })
+        );
+        m.scale.set(1 - s * 0.22, 1 - s * 0.15, 1);
+        m.position.z = -s * 0.42;
+        fish.add(m);
+        segments.push(m);
+      }
+      koiGroup.add(fish);
+      koiList.push({
+        group: fish,
+        segments,
+        centerZ,
+        radiusX,
+        radiusZ,
+        speed,
+        phase
+      });
+    }
+
+    createVoxelKoi('#ff4d29', '#ffffff', '#ff4d29', 0, 1.8, 3.2, 0.85, 0.0);
+    createVoxelKoi('#ffae2b', '#fff5e0', '#ffae2b', 6, 2.1, 2.8, -0.75, 2.1);
+    createVoxelKoi('#ffffff', '#e62e25', '#ffffff', 9, 1.6, 2.4, 0.95, 4.2);
+    createVoxelKoi('#ff6238', '#ff6238', '#ffffff', -8, 1.2, 3.5, 0.7, 1.2);
+    createVoxelKoi('#ffd23f', '#2b2d3c', '#ffd23f', 13, 1.5, 2.2, -0.8, 3.5);
+
+    // 10.3 夜樱流萤 (Fireflies - 在黄昏与夜晚发光飞舞)
+    const FIREFLY_COUNT = 55;
+    const fireflyGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+    const fireflyMat = new THREE.MeshBasicMaterial({
+      color: '#ffe97d',
+      transparent: true,
+      opacity: 0.0
+    });
+    const fireflyMesh = new THREE.InstancedMesh(fireflyGeo, fireflyMat, FIREFLY_COUNT);
+    scene.add(fireflyMesh);
+
+    const fireflies = [];
+    for (let i = 0; i < FIREFLY_COUNT; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 4 + Math.random() * 24;
+      fireflies.push({
+        baseX: Math.cos(angle) * dist,
+        baseY: 2 + Math.random() * 14,
+        baseZ: Math.sin(angle) * dist,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.6 + Math.random() * 0.8
+      });
+    }
+
+    // ==========================================
+    // 11. 氛围光影切换 & 视角预设过渡
+    // ==========================================
+    const TIME_MODES = {
+      spring: {
+        topColor: '#6eb2f5',
+        midColor: '#ffd4e3',
+        bottomColor: '#fff4e6',
+        fogColor: '#ffe8ed',
+        sunColor: '#fff3df',
+        sunIntensity: 2.2,
+        sunPos: [55, 78, 45],
+        ambientSky: '#fff4f8',
+        ambientGround: '#6b5362',
+        ambientIntensity: 0.95,
+        lanternFactor: 0.35,
+        emissiveIntensity: 0.85,
+        fireflyOpacity: 0.0
+      },
+      sunset: {
+        topColor: '#3a2b5c',
+        midColor: '#eb6b78',
+        bottomColor: '#ffb86c',
+        fogColor: '#f29b88',
+        sunColor: '#ff8847',
+        sunIntensity: 2.4,
+        sunPos: [-65, 28, 48],
+        ambientSky: '#ffbfa8',
+        ambientGround: '#3d263b',
+        ambientIntensity: 0.78,
+        lanternFactor: 1.25,
+        emissiveIntensity: 1.9,
+        fireflyOpacity: 0.55
+      },
+      night: {
+        topColor: '#0c1026',
+        midColor: '#1d254a',
+        bottomColor: '#352f57',
+        fogColor: '#191f3d',
+        sunColor: '#7ea4ff',
+        sunIntensity: 0.55,
+        sunPos: [-40, 68, -45],
+        ambientSky: '#4a5f9e',
+        ambientGround: '#1a162b',
+        ambientIntensity: 0.48,
+        lanternFactor: 1.95,
+        emissiveIntensity: 2.8,
+        fireflyOpacity: 0.95
+      }
+    };
+
+    let currentMode = 'spring';
+    let targetFireflyOpacity = 0.0;
+    let targetLanternFactor = 0.35;
+
+    function applyTimeMode(modeKey) {
+      const cfg = TIME_MODES[modeKey];
+      if (!cfg) return;
+      currentMode = modeKey;
+
+      skyMat.uniforms.topColor.value.set(cfg.topColor);
+      skyMat.uniforms.midColor.value.set(cfg.midColor);
+      skyMat.uniforms.bottomColor.value.set(cfg.bottomColor);
+      scene.fog.color.set(cfg.fogColor);
+
+      sunLight.color.set(cfg.sunColor);
+      sunLight.intensity = cfg.sunIntensity;
+      sunLight.position.set(...cfg.sunPos);
+
+      ambientLight.color.set(cfg.ambientSky);
+      ambientLight.groundColor.set(cfg.ambientGround);
+      ambientLight.intensity = cfg.ambientIntensity;
+
+      emissiveMat.emissiveIntensity = cfg.emissiveIntensity;
+      targetLanternFactor = cfg.lanternFactor;
+      targetFireflyOpacity = cfg.fireflyOpacity;
+    }
+
+    applyTimeMode('spring');
+
+    // 视角平滑过渡
+    let camTransition = null;
+    const CAM_PRESETS = {
+      overview: { pos: [58, 44, 62], target: [0, 12, 0] },
+      pagoda: { pos: [14, 14, 24], target: [-10, 21, -8] },
+      bridge: { pos: [26, 13, 24], target: [10, 2, 4] },
+      tea: { pos: [-2, 11, 32], target: [-15, 4, 14] }
+    };
+
+    function moveToCameraPreset(key) {
+      const preset = CAM_PRESETS[key];
+      if (!preset) return;
+      camTransition = {
+        startPos: camera.position.clone(),
+        endPos: new THREE.Vector3(...preset.pos),
+        startTarget: controls.target.clone(),
+        endTarget: new THREE.Vector3(...preset.target),
+        progress: 0
+      };
+    }
+
+    // 绑定底部按钮事件
+    document.querySelectorAll('#time-group .ctrl-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#time-group .ctrl-btn').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        applyTimeMode(btn.dataset.mode);
+      });
+    });
+
+    const btnRotate = document.getElementById('btn-rotate');
+    document.querySelectorAll('#cam-group .ctrl-btn').forEach((btn) => {
+      if (btn === btnRotate) return;
+      btn.addEventListener('click', () => {
+        moveToCameraPreset(btn.dataset.cam);
+      });
+    });
+
+    btnRotate.addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+      btnRotate.classList.toggle('active', controls.autoRotate);
+    });
+
+    // ==========================================
+    // 12. 动画主循环与自适应窗口
+    // ==========================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      // 1. 视角过渡插值
+      if (camTransition) {
+        camTransition.progress += dt * 1.4;
+        const t = Math.min(camTransition.progress, 1);
+        const ease = 1 - Math.pow(1 - t, 3);
+        camera.position.lerpVectors(camTransition.startPos, camTransition.endPos, ease);
+        controls.target.lerpVectors(camTransition.startTarget, camTransition.endTarget, ease);
+        if (t >= 1) camTransition = null;
+      }
+
+      // 2. 樱花花瓣飘落与旋舞
+      for (let i = 0; i < PETAL_COUNT; i++) {
+        const p = petals[i];
+        p.y -= p.vy * dt;
+        p.x += Math.sin(elapsed * 1.2 + p.phase) * p.vx * dt;
+        p.z += Math.cos(elapsed * 0.9 + p.phase) * p.vz * dt;
+
+        if (p.y < -4) {
+          const src = canopyCenters[i % canopyCenters.length] || { x: 0, y: 18, z: 0 };
+          p.x = src.x + (Math.random() - 0.5) * 20;
+          p.y = src.y + 2 + Math.random() * 6;
+          p.z = src.z + (Math.random() - 0.5) * 20;
+        }
+
+        dummy.position.set(p.x, p.y, p.z);
+        dummy.rotation.set(
+          elapsed * p.rotSpeedX + p.phase,
+          elapsed * 0.8 + p.phase,
+          elapsed * p.rotSpeedZ
+        );
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        petalMesh.setMatrixAt(i, dummy.matrix);
+      }
+      petalMesh.instanceMatrix.needsUpdate = true;
+
+      // 3. 池塘与瀑布水体微澜动画
+      for (let i = 0; i < waterVoxelList.length; i++) {
+        const w = waterVoxelList[i];
+        const wave = Math.sin(elapsed * 2.6 + w.x * 0.45 + w.z * 0.35) * 0.07;
+        dummy.position.set(w.x, w.y + wave, w.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        waterInstancedMesh.setMatrixAt(i, dummy.matrix);
+      }
+      waterInstancedMesh.instanceMatrix.needsUpdate = true;
+
+      // 4. 锦鲤悠游摆尾动画
+      for (const koi of koiList) {
+        const ang = elapsed * koi.speed + koi.phase;
+        const nextAng = ang + (koi.speed > 0 ? 0.08 : -0.08);
+        const zPos = koi.centerZ + Math.sin(ang) * koi.radiusZ;
+        const xPos = getRiverCenterX(zPos) + Math.cos(ang) * koi.radiusX;
+
+        const nextZ = koi.centerZ + Math.sin(nextAng) * koi.radiusZ;
+        const nextX = getRiverCenterX(nextZ) + Math.cos(nextAng) * koi.radiusX;
+
+        koi.group.position.set(xPos, -0.58, zPos);
+        koi.group.lookAt(nextX, -0.58, nextZ);
+
+        for (let s = 0; s < koi.segments.length; s++) {
+          koi.segments[s].position.x = Math.sin(elapsed * 9 - s * 1.3 + koi.phase) * 0.08 * s;
+        }
+      }
+
+      // 5. 灯笼烛光轻微摇曳与流萤飞舞
+      for (const item of lanternPointLights) {
+        const flicker = 1 + Math.sin(elapsed * 5.5 + item.phase) * 0.08;
+        item.light.intensity = item.baseIntensity * targetLanternFactor * flicker;
+      }
+
+      fireflyMat.opacity += (targetFireflyOpacity - fireflyMat.opacity) * 0.06;
+      if (fireflyMat.opacity > 0.01) {
+        for (let i = 0; i < FIREFLY_COUNT; i++) {
+          const f = fireflies[i];
+          const fx = f.baseX + Math.sin(elapsed * f.speed + f.phase) * 1.8;
+          const fy = f.baseY + Math.sin(elapsed * f.speed * 1.4 + f.phase) * 1.1;
+          const fz = f.baseZ + Math.cos(elapsed * f.speed + f.phase) * 1.8;
+          const pulse = 0.65 + Math.sin(elapsed * 4 + f.phase) * 0.35;
+          dummy.position.set(fx, fy, fz);
+          dummy.rotation.set(0, 0, 0);
+          dummy.scale.setScalar(pulse);
+          dummy.updateMatrix();
+          fireflyMesh.setMatrixAt(i, dummy.matrix);
+        }
+        fireflyMesh.instanceMatrix.needsUpdate = true;
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // 响应式窗口尺寸适配
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+  </script>
+  <script src="../prompt-panel.js" data-id="sakura-pagoda-web"></script>
+</body>
+</html>

@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>豌豆射手 3D 体素挂件</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    width: 100%; height: 100%;
+    overflow: hidden;
+    background: #07121a;
+    -webkit-tap-highlight-color: transparent;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  }
+  #scene {
+    display: block;
+    width: 100%; height: 100%;
+    touch-action: none;
+  }
+  .back-link {
+    position: fixed;
+    top: 16px; left: 16px;
+    z-index: 100;
+    display: inline-flex;
+    align-items: center;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: .2px;
+    color: #3a3223;
+    text-decoration: none;
+    background: rgba(255, 246, 224, 0.82);
+    border-radius: 999px;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, .28);
+    transition: transform .18s ease, background .18s ease;
+  }
+  .back-link:hover { background: rgba(255, 251, 238, .96); transform: translateY(-1px); }
+  .back-link:active { transform: translateY(0) scale(.97); }
+
+  #hud {
+    position: fixed;
+    top: 16px; right: 16px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+    pointer-events: none;
+    user-select: none;
+  }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    font-size: 13px;
+    color: #e9f6dc;
+    background: rgba(255, 246, 224, .10);
+    border: 1px solid rgba(255, 246, 224, .18);
+    border-radius: 999px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+  }
+  #score {
+    font-weight: 700;
+    font-size: 16px;
+    color: #b9ff7f;
+    min-width: 1.1em;
+    text-align: right;
+    transition: transform .16s cubic-bezier(.34, 1.56, .64, 1);
+  }
+  #score.pop { transform: scale(1.45); }
+
+  #hint {
+    position: fixed;
+    left: 50%;
+    bottom: max(20px, env(safe-area-inset-bottom, 20px));
+    transform: translateX(-50%);
+    z-index: 100;
+    padding: 9px 18px;
+    font-size: 12.5px;
+    letter-spacing: .3px;
+    color: rgba(226, 244, 214, .68);
+    background: rgba(255, 246, 224, .07);
+    border: 1px solid rgba(255, 246, 224, .12);
+    border-radius: 999px;
+    white-space: nowrap;
+    pointer-events: none;
+    user-select: none;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    transition: opacity .6s ease;
+  }
+  @media (max-width: 460px) {
+    .back-link { font-size: 12px; padding: 8px 13px; }
+    #hint { font-size: 11.5px; padding: 8px 14px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="back-link" href="../">← 返回 3D 作品</a>
+
+<div id="hud">
+  <div class="pill"><span>命中</span><span id="score">0</span></div>
+</div>
+
+<div id="hint">点击屏幕 · 豌豆射手会瞄准最近的僵尸头</div>
+
+<canvas id="scene"></canvas>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   0. 常量与工具
+   ============================================================ */
+const V = 0.22;                                   // 一个体素对应的世界单位
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);  // 所有体素共用的几何体
+const LIGHT_DIR = new THREE.Vector3(-0.45, 0.82, 0.38).normalize();
+
+const PAL = {
+  body:       0x63c23f,  // 豌豆射手主体
+  snout:      0x77d84f,  // 炮口
+  mouthDark:  0x14300f,  // 炮管内部
+  stem:       0x4f9e33,  // 茎
+  leaf:       0x5cb83a,  // 叶子
+  pot:        0xc98a58,  // 花盆
+  soil:       0x4a3320,  // 泥土
+  eyeWhite:   0xf4f7ea,
+  eyeBlack:   0x121a10,
+  zombie:     0x8fa87a,  // 靶子（僵尸头）
+  zombieEye:  0xff4a3a
+};
+
+// —— 体素明暗着色（量化成有限档，减少材质数量）——
+const SHADES = [0.50, 0.68, 0.85, 1.0, 1.14];
+const _shadeCache = new Map();
+function shadeHex(hex, t) {
+  const idx = Math.max(0, Math.min(SHADES.length - 1, Math.floor(t * SHADES.length)));
+  const key = hex + ':' + idx;
+  const cached = _shadeCache.get(key);
+  if (cached !== undefined) return cached;
+  const f = SHADES[idx];
+  const r = Math.min(255, Math.round(((hex >> 16) & 255) * f));
+  const g = Math.min(255, Math.round(((hex >> 8) & 255) * f));
+  const b = Math.min(255, Math.round((hex & 255) * f));
+  const out = (r << 16) | (g << 8) | b;
+  _shadeCache.set(key, out);
+  return out;
+}
+
+/* ============================================================
+   1. 体素构建器
+   ============================================================ */
+class VoxelBuilder {
+  constructor() { this.buckets = new Map(); }
+
+  add(x, y, z, color, size = 1) {
+    let bucket = this.buckets.get(color);
+    if (!bucket) {
+      bucket = { color, items: [] };
+      this.buckets.set(color, bucket);
+    }
+    bucket.items.push({ x, y, z, size });
+  }
+
+  build(materialOpts = {}) {
+    const group = new THREE.Group();
+    const dummy = new THREE.Object3D();
+
+    for (const bucket of this.buckets.values()) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: bucket.color,
+        roughness: 0.76,
+        metalness: 0.02,
+        flatShading: true,
+        ...materialOpts
+      });
+      const inst = new THREE.InstancedMesh(UNIT_BOX, mat, bucket.items.length);
+      for (let i = 0; i < bucket.items.length; i++) {
+        const it = bucket.items[i];
+        dummy.position.set(it.x, it.y, it.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.setScalar(it.size);
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+      }
+      inst.instanceMatrix.needsUpdate = true;
+      inst.castShadow = true;
+      inst.receiveShadow = true;
+      inst.frustumCulled = false;
+      group.add(inst);
+    }
+    return group;
+  }
+}
+
+/* ============================================================
+   2. 渲染器 / 场景 / 相机
+   ============================================================ */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({
+  canvas,
+  antialias: true,
+  alpha: false,
+  powerPreference: 'high-performance'
+});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.NoToneMapping;
+
+const scene = new THREE.Scene();
+
+// 程序化渐变背景
+(function makeBackground() {
+  const c = document.createElement('canvas');
+  c.width = 4; c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.00, '#1b3b45');
+  g.addColorStop(0.35, '#122a33');
+  g.addColorStop(0.70, '#0b1a22');
+  g.addColorStop(1.00, '#050d12');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 4, 512);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.minFilter = THREE.LinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  scene.background = tex;
+})();
+
+scene.fog = new THREE.Fog(0x0a1820, 14, 34);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 200);
+
+const isPortrait = window.innerHeight > window.innerWidth;
+const startDist = isPortrait ? 12.5 : 9.0;
+camera.position.set(3.6, 2.4, 7.0).normalize().multiplyScalar(startDist);
+camera.position.y = 2.4 + (isPortrait ? 1.2 : 0);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.35, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.rotateSpeed = 0.85;
+controls.zoomSpeed = 0.9;
+controls.enablePan = false;
+controls.minDistance = 4.5;
+controls.maxDistance = 22;
+controls.minPolarAngle = Math.PI * 0.06;
+controls.maxPolarAngle = Math.PI * 0.54;
+controls.update();
+
+/* ============================================================
+   3. 灯光
+   ============================================================ */
+scene.add(new THREE.HemisphereLight(0xbfe9ff, 0x24361c, 1.15));
+
+const keyLight = new THREE.DirectionalLight(0xfff2d6, 2.3);
+keyLight.position.set(6, 10, 7);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(1024, 1024);
+keyLight.shadow.camera.near = 1;
+keyLight.shadow.camera.far = 32;
+keyLight.shadow.camera.left = -8;
+keyLight.shadow.camera.right = 8;
+keyLight.shadow.camera.top = 8;
+keyLight.shadow.camera.bottom = -8;
+keyLight.shadow.bias = -0.0008;
+keyLight.shadow.normalBias = 0.02;
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x59c8ff, 1.05);
+rimLight.position.set(-7, 4, -7);
+scene.add(rimLight);
+
+const fillLight = new THREE.DirectionalLight(0x9ad46a, 0.45);
+fillLight.position.set(-4, -3, 6);
+scene.add(fillLight);
+
+/* ============================================================
+   4. 地面
+   ============================================================ */
+(function makeGround() {
+  const c = document.createElement('canvas');
+  c.width = 128; c.height = 128;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(64, 64, 4, 64, 64, 64);
+  g.addColorStop(0, 'rgba(70,110,90,0.55)');
+  g.addColorStop(0.55, 'rgba(30,55,52,0.30)');
+  g.addColorStop(1, 'rgba(8,18,24,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 128, 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+
+  const ground = new THREE.Mesh(
+    new THREE.CircleGeometry(9, 48),
+    new THREE.MeshStandardMaterial({
+      map: tex,
+      transparent: true,
+      roughness: 1,
+      metalness: 0,
+      depthWrite: false
+    })
+  );
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.y = -2.96;
+  ground.receiveShadow = true;
+  scene.add(ground);
+})();
+
+/* ============================================================
+   5. 豌豆射手体素模型
+   ============================================================ */
+const HEAD_Y = 1.5;
+
+// —— 头部（含炮管、眼睛）——
+function buildHeadVoxels() {
+  const b = new VoxelBuilder();
+  const R = 5.2;
+
+  // 球形脑袋
+  for (let x = -6; x <= 6; x++) {
+    for (let y = -6; y <= 6; y++) {
+      for (let z = -6; z <= 6; z++) {
+        const d2 = x * x + y * y + z * z;
+        if (d2 > R * R) continue;
+        const d = Math.sqrt(d2) || 1;
+        const nd = (x / d) * LIGHT_DIR.x + (y / d) * LIGHT_DIR.y + (z / d) * LIGHT_DIR.z;
+        b.add(x, y, z, shadeHex(PAL.body, 0.5 + 0.5 * nd));
+      }
+    }
+  }
+
+  // 炮管（空心圆筒）
+  for (let z = 4; z <= 9; z++) {
+    for (let x = -4; x <= 4; x++) {
+      for (let y = -4; y <= 4; y++) {
+        const r = Math.hypot(x, y);
+        if (r > 3.7) continue;
+        if (r < 1.9) {
+          if (z === 4) b.add(x, y, z, PAL.mouthDark);
+          continue;
+        }
+        const nd = 0.5 + 0.5 * ((x / 3.7) * LIGHT_DIR.x + (y / 3.7) * LIGHT_DIR.y + 0.25);
+        b.add(x, y, z, shadeHex(PAL.snout, nd));
+      }
+    }
+  }
+
+  // 眼睛
+  const ex = 3.2, ey = 2.8;
+  const ez = Math.sqrt(Math.max(0, R * R - ex * ex - ey * ey));
+  for (const s of [-1, 1]) {
+    b.add(s * ex, ey, ez, PAL.eyeWhite, 2.5);
+    b.add(s * ex + s * 0.22, ey - 0.1, ez + 0.95, PAL.eyeBlack, 1.25);
+  }
+
+  return b.build();
+}
+
+// —— 茎 + 叶子 ——
+function addLeaf(b, y0, dir) {
+  for (let t = 0; t < 6; t++) {
+    const x = dir * (3 + t * 1.05);
+    const y = y0 + Math.sin((t / 5) * Math.PI) * 1.6;
+    for (let dz = -1; dz <= 1; dz++) {
+      for (let dy = 0; dy <= 1; dy++) {
+        if (t > 0 && Math.abs(dz) === 1 && dy === 1) continue;
+        b.add(x, y + dy, dz, shadeHex(PAL.leaf, 0.55 + 0.18 * dy + 0.12 * (dz === 0 ? 1 : 0)));
+      }
+    }
+  }
+}
+
+function buildStemVoxels() {
+  const b = new VoxelBuilder();
+
+  for (let y = -5; y >= -14; y--) {
+    const t = (-5 - y) / 9;
+    const bend = Math.sin(t * Math.PI) * 0.55;
+    for (let x = -2; x <= 2; x++) {
+      for (let z = -2; z <= 2; z++) {
+        if (x * x + z * z > 3.5) continue;
+        const nd = 0.5 + 0.5 * ((x / 2) * LIGHT_DIR.x + (z / 2) * LIGHT_DIR.z + 0.3);
+        b.add(x + bend, y, z, shadeHex(PAL.stem, nd));
+      }
+    }
+  }
+
+  addLeaf(b, -7.5, 1);
+  addLeaf(b, -11, -1);
+
+  return b.build();
+}
+
+// —— 花盆 + 泥土 ——
+function buildPotVoxels() {
+  const b = new VoxelBuilder();
+  const topY = -14, botY = -20;
+
+  for (let y = botY; y <= topY; y++) {
+    const t = (y - botY) / (topY - botY);
+    const rOut = 3.4 + t * 1.7;
+    for (let x = -6; x <= 6; x++) {
+      for (let z = -6; z <= 6; z++) {
+        const r = Math.hypot(x, z);
+        if (r > rOut) continue;
+        const isBottom = (y === botY);
+        const isWall = r > rOut - 1.6;
+        if (!isBottom && !isWall) continue;
+        const rr = Math.max(r, 0.001);
+        const nd = 0.5 + 0.5 * ((x / rr) * LIGHT_DIR.x + (z / rr) * LIGHT_DIR.z + 0.35);
+        b.add(x, y, z, shadeHex(PAL.pot, nd));
+      }
+    }
+  }
+
+  for (let x = -5; x <= 5; x++) {
+    for (let z = -5; z <= 5; z++) {
+      if (Math.hypot(x, z) > 4.1) continue;
+      b.add(x, topY, z, shadeHex(PAL.soil, 0.72 + Math.random() * 0.18));
+    }
+  }
+
+  return b.build();
+}
+
+// —— 组装 ——
+const plantRoot = new THREE.Group();
+scene.add(plantRoot);
+
+const potGroup = new THREE.Group();
+potGroup.scale.setScalar(V);
+potGroup.position.set(0, HEAD_Y, 0);
+potGroup.add(buildPotVoxels());
+plantRoot.add(potGroup);
+
+const stemGroup = new THREE.Group();
+stemGroup.scale.setScalar(V);
+stemGroup.position.set(0, HEAD_Y, 0);
+stemGroup.add(buildStemVoxels());
+plantRoot.add(stemGroup);
+
+const headPivot = new THREE.Group();
+headPivot.position.set(0, HEAD_Y, 0);
+headPivot.rotation.order = 'YXZ';
+plantRoot.add(headPivot);
+
+const headSquash = new THREE.Group();
+headPivot.add(headSquash);
+
+const headGroup = new THREE.Group();
+headGroup.scale.setScalar(V);
+headGroup.add(buildHeadVoxels());
+headSquash.add(headGroup);
+
+/* ============================================================
+   6. 靶子（僵尸头）
+   ============================================================ */
+function buildZombieHead() {
+  const b = new VoxelBuilder();
+  const R = 2.6;
+
+  for (let x = -3; x <= 3; x++) {
+    for (let y = -3; y <= 3; y++) {
+      for (let z = -3; z <= 3; z++) {
+        const d2 = x * x + y * y + z * z;
+        if (d2 > R * R) continue;
+        const d = Math.sqrt(d2) || 1;
+        const nd = (x / d) * LIGHT_DIR.x + (y / d) * LIGHT_DIR.y + (z / d) * LIGHT_DIR.z;
+        b.add(x, y, z, shadeHex(PAL.zombie, 0.5 + 0.5 * nd));
+      }
+    }
+  }
+
+  // 眼睛
+  for (const s of [-1, 1]) {
+    b.add(s * 1.25, 0.45, 2.25, 0x1b1b14, 1.45);
+    b.add(s * 1.25, 0.45, 2.85, PAL.zombieEye, 0.85);
+  }
+
+  const g = b.build();
+  g.scale.setScalar(V);
+  return g;
+}
+
+const TARGET_DEFS = [
+  { x: -3.15, y: 2.05, z: 2.85, phase: 0.0 },
+  { x:  0.30, y: 2.85, z: 2.15, phase: 2.1 },
+  { x:  3.15, y: 1.80, z: 2.65, phase: 4.2 }
+];
+
+const targets = [];
+
+for (let i = 0; i < TARGET_DEFS.length; i++) {
+  const def = TARGET_DEFS[i];
+  const group = new THREE.Group();
+  group.position.set(def.x, def.y, def.z);
+  group.add(buildZombieHead());
+  scene.add(group);
+
+  targets.push({
+    group,
+    baseX: def.x,
+    baseY: def.y,
+    baseZ: def.z,
+    phase: def.phase,
+    alive: true,
+    respawnAt: 0,
+    popTimer: 0
+  });
+}
+
+/* ============================================================
+   7. 豌豆与粒子
+   ============================================================ */
+const peaGeo = new THREE.IcosahedronGeometry(0.135, 1);
+const peaMat = new THREE.MeshStandardMaterial({
+  color: 0x9bef62,
+  emissive: 0x3f8c1c,
+  emissiveIntensity: 0.7,
+  roughness: 0.42,
+  metalness: 0.05
+});
+
+const peas = [];
+
+// —— 粒子池 ——
+const MAX_PARTICLES = 180;
+const particleMesh = new THREE.InstancedMesh(
+  UNIT_BOX,
+  new THREE.MeshStandardMaterial({ roughness: 0.62, metalness: 0.05 }),
+  MAX_PARTICLES
+);
+particleMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+particleMesh.frustumCulled = false;
+particleMesh.castShadow = false;
+particleMesh.receiveShadow = false;
+scene.add(particleMesh);
+
+const particles = [];
+const particleDummy = new THREE.Object3D();
+
+(function initParticles() {
+  const white = new THREE.Color(0xffffff);
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    particles.push({
+      active: false,
+      pos: new THREE.Vector3(),
+      vel: new THREE.Vector3(),
+      life: 0,
+      maxLife: 1,
+      size: 0.1,
+      spin: 0
+    });
+    particleDummy.position.set(0, -999, 0);
+    particleDummy.scale.setScalar(0.0001);
+    particleDummy.updateMatrix();
+    particleMesh.setMatrixAt(i, particleDummy.matrix);
+    particleMesh.setColorAt(i, white);
+    particleDummy.scale.setScalar(1);
+  }
+  particleMesh.instanceMatrix.needsUpdate = true;
+  particleMesh.instanceColor.needsUpdate = true;
+})();
+
+let particleCursor = 0;
+
+function allocParticle() {
+  for (let k = 0; k < MAX_PARTICLES; k++) {
+    const i = (particleCursor + k) % MAX_PARTICLES;
+    if (!particles[i].active) {
+      particleCursor = (i + 1) % MAX_PARTICLES;
+      return i;
+    }
+  }
+  return -1;
+}
+
+function spawnParticle(pos, colorHex) {
+  const idx = allocParticle();
+  if (idx < 0) return;
+  const p = particles[idx];
+  p.active = true;
+  p.pos.copy(pos);
+  p.vel.set(
+    (Math.random() - 0.5) * 5.2,
+    Math.random() * 4.2 + 1.0,
+    (Math.random() - 0.5) * 5.2
+  );
+  p.life = 0;
+  p.maxLife = 0.45 + Math.random() * 0.55;
+  p.size = 0.055 + Math.random() * 0.10;
+  p.spin = Math.random() * 8;
+
+  const c = new THREE.Color(colorHex);
+  c.offsetHSL(0, 0, (Math.random() - 0.5) * 0.16);
+  particleMesh.setColorAt(idx, c);
+  particleMesh.instanceColor.needsUpdate = true;
+}
+
+function burst(pos, colorHex, count = 18) {
+  for (let i = 0; i < count; i++) spawnParticle(pos, colorHex);
+}
+
+function updateParticles(dt) {
+  for (let i = 0; i < MAX_PARTICLES; i++) {
+    const p = particles[i];
+    if (!p.active) continue;
+
+    p.life += dt;
+    p.vel.y -= 9.0 * dt;
+    p.pos.addScaledVector(p.vel, dt);
+
+    const k = 1 - p.life / p.maxLife;
+    if (k <= 0) {
+      p.active = false;
+      particleDummy.position.set(0, -999, 0);
+      particleDummy.scale.setScalar(0.0001);
+      particleDummy.rotation.set(0, 0, 0);
+      particleDummy.updateMatrix();
+      particleMesh.setMatrixAt(i, particleDummy.matrix);
+      continue;
+    }
+
+    const s = p.size * (0.25 + 0.75 * k);
+    particleDummy.position.copy(p.pos);
+    particleDummy.rotation.set(p.life * 6 + p.spin, p.life * 4.5, p.spin * 0.5);
+    particleDummy.scale.setScalar(s);
+    particleDummy.updateMatrix();
+    particleMesh.setMatrixAt(i, particleDummy.matrix);
+  }
+  particleMesh.instanceMatrix.needsUpdate = true;
+}
+
+/* ============================================================
+   8. 交互状态
+   ============================================================ */
+let elapsed = 0;
+let score = 0;
+let recoil = 0;
+let aimTimer = 0;
+let aimTarget = null;
+let curYaw = 0;
+let curPitch = 0;
+let pointerNX = 0;
+let pointerNY = 0;
+
+const scoreEl = document.getElementById('score');
+const hintEl = document.getElementById('hint');
+let hintHidden = false;
+
+function updateHUD() {
+  scoreEl.textContent = String(score);
+  scoreEl.classList.add('pop');
+  setTimeout(() => scoreEl.classList.remove('pop'), 160);
+}
+
+function hideHint() {
+  if (hintHidden) return;
+  hintHidden = true;
+  hintEl.style.opacity = '0';
+}
+
+/* ============================================================
+   9. 射击逻辑
+   ============================================================ */
+const _muzzleWorld = new THREE.Vector3();
+const _tmpVec = new THREE.Vector3();
+
+function getMuzzleWorld() {
+  _muzzleWorld.set(0, 0, 9.6);
+  scene.updateMatrixWorld(true);
+  return headGroup.localToWorld(_muzzleWorld);
+}
+
+function fire(target) {
+  if (!target || !target.alive) return;
+
+  const muzzle = getMuzzleWorld().clone();
+  const tp = target.group.position.clone();
+  const dir = tp.clone().sub(muzzle).normalize();
+
+  const pea = new THREE.Mesh(peaGeo, peaMat);
+  pea.position.copy(muzzle);
+  pea.castShadow = true;
+  scene.add(pea);
+
+  peas.push({ mesh: pea, dir, target, life: 0, speed: 19 });
+
+  recoil = 1;
+  aimTarget = target;
+  aimTimer = 0.55;
+
+  hideHint();
+}
+
+function pickTargetAt(cx, cy) {
+  let best = null;
+  let bestD = Infinity;
+  const v = new THREE.Vector3();
+
+  for (const t of targets) {
+    if (!t.alive) continue;
+    v.copy(t.group.position).project(camera);
+    const sx = (v.x * 0.5 + 0.5) * window.innerWidth;
+    const sy = (-v.y * 0.5 + 0.5) * window.innerHeight;
+    const d = Math.hypot(sx - cx, sy - cy);
+    if (d < bestD) { bestD = d; best = t; }
+  }
+  return best;
+}
+
+function onTap(cx, cy) {
+  const t = pickTargetAt(cx, cy);
+  if (t) fire(t);
+}
+
+function hitTarget(target, worldPos) {
+  target.alive = false;
+  target.group.visible = false;
+  target.respawnAt = elapsed + 1.7;
+
+  score += 1;
+  updateHUD();
+  burst(worldPos, 0x9bef62, 20);
+  burst(worldPos, 0xff9a3c, 8);
+
+  // 命中的靶子也是目标，顺便让瞄准状态解除
+  if (aimTarget === target) {
+    aimTarget = null;
+    aimTimer = 0;
+  }
+}
+
+function updatePeas(dt) {
+  for (let i = peas.length - 1; i >= 0; i--) {
+    const p = peas[i];
+    p.life += dt;
+    p.mesh.position.addScaledVector(p.dir, p.speed * dt);
+    p.mesh.rotation.x += dt * 9;
+    p.mesh.rotation.y += dt * 7;
+
+    let remove = false;
+
+    if (p.target && p.target.alive) {
+      const d = p.mesh.position.distanceTo(p.target.group.position);
+      if (d < 0.78) {
+        hitTarget(p.target, p.mesh.position.clone());
+        remove = true;
+      }
+    }
+
+    if (p.life > 2.4) remove = true;
+
+    if (remove) {
+      scene.remove(p.mesh);
+      peas.splice(i, 1);
+    }
+  }
+}
+
+/* ============================================================
+   10. 指针事件
+   ============================================================ */
+let downX = 0, downY = 0, downTime = 0, pointerDownId = -1;
+
+canvas.addEventListener('pointerdown', (e) => {
+  downX = e.clientX;
+  downY = e.clientY;
+  downTime = performance.now();
+  pointerDownId = e.pointerId;
+});
+
+canvas.addEventListener('pointerup', (e) => {
+  if (e.pointerId !== pointerDownId) return;
+  pointerDownId = -1;
+  const dt = performance.now() - downTime;
+  const dist = Math.hypot(e.clientX - downX, e.clientY - downY);
+  if (dt < 450 && dist < 12) {
+    onTap(e.clientX, e.clientY);
+  }
+});
+
+canvas.addEventListener('pointercancel', () => { pointerDownId = -1; });
+
+canvas.addEventListener('pointermove', (e) => {
+  pointerNX = (e.clientX / window.innerWidth) * 2 - 1;
+  pointerNY = (e.clientY / window.innerHeight) * 2 - 1;
+}, { passive: true });
+
+canvas.addEventListener('pointerleave', () => {
+  pointerNX = 0;
+  pointerNY = 0;
+});
+
+/* ============================================================
+   11. 每帧更新
+   ============================================================ */
+const _headWorldPos = new THREE.Vector3();
+
+function updatePlant(dt) {
+  // 呼吸浮动
+  plantRoot.position.y = Math.sin(elapsed * 1.5) * 0.032;
+  stemGroup.rotation.z = Math.sin(elapsed * 1.05) * 0.026;
+  stemGroup.rotation.x = Math.cos(elapsed * 0.82) * 0.018;
+  headPivot.position.y = HEAD_Y + Math.sin(elapsed * 1.5 + 0.7) * 0.022;
+
+  // —— 头部朝向 ——
+  let desireYaw, desirePitch;
+
+  if (aimTimer > 0 && aimTarget && aimTarget.alive) {
+    aimTimer -= dt;
+
+    headPivot.getWorldPosition(_headWorldPos);
+    const tp = aimTarget.group.position;
+    const dx = tp.x - _headWorldPos.x;
+    const dy = tp.y - _headWorldPos.y;
+    const dz = tp.z - _headWorldPos.z;
+    const horiz = Math.hypot(dx, dz);
+
+    desireYaw = Math.atan2(dx, dz);
+    desirePitch = -Math.atan2(dy, horiz);
+    desireYaw = THREE.MathUtils.clamp(desireYaw, -1.05, 1.05);
+    desirePitch = THREE.MathUtils.clamp(desirePitch, -0.62, 0.62);
+  } else {
+    if (aimTimer > 0) aimTimer = Math.max(0, aimTimer - dt);
+    desireYaw = pointerNX * 0.42;
+    desirePitch = -pointerNY * 0.22;
+  }
+
+  const smooth = Math.min(1, dt * 9);
+  curYaw += (desireYaw - curYaw) * smooth;
+  curPitch += (desirePitch - curPitch) * smooth;
+  headPivot.rotation.y = curYaw;
+  headPivot.rotation.x = curPitch;
+
+  // —— 后坐力 ——
+  recoil = Math.max(0, recoil - dt * 4.2);
+  const r = recoil;
+  headSquash.scale.set(1 + 0.15 * r, 1 - 0.10 * r, 1 - 0.13 * r);
+  headSquash.position.z = -0.075 * r;
+  headSquash.position.y = 0.02 * r;
+}
+
+function updateTargets(dt) {
+  for (const t of targets) {
+    if (!t.alive) {
+      if (elapsed >= t.respawnAt) {
+        t.alive = true;
+        t.group.visible = true;
+        t.popTimer = 0;
+        burst(t.group.position.clone(), 0x8fa87a, 10);
+      }
+      continue;
+    }
+
+    t.group.position.x = t.baseX + Math.sin(elapsed * 0.72 + t.phase) * 0.22;
+    t.group.position.y = t.baseY + Math.sin(elapsed * 1.15 + t.phase * 1.7) * 0.30;
+    t.group.position.z = t.baseZ + Math.cos(elapsed * 0.61 + t.phase) * 0.18;
+
+    t.group.rotation.y = Math.sin(elapsed * 0.62 + t.phase) * 0.55;
+    t.group.rotation.z = Math.sin(elapsed * 0.95 + t.phase * 2.1) * 0.10;
+
+    // 出场缩放动画
+    if (t.popTimer < 1) {
+      t.popTimer = Math.min(1, t.popTimer + dt * 3.2);
+      const e = 1 - Math.pow(1 - t.popTimer, 3);
+      const overshoot = 1 + Math.sin(e * Math.PI) * 0.28;
+      const s = e * overshoot;
+      t.group.scale.setScalar(Math.max(0.001, s));
+    } else {
+      t.group.scale.setScalar(1);
+    }
+  }
+}
+
+/* ============================================================
+   12. 主循环
+   ============================================================ */
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+
+  updatePlant(dt);
+  updateTargets(dt);
+  updatePeas(dt);
+  updateParticles(dt);
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+/* ============================================================
+   13. 自适应
+   ============================================================ */
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', () => {
+  setTimeout(onResize, 120);
+});
+
+/* ============================================================
+   14. 启动
+   ============================================================ */
+onResize();
+animate();
+
+// 开场小动画：让豌豆射手“登场”一下
+setTimeout(() => {
+  burst(new THREE.Vector3(0, 2.6, 0.4), 0x9bef62, 14);
+}, 420);
+</script>
+
+<script src="../prompt-panel.js" data-id="peashooter-deepseek"></script>
+</body>
+</html>

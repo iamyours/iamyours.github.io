@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>瓶中体素帆船 · Voxel Ship in a Bottle</title>
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden; background: #04060c;
+  }
+  canvas { display: block; }
+  #back {
+    position: fixed; top: 14px; left: 14px; z-index: 20;
+    padding: 7px 14px; border-radius: 999px;
+    background: rgba(255, 248, 230, 0.74);
+    color: #2a2118; text-decoration: none;
+    font: 500 13px/1.3 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    border: 1px solid rgba(255, 255, 255, 0.65);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+    transition: background .2s ease, transform .2s ease;
+  }
+  #back:hover { background: rgba(255, 248, 230, 0.95); transform: translateY(-1px); }
+  #hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    color: rgba(190, 220, 255, 0.5);
+    font: 12px/1.4 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+    letter-spacing: .08em; pointer-events: none; z-index: 20;
+    white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<a id="back" href="../">← 返回 3D 作品</a>
+<div id="hint">拖动旋转 · 滚轮 / 双指缩放</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ============================================================
+   1. 渲染器 / 场景 / 相机
+   ============================================================ */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 400);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.075;
+controls.enablePan = false;
+controls.minPolarAngle = 0.18;
+controls.maxPolarAngle = Math.PI - 0.18;
+controls.target.set(0, 0, 0);
+
+/* ============================================================
+   2. 程序化环境贴图 & 背景
+   ============================================================ */
+function createEnvTexture() {
+  const c = document.createElement('canvas');
+  c.width = 1024; c.height = 512;
+  const ctx = c.getContext('2d');
+
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.00, '#a8dcff');
+  g.addColorStop(0.30, '#3f7fb5');
+  g.addColorStop(0.48, '#15273f');
+  g.addColorStop(0.72, '#080e1a');
+  g.addColorStop(1.00, '#02040a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 1024, 512);
+
+  // 模拟摄影棚里几块柔光板，让玻璃有漂亮的高光
+  const blobs = [
+    { x: 190, y: 100, rx: 165, ry: 55, a: 0.95, col: '255,255,255' },
+    { x: 720, y: 140, rx: 120, ry: 46, a: 0.80, col: '255,226,170' },
+    { x: 470, y: 62,  rx: 230, ry: 48, a: 0.45, col: '170,220,255' },
+    { x: 880, y: 210, rx: 90,  ry: 34, a: 0.35, col: '120,200,255' }
+  ];
+  for (const b of blobs) {
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.scale(1, b.ry / b.rx);
+    const rg = ctx.createRadialGradient(0, 0, 0, 0, 0, b.rx);
+    rg.addColorStop(0.00, `rgba(${b.col},${b.a})`);
+    rg.addColorStop(0.45, `rgba(${b.col},${b.a * 0.42})`);
+    rg.addColorStop(1.00, `rgba(${b.col},0)`);
+    ctx.fillStyle = rg;
+    ctx.beginPath();
+    ctx.arc(0, 0, b.rx, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const tex = new THREE.CanvasTexture(c);
+  tex.mapping = THREE.EquirectangularReflectionMapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const pmrem = new THREE.PMREMGenerator(renderer);
+const envSource = createEnvTexture();
+const envRT = pmrem.fromEquirectangular(envSource);
+scene.environment = envRT.texture;
+envSource.dispose();
+pmrem.dispose();
+
+// 背景：竖直渐变天空
+(function buildBackground() {
+  const c = document.createElement('canvas');
+  c.width = 64; c.height = 512;
+  const ctx = c.getContext('2d');
+  const g = ctx.createLinearGradient(0, 0, 0, 512);
+  g.addColorStop(0.00, '#141f38');
+  g.addColorStop(0.42, '#0a1120');
+  g.addColorStop(1.00, '#02040a');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 512);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.mapping = THREE.EquirectangularReflectionMapping;
+  scene.background = t;
+})();
+
+/* ============================================================
+   3. 灯光
+   ============================================================ */
+scene.add(new THREE.HemisphereLight(0x9ecbff, 0x0a1020, 1.05));
+
+const keyLight = new THREE.DirectionalLight(0xfff2d8, 2.6);
+keyLight.position.set(9, 15, 11);
+scene.add(keyLight);
+
+const rimLight = new THREE.DirectionalLight(0x4f7bff, 1.9);
+rimLight.position.set(-13, 5, -10);
+scene.add(rimLight);
+
+const fillLight = new THREE.PointLight(0x38dcff, 45, 26, 2);
+fillLight.position.set(0.5, -0.4, 0);
+scene.add(fillLight);
+
+const topGlow = new THREE.PointLight(0xaad8ff, 28, 22, 2);
+topGlow.position.set(-2, 4.5, 2);
+scene.add(topGlow);
+
+/* ============================================================
+   4. 瓶子轮廓（LatheGeometry 旋转体）
+   ============================================================ */
+const X_OFFSET = -0.9;
+
+// [半径, 轴向坐标]  —— 之后会绕 Z 轴旋转 -90°，使轴向变成 +X
+const PROFILE = [
+  [0.00, -7.00],
+  [3.20, -7.00],
+  [4.02, -6.70],
+  [4.30, -6.15],
+  [4.35, -5.40],
+  [4.35,  4.55],
+  [4.12,  5.25],
+  [3.28,  6.05],
+  [2.10,  6.80],
+  [1.65,  7.40],
+  [1.56,  8.30],
+  [1.56,  8.70]
+];
+
+const bottleGeo = new THREE.LatheGeometry(
+  PROFILE.map(p => new THREE.Vector2(p[0], p[1])),
+  64
+);
+bottleGeo.rotateZ(-Math.PI / 2);
+bottleGeo.translate(X_OFFSET, 0, 0);
+
+// 半径查找函数（用于把水、礁石裁剪在瓶身内部）
+const PROF_X = PROFILE.map(p => p[1] + X_OFFSET);
+const PROF_R = PROFILE.map(p => p[0]);
+function radiusAt(x) {
+  if (x <= PROF_X[0]) return PROF_R[0];
+  for (let i = 1; i < PROF_X.length; i++) {
+    if (x <= PROF_X[i]) {
+      const span = (PROF_X[i] - PROF_X[i - 1]) || 1e-5;
+      const t = (x - PROF_X[i - 1]) / span;
+      return PROF_R[i - 1] + (PROF_R[i] - PROF_R[i - 1]) * t;
+    }
+  }
+  return PROF_R[PROF_R.length - 1];
+}
+
+const bottle = new THREE.Group();
+scene.add(bottle);
+
+// 玻璃主体
+const glassMat = new THREE.MeshPhysicalMaterial({
+  color: 0xd6f0ff,
+  transparent: true,
+  opacity: 0.115,
+  roughness: 0.045,
+  metalness: 0.0,
+  clearcoat: 1.0,
+  clearcoatRoughness: 0.03,
+  envMapIntensity: 2.4,
+  side: THREE.DoubleSide,
+  depthWrite: false
+});
+const glassMesh = new THREE.Mesh(bottleGeo, glassMat);
+glassMesh.renderOrder = 10;
+bottle.add(glassMesh);
+
+// 玻璃外沿的菲涅尔“光晕”
+const rimMat = new THREE.MeshBasicMaterial({
+  color: 0x5ec8ff,
+  transparent: true,
+  opacity: 0.05,
+  blending: THREE.AdditiveBlending,
+  side: THREE.BackSide,
+  depthWrite: false
+});
+const rimMesh = new THREE.Mesh(bottleGeo, rimMat);
+rimMesh.scale.set(1.004, 1.018, 1.018);
+rimMesh.renderOrder = 11;
+bottle.add(rimMesh);
+
+/* ============================================================
+   5. 木塞 + 瓶颈装饰环
+   ============================================================ */
+const corkMat = new THREE.MeshStandardMaterial({
+  color: 0xc79a63, roughness: 0.94, metalness: 0.0, flatShading: true
+});
+const corkGeo = new THREE.CylinderGeometry(1.48, 1.40, 1.65, 18, 1);
+corkGeo.rotateZ(-Math.PI / 2);
+const cork = new THREE.Mesh(corkGeo, corkMat);
+cork.position.set(7.30, 0, 0);
+bottle.add(cork);
+
+// 瓶颈金色细环
+const goldMat = new THREE.MeshStandardMaterial({
+  color: 0xe0b34a, roughness: 0.28, metalness: 1.0, envMapIntensity: 1.6
+});
+for (const gx of [6.55, 6.85]) {
+  const ringGeo = new THREE.TorusGeometry(1.70, 0.045, 8, 40);
+  ringGeo.rotateY(Math.PI / 2);
+  const ring = new THREE.Mesh(ringGeo, goldMat);
+  ring.position.set(gx, 0, 0);
+  bottle.add(ring);
+}
+
+/* ============================================================
+   6. 波浪函数（船与水共用）
+   ============================================================ */
+const WATER_LEVEL = -1.55;
+
+function waveAt(x, z, t) {
+  let h = 0;
+  h += Math.sin(x * 1.10 + t * 1.90) * 0.135;
+  h += Math.sin(z * 1.52 - t * 1.30 + x * 0.35) * 0.100;
+  h += Math.sin((x + z) * 0.86 + t * 2.40) * 0.062;
+  h += Math.sin((x - z) * 1.95 - t * 3.10) * 0.034;
+  h += Math.sin(Math.hypot(x + 1.0, z) * 2.60 - t * 2.90) * 0.048;
+  return h;
+}
+
+/* ============================================================
+   7. 体素水面（InstancedMesh）
+   ============================================================ */
+const STEP = 0.30;
+const WATER_X_MIN = -6.90;
+const WATER_X_MAX = 3.90;
+const WATER_Z_LIM = 3.60;
+
+const cubes = [];
+for (let x = WATER_X_MIN; x <= WATER_X_MAX; x += STEP) {
+  const r = radiusAt(x);
+  for (let z = -WATER_Z_LIM; z <= WATER_Z_LIM; z += STEP) {
+    const halo = Math.sqrt(Math.max(0, r * r - z * z));
+    const yBottom = Math.max(-4.15, -halo + 0.10);
+    if (yBottom > WATER_LEVEL - 0.70) continue;   // 靠近瓶壁的浅水区跳过
+    cubes.push({ x, z, yBottom });
+  }
+}
+
+const waterGeo = new THREE.BoxGeometry(STEP * 0.97, 1, STEP * 0.97);
+waterGeo.translate(0, 0.5, 0);   // 让缩放从底部生长
+
+const waterMat = new THREE.MeshStandardMaterial({
+  roughness: 0.16,
+  metalness: 0.30,
+  envMapIntensity: 1.5
+});
+
+const waterMesh = new THREE.InstancedMesh(waterGeo, waterMat, cubes.length);
+waterMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+waterMesh.frustumCulled = false;
+scene.add(waterMesh);
+
+// 初始化一次颜色缓冲（必须先把每个实例都写一遍）
+{
+  const tmpC = new THREE.Color(0x115599);
+  for (let i = 0; i < cubes.length; i++) waterMesh.setColorAt(i, tmpC);
+}
+
+const _wm = new THREE.Matrix4();
+const _wc = new THREE.Color();
+const QUANT = 0.055;   // 波高量化步长 —— 制造体素台阶感
+
+function updateWater(t) {
+  for (let i = 0; i < cubes.length; i++) {
+    const c = cubes[i];
+
+    let h = waveAt(c.x, c.z, t);
+    h = Math.round(h / QUANT) * QUANT;
+
+    const yTop = WATER_LEVEL + h;
+    const height = Math.max(0.06, yTop - c.yBottom);
+
+    _wm.set(
+      STEP * 0.97, 0, 0, c.x,
+      0, height, 0, c.yBottom,
+      0, 0, STEP * 0.97, c.z,
+      0, 0, 0, 1
+    );
+    waterMesh.setMatrixAt(i, _wm);
+
+    // 越靠近波峰越亮越偏青
+    const k = Math.min(1, Math.max(0, (h + 0.45) / 0.90));
+    const light = 0.10 + 0.47 * Math.pow(k, 1.35);
+    const hue = 0.578 - 0.078 * k;
+    _wc.setHSL(hue, 0.80, light);
+    waterMesh.setColorAt(i, _wc);
+  }
+  waterMesh.instanceMatrix.needsUpdate = true;
+  if (waterMesh.instanceColor) waterMesh.instanceColor.needsUpdate = true;
+}
+
+/* ============================================================
+   8. 体素帆船
+   ============================================================ */
+const VOX = 0.30;
+const shipVoxels = [];
+
+function put(ix, iy, iz, color) {
+  shipVoxels.push({ x: ix, y: iy, z: iz, c: color });
+}
+
+const COL = {
+  hullDark:  0x331d10,
+  hullMid:   0x6b4526,
+  hullLight: 0xa06d3c,
+  deck:      0xc7a06a,
+  gold:      0xe4b447,
+  mast:      0x6a4a2a,
+  sail:      0xf3efe3,
+  sailB:     0xe6dcc4,
+  flag:      0xd1342f
+};
+
+/* --- 船体 --- */
+for (let i = -7; i <= 7; i++) {
+  const t = i / 7.5;
+  const wMax = Math.round(3.1 * Math.sqrt(Math.max(0, 1 - t * t)));
+  if (wMax < 1) continue;
+
+  for (let j = -3; j <= 0; j++) {
+    const k = (j + 3) / 3;                       // 0 = 龙骨, 1 = 甲板
+    const wj = Math.max(0, Math.round(wMax * (0.28 + 0.72 * k)));
+    for (let z = -wj; z <= wj; z++) {
+      let color;
+      if (j === 0) {
+        color = (Math.abs(z) === wj) ? COL.hullLight : COL.deck;
+      } else if (j === -3) {
+        color = COL.hullDark;
+      } else if (j === -2) {
+        color = COL.hullMid;
+      } else {
+        color = COL.hullLight;
+      }
+      put(i, j, z, color);
+    }
+  }
+
+  // 金色船舷
+  if (wMax >= 2) {
+    const wj = wMax;
+    for (let z = -wj; z <= wj; z++) {
+      if (Math.abs(z) === wj) put(i, 1, z, COL.gold);
+    }
+  }
+}
+
+/* --- 船首斜桅 --- */
+for (let i = 8; i <= 10; i++) put(i, 0, 0, COL.hullMid);
+put(10, 1, 0, COL.gold);
+
+/* --- 船尾楼 --- */
+for (let i = -6; i <= -4; i++) {
+  for (let j = 1; j <= 2; j++) {
+    for (let z = -1; z <= 1; z++) {
+      put(i, j, z, j === 2 ? COL.hullLight : COL.hullMid);
+    }
+  }
+}
+
+/* --- 桅杆 --- */
+for (let j = 1; j <= 9; j++) put(0, j, 0, COL.mast);
+
+/* --- 横桅 --- */
+for (let z = -3; z <= 3; z++) put(0, 8, z, COL.mast);
+
+/* --- 主帆（向 +X 鼓起） --- */
+for (let j = 2; j <= 7; j++) {
+  for (let z = -3; z <= 3; z++) {
+    const bulge = Math.round(1.7 * Math.cos((z / 3.4) * Math.PI * 0.5));
+    put(bulge, j, z, (j % 2 === 0) ? COL.sail : COL.sailB);
+  }
+}
+
+/* --- 旗子 --- */
+put(-1, 9, 0, COL.flag);
+put(-2, 9, 0, COL.flag);
+put(-1, 8, 1, COL.flag);
+
+/* --- 用 InstancedMesh 合批 --- */
+const shipGeo = new THREE.BoxGeometry(VOX * 0.96, VOX * 0.96, VOX * 0.96);
+const shipMat = new THREE.MeshStandardMaterial({
+  roughness: 0.72, metalness: 0.06, envMapIntensity: 0.95
+});
+const shipMesh = new THREE.InstancedMesh(shipGeo, shipMat, shipVoxels.length);
+shipMesh.frustumCulled = false;
+
+{
+  const m = new THREE.Matrix4();
+  const c = new THREE.Color();
+  for (let i = 0; i < shipVoxels.length; i++) {
+    const v = shipVoxels[i];
+    m.makeTranslation(v.x * VOX, v.y * VOX, v.z * VOX);
+    shipMesh.setMatrixAt(i, m);
+    c.setHex(v.c);
+    const f = 0.90 + Math.random() * 0.20;   // 轻微色差，更有木头质感
+    c.multiplyScalar(f);
+    shipMesh.setColorAt(i, c);
+  }
+  shipMesh.instanceMatrix.needsUpdate = true;
+  shipMesh.instanceColor.needsUpdate = true;
+}
+
+const ship = new THREE.Group();
+ship.add(shipMesh);
+ship.position.set(-0.3, WATER_LEVEL + 0.55, 0);
+scene.add(ship);
+
+/* ============================================================
+   9. 瓶内静态点缀：礁石小岛
+   ============================================================ */
+const decoList = [];   // {p:Vector3, s:Number, c:Number}
+
+function addRockStack(cx, cz, height) {
+  const yBottom = -3.95;
+  const s = 0.26;
+  for (let j = 0; j < height; j++) {
+    const tt = j / height;
+    const r = Math.max(0, Math.round(1.7 * (1 - tt * 0.82)));
+    const y = yBottom + j * s;
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (dx * dx + dz * dz > r * r + 0.35) continue;
+        if (Math.random() < 0.16) continue;
+        const wx = cx + dx * s;
+        const wz = cz + dz * s;
+        // 保证不穿出瓶壁
+        if (Math.hypot(0, 0) + Math.abs(wz) > radiusAt(wx) - 0.15) continue;
+        let color = 0x6d7480;
+        if (y > -1.95) color = 0x4f7d4a;       // 顶部苔藓
+        else if (y > -2.55) color = 0x7b8490;
+        decoList.push({ p: new THREE.Vector3(wx, y, wz), s, c: color });
+      }
+    }
+  }
+}
+
+addRockStack(-5.40, -1.30, 13);
+addRockStack(3.00, 1.90, 12);
+addRockStack(-4.10, 2.10, 8);
+
+/* --- 瓶中漂浮云朵（单独管理，会缓慢漂移） --- */
+const cloudMat = new THREE.MeshStandardMaterial({
+  color: 0xe8f2ff, roughness: 1.0, metalness: 0.0,
+  emissive: 0x2b4a7a, emissiveIntensity: 0.9
+});
+const clouds = [];
+
+function makeCloud() {
+  const g = new THREE.Group();
+  const n = 4 + Math.floor(Math.random() * 4);
+  for (let i = 0; i < n; i++) {
+    const s = 0.20 + Math.random() * 0.16;
+    const b = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), cloudMat);
+    b.position.set(
+      (Math.random() - 0.5) * 0.75,
+      (Math.random() - 0.5) * 0.22,
+      (Math.random() - 0.5) * 0.75
+    );
+    g.add(b);
+  }
+  return g;
+}
+
+for (let i = 0; i < 7; i++) {
+  const obj = makeCloud();
+  const baseY = 2.05 + Math.random() * 0.95;
+  const baseZ = (Math.random() - 0.5) * 3.6;
+  obj.position.set(-6.2 + Math.random() * 9.5, baseY, baseZ);
+  scene.add(obj);
+  clouds.push({
+    obj,
+    baseY,
+    speed: 0.16 + Math.random() * 0.22,
+    phase: Math.random() * Math.PI * 2
+  });
+}
+
+/* --- 把静态点缀合批 --- */
+if (decoList.length > 0) {
+  const decoGeo = new THREE.BoxGeometry(1, 1, 1);
+  const decoMat = new THREE.MeshStandardMaterial({
+    roughness: 0.92, metalness: 0.02, envMapIntensity: 0.7, flatShading: true
+  });
+  const decoMesh = new THREE.InstancedMesh(decoGeo, decoMat, decoList.length);
+  decoMesh.frustumCulled = false;
+
+  const m = new THREE.Matrix4();
+  const c = new THREE.Color();
+  for (let i = 0; i < decoList.length; i++) {
+    const d = decoList[i];
+    m.makeScale(d.s, d.s, d.s);
+    m.setPosition(d.p.x, d.p.y, d.p.z);
+    decoMesh.setMatrixAt(i, m);
+    c.setHex(d.c).multiplyScalar(0.9 + Math.random() * 0.2);
+    decoMesh.setColorAt(i, c);
+  }
+  decoMesh.instanceMatrix.needsUpdate = true;
+  decoMesh.instanceColor.needsUpdate = true;
+  scene.add(decoMesh);
+}
+
+/* ============================================================
+   10. 漂浮的小木桶（带波浪物理）
+   ============================================================ */
+const barrelBodyMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2f, roughness: 0.88 });
+const barrelBandMat = new THREE.MeshStandardMaterial({ color: 0x4b4b58, roughness: 0.45, metalness: 0.75 });
+const barrelBodyGeo = new THREE.BoxGeometry(0.30, 0.32, 0.30);
+const barrelBandGeo = new THREE.BoxGeometry(0.335, 0.055, 0.335);
+
+function makeBarrel() {
+  const g = new THREE.Group();
+  g.add(new THREE.Mesh(barrelBodyGeo, barrelBodyMat));
+  const top = new THREE.Mesh(barrelBandGeo, barrelBandMat);
+  top.position.y = 0.125;
+  g.add(top);
+  const bot = new THREE.Mesh(barrelBandGeo, barrelBandMat);
+  bot.position.y = -0.125;
+  g.add(bot);
+  return g;
+}
+
+const floaters = [];
+const floaterSpots = [
+  [-4.55, 1.55], [-2.85, -2.35], [1.55, 2.30],
+  [2.95, -1.75], [-1.15, 2.55]
+];
+for (const [fx, fz] of floaterSpots) {
+  const g = makeBarrel();
+  g.position.set(fx, WATER_LEVEL, fz);
+  const s = 0.85 + Math.random() * 0.45;
+  g.scale.setScalar(s);
+  scene.add(g);
+  floaters.push({ obj: g, x: fx, z: fz, phase: Math.random() * Math.PI * 2 });
+}
+
+/* ============================================================
+   11. 漂浮微尘粒子
+   ============================================================ */
+function createDotTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const ctx = c.getContext('2d');
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  g.addColorStop(0.00, 'rgba(255,255,255,1)');
+  g.addColorStop(0.32, 'rgba(180,235,255,0.65)');
+  g.addColorStop(1.00, 'rgba(110,190,255,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+const DUST_COUNT = 190;
+const dustPositions = new Float32Array(DUST_COUNT * 3);
+
+for (let i = 0; i < DUST_COUNT; i++) {
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const x = -6.6 + Math.random() * 10.4;
+    const R = Math.max(0.6, radiusAt(x) - 0.45);
+    const ang = Math.random() * Math.PI * 2;
+    const rr = Math.sqrt(Math.random()) * R;
+    const y = Math.cos(ang) * rr;
+    const z = Math.sin(ang) * rr;
+    if (y < WATER_LEVEL + 0.15) continue;   // 只放在水面之上
+    dustPositions[i * 3] = x;
+    dustPositions[i * 3 + 1] = y;
+    dustPositions[i * 3 + 2] = z;
+    break;
+  }
+}
+
+const dustGeo = new THREE.BufferGeometry();
+dustGeo.setAttribute('position', new THREE.BufferAttribute(dustPositions, 3));
+
+const dustMat = new THREE.PointsMaterial({
+  size: 0.115,
+  map: createDotTexture(),
+  color: 0xa8dcff,
+  transparent: true,
+  opacity: 0.85,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending,
+  sizeAttenuation: true
+});
+
+const dustPoints = new THREE.Points(dustGeo, dustMat);
+scene.add(dustPoints);
+
+/* ============================================================
+   12. 动画更新
+   ============================================================ */
+function updateShip(t, dt) {
+  const cx = -0.30;
+  const cz = 0;
+
+  const targetY = WATER_LEVEL + 0.55 + waveAt(cx, cz, t) * 1.15;
+  ship.position.x = cx;
+  ship.position.z = cz;
+  ship.position.y += (targetY - ship.position.y) * Math.min(1, dt * 7.0);
+
+  const hFore  = waveAt(cx + 1.9, cz, t);
+  const hAft   = waveAt(cx - 1.9, cz, t);
+  const hLeft  = waveAt(cx, cz - 1.1, t);
+  const hRight = waveAt(cx, cz + 1.1, t);
+
+  const pitch = Math.atan2(hFore - hAft, 3.8) * 0.95;
+  const roll  = Math.atan2(hLeft - hRight, 2.2) * 0.55;
+
+  ship.rotation.z += (pitch - ship.rotation.z) * Math.min(1, dt * 5.5);
+  ship.rotation.x += (roll - ship.rotation.x) * Math.min(1, dt * 5.5);
+
+  // 轻微摇曳
+  ship.rotation.y = Math.sin(t * 0.45) * 0.035;
+}
+
+function updateFloaters(t) {
+  for (const f of floaters) {
+    const h = waveAt(f.x, f.z, t);
+    f.obj.position.y = WATER_LEVEL + h + 0.02;
+    const hx = waveAt(f.x + 0.35, f.z, t) - waveAt(f.x - 0.35, f.z, t);
+    const hz = waveAt(f.x, f.z + 0.35, t) - waveAt(f.x, f.z - 0.35, t);
+    f.obj.rotation.z = Math.atan2(hx, 0.7) * 0.65;
+    f.obj.rotation.x = -Math.atan2(hz, 0.7) * 0.65;
+    f.obj.rotation.y = f.phase + t * 0.25;
+  }
+}
+
+function updateClouds(t, dt) {
+  for (const c of clouds) {
+    c.obj.position.x += c.speed * dt;
+    if (c.obj.position.x > 3.9) c.obj.position.x = -6.4;
+    c.obj.position.y = c.baseY + Math.sin(t * 0.68 + c.phase) * 0.13;
+  }
+}
+
+/* ============================================================
+   13. 相机自动取景 & 自适应
+   ============================================================ */
+function frameCamera() {
+  const sphereR = 9.6;
+  const vFov = camera.fov * Math.PI / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const fov = Math.min(vFov, hFov);
+  const dist = (sphereR / Math.sin(fov / 2)) * 1.06;
+
+  const dir = new THREE.Vector3(0.62, 0.40, 0.88).normalize();
+  camera.position.copy(dir.multiplyScalar(dist));
+  camera.lookAt(controls.target);
+
+  controls.minDistance = dist * 0.35;
+  controls.maxDistance = dist * 2.1;
+  controls.update();
+}
+
+frameCamera();
+
+function onResize() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  renderer.setSize(w, h);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+
+/* ============================================================
+   14. 主循环
+   ============================================================ */
+const clock = new THREE.Clock();
+let elapsed = 0;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  const dt = Math.min(clock.getDelta(), 0.05);
+  elapsed += dt;
+
+  updateWater(elapsed);
+  updateShip(elapsed, dt);
+  updateFloaters(elapsed);
+  updateClouds(elapsed, dt);
+
+  // 瓶中微尘缓慢旋转
+  dustPoints.rotation.x = elapsed * 0.035;
+  dustMat.opacity = 0.62 + Math.sin(elapsed * 0.9) * 0.18;
+
+  // 灯光微微呼吸
+  fillLight.intensity = 45 + Math.sin(elapsed * 1.3) * 6;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+
+// 先算一帧水，避免出现全黑实例
+updateWater(0);
+animate();
+</script>
+
+<script src="../prompt-panel.js" data-id="ship-bottle-deepseek"></script>
+</body>
+</html>

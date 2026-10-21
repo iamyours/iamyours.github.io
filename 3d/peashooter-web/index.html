@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D体素豌豆射手挂件 - 互动工作台</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 50% 35%, #fffdf5 0%, #e7f5dc 52%, #bfe3b4 100%);
+      color: #2b3a24;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角固定返回按钮（半透明奶油色圆角小按钮样式） */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 15px;
+      background: rgba(255, 250, 238, 0.86);
+      color: #4a3f2c;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(215, 198, 165, 0.65);
+      box-shadow: 0 4px 14px rgba(60, 45, 15, 0.12);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 253, 246, 0.96);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 6px 18px rgba(60, 45, 15, 0.18);
+    }
+
+    .back-btn:active {
+      transform: translateY(0) scale(0.98);
+    }
+
+    /* 顶部状态与计分板 */
+    .hud-top {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      pointer-events: none;
+    }
+
+    .stat-pill {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 14px;
+      background: rgba(255, 250, 238, 0.88);
+      border: 2px solid rgba(130, 175, 95, 0.45);
+      border-radius: 999px;
+      box-shadow: 0 4px 14px rgba(45, 80, 30, 0.12);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 13px;
+      font-weight: 700;
+      color: #365226;
+    }
+
+    .stat-pill .badge {
+      background: #58c928;
+      color: #fff;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      min-width: 28px;
+      text-align: center;
+      box-shadow: inset 0 -2px 0 rgba(0,0,0,0.18);
+    }
+
+    .sound-btn {
+      pointer-events: auto;
+      cursor: pointer;
+      border: 2px solid rgba(130, 175, 95, 0.45);
+      background: rgba(255, 250, 238, 0.88);
+      color: #365226;
+      border-radius: 999px;
+      padding: 7px 13px;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 4px 14px rgba(45, 80, 30, 0.12);
+      backdrop-filter: blur(8px);
+      transition: all 0.18s ease;
+    }
+
+    .sound-btn:hover {
+      background: #ffffff;
+      transform: translateY(-1px);
+    }
+
+    /* 标题提示卡 */
+    .title-banner {
+      position: fixed;
+      top: 68px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      text-align: center;
+      pointer-events: none;
+      width: 92%;
+      max-width: 520px;
+    }
+
+    .title-banner h1 {
+      font-size: clamp(20px, 3.5vw, 28px);
+      font-weight: 900;
+      color: #264c17;
+      letter-spacing: 0.5px;
+      text-shadow: 0 2px 0 rgba(255, 255, 255, 0.9), 0 6px 16px rgba(65, 120, 35, 0.18);
+    }
+
+    .title-banner p {
+      margin-top: 4px;
+      font-size: clamp(12px, 2vw, 13.5px);
+      color: #4b6e39;
+      background: rgba(255, 252, 242, 0.75);
+      display: inline-block;
+      padding: 4px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(130, 175, 95, 0.35);
+      backdrop-filter: blur(4px);
+    }
+
+    /* 底部交互控制坞 */
+    .dock-wrapper {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 25;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: 95%;
+      max-width: 680px;
+      pointer-events: none;
+    }
+
+    .mode-switcher, .action-bar {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 8px 12px;
+      background: rgba(255, 250, 238, 0.88);
+      border: 2px solid rgba(135, 175, 100, 0.45);
+      border-radius: 22px;
+      box-shadow: 0 10px 28px rgba(35, 65, 20, 0.16);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .ctrl-btn {
+      cursor: pointer;
+      border: none;
+      outline: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 15px;
+      border-radius: 14px;
+      font-size: 13.5px;
+      font-weight: 800;
+      color: #2f4722;
+      background: #f3eedc;
+      box-shadow: 0 3px 0 #cfc4a5, 0 4px 8px rgba(0, 0, 0, 0.08);
+      transition: transform 0.14s cubic-bezier(0.34, 1.56, 0.64, 1), background 0.15s ease, box-shadow 0.14s ease;
+    }
+
+    .ctrl-btn:hover {
+      transform: translateY(-2px);
+      background: #faf6e8;
+      box-shadow: 0 5px 0 #cfc4a5, 0 6px 12px rgba(0, 0, 0, 0.12);
+    }
+
+    .ctrl-btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #cfc4a5;
+    }
+
+    .ctrl-btn.primary {
+      background: linear-gradient(180deg, #74e33b 0%, #4dbd1b 100%);
+      color: #ffffff;
+      box-shadow: 0 4px 0 #2e7d0c, 0 6px 14px rgba(77, 189, 27, 0.35);
+      text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+
+    .ctrl-btn.primary:hover {
+      background: linear-gradient(180deg, #82ec4b 0%, #56cb22 100%);
+      box-shadow: 0 5px 0 #2e7d0c, 0 8px 18px rgba(77, 189, 27, 0.45);
+    }
+
+    .ctrl-btn.primary:active {
+      transform: translateY(2px);
+      box-shadow: 0 1px 0 #2e7d0c;
+    }
+
+    .ctrl-btn.plantfood {
+      background: linear-gradient(180deg, #ffe047 0%, #f59e0b 100%);
+      color: #4a2700;
+      box-shadow: 0 4px 0 #b46904, 0 6px 14px rgba(245, 158, 11, 0.35);
+    }
+
+    .ctrl-btn.plantfood:hover {
+      background: linear-gradient(180deg, #ffe869 0%, #fbab19 100%);
+    }
+
+    .ctrl-btn.plantfood.active-ult {
+      animation: pulseUlt 0.4s infinite alternate;
+      pointer-events: none;
+    }
+
+    @keyframes pulseUlt {
+      from { transform: scale(1); filter: brightness(1); }
+      to { transform: scale(1.06); filter: brightness(1.18); }
+    }
+
+    .mode-btn {
+      cursor: pointer;
+      border: 2px solid transparent;
+      padding: 6px 13px;
+      border-radius: 12px;
+      font-size: 12.5px;
+      font-weight: 800;
+      background: rgba(235, 242, 226, 0.7);
+      color: #466138;
+      transition: all 0.18s ease;
+    }
+
+    .mode-btn:hover {
+      background: rgba(220, 236, 205, 0.95);
+    }
+
+    .mode-btn.active {
+      background: #ffffff;
+      border-color: #58c928;
+      color: #244b12;
+      box-shadow: 0 3px 10px rgba(88, 201, 40, 0.22);
+    }
+
+    .mode-btn[data-mode="ice"].active {
+      border-color: #29b6f6;
+      color: #095c85;
+      box-shadow: 0 3px 10px rgba(41, 182, 246, 0.25);
+    }
+
+    .mode-btn[data-mode="fire"].active {
+      border-color: #ff7043;
+      color: #8c2505;
+      box-shadow: 0 3px 10px rgba(255, 112, 67, 0.25);
+    }
+
+    /* 浮动伤害与互动文字特效 */
+    #floating-labels {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 18;
+      overflow: hidden;
+    }
+
+    .float-text {
+      position: absolute;
+      font-weight: 900;
+      font-size: 18px;
+      transform: translate(-50%, -50%);
+      text-shadow: 0 2px 0 rgba(0, 0, 0, 0.25), 0 0 8px rgba(255, 255, 255, 0.7);
+      animation: floatUp 0.95s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+      white-space: nowrap;
+    }
+
+    @keyframes floatUp {
+      0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+      }
+      25% {
+        opacity: 1;
+        transform: translate(-50%, -95%) scale(1.15);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -175%) scale(0.9);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .title-banner {
+        top: 62px;
+      }
+      .ctrl-btn {
+        padding: 8px 11px;
+        font-size: 12px;
+      }
+      .mode-btn {
+        padding: 5px 10px;
+        font-size: 11.5px;
+      }
+      .dock-wrapper {
+        bottom: 12px;
+        gap: 6px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 左上角固定返回按钮 -->
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <!-- 右上角计分与音效开关 -->
+  <div class="hud-top">
+    <div class="stat-pill" title="击中右侧僵尸挂件的次数">
+      <span>🎯 命中僵尸</span>
+      <span class="badge" id="hit-counter">0</span>
+    </div>
+    <div class="stat-pill" title="收集到的阳光能量">
+      <span>☀️ 阳光</span>
+      <span class="badge" id="sun-counter" style="background:#f59e0b;">150</span>
+    </div>
+    <button class="sound-btn" id="sound-toggle" title="开关合成音效">🔊 音效: 开</button>
+  </div>
+
+  <!-- 顶部标题引导 -->
+  <div class="title-banner">
+    <h1>🌱 豌豆射手 · 3D体素挂件</h1>
+    <p>点击豌豆头发射 · 摸摸头顶叶片有惊喜 · 点击僵尸换防具 · 空格键连发</p>
+  </div>
+
+  <!-- 浮动文字容器 -->
+  <div id="floating-labels"></div>
+
+  <!-- 3D 画布容器 -->
+  <div id="canvas-container"></div>
+
+  <!-- 底部操作面板 -->
+  <div class="dock-wrapper">
+    <div class="mode-switcher">
+      <button class="mode-btn active" data-mode="classic">🟢 经典豌豆</button>
+      <button class="mode-btn" data-mode="ice">❄️ 寒冰射手</button>
+      <button class="mode-btn" data-mode="fire">🔥 烈火豌豆</button>
+    </div>
+    <div class="action-bar">
+      <button class="ctrl-btn primary" id="btn-shoot">🟢 发射豌豆 (Space)</button>
+      <button class="ctrl-btn plantfood" id="btn-ult">⚡ 喂能量豆 (机枪大招)</button>
+      <button class="ctrl-btn" id="btn-pet">💚 摸摸叶片</button>
+      <button class="ctrl-btn" id="btn-zombie-hat">🪣 切换僵尸防具</button>
+      <button class="ctrl-btn" id="btn-shake">🔔 晃动挂件</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+    // ==========================================
+    // 1. Web Audio API 程序化音效合成器（零外部音频）
+    // ==========================================
+    class SoundFX {
+      constructor() {
+        this.enabled = true;
+        this.ctx = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) this.ctx = new AudioCtx();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      playPop(pitchOffset = 0) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        const baseFreq = 260 + pitchOffset * 40;
+        osc.frequency.setValueAtTime(baseFreq, now);
+        osc.frequency.exponentialRampToValueAtTime(baseFreq * 2.4, now + 0.065);
+        osc.frequency.exponentialRampToValueAtTime(140, now + 0.13);
+
+        gain.gain.setValueAtTime(0.28, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.15);
+      }
+
+      playHit(armorType = 'none') {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        if (armorType === 'bucket') {
+          // 铁桶清脆金属当当声
+          [620, 940, 1480].forEach((freq, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = idx === 0 ? 'triangle' : 'square';
+            osc.frequency.setValueAtTime(freq + (Math.random() - 0.5) * 30, now);
+            osc.frequency.exponentialRampToValueAtTime(freq * 0.85, now + 0.22);
+
+            gain.gain.setValueAtTime(0.14 / (idx + 1), now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.25);
+          });
+        } else if (armorType === 'cone') {
+          // 塑料路障闷响
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(210, now);
+          osc.frequency.exponentialRampToValueAtTime(75, now + 0.12);
+
+          gain.gain.setValueAtTime(0.32, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.14);
+        } else {
+          // 普通击中啪嗒声
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(160, now);
+          osc.frequency.exponentialRampToValueAtTime(55, now + 0.1);
+
+          gain.gain.setValueAtTime(0.22, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.12);
+        }
+      }
+
+      playPowerUp() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const notes = [330, 440, 554.37, 659.25, 880];
+        notes.forEach((n, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(n, now + i * 0.055);
+          gain.gain.setValueAtTime(0.18, now + i * 0.055);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.055 + 0.28);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.055);
+          osc.stop(now + i * 0.055 + 0.3);
+        });
+      }
+
+      playCuteChime() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+          gain.gain.setValueAtTime(0.16, now + idx * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.25);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.06);
+          osc.stop(now + idx * 0.06 + 0.26);
+        });
+      }
+
+      playJingle() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        [1850, 2320, 2760].forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, now + i * 0.035);
+          gain.gain.setValueAtTime(0.08, now + i * 0.035);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.035 + 0.16);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + i * 0.035);
+          osc.stop(now + i * 0.035 + 0.17);
+        });
+      }
+    }
+
+    const sfx = new SoundFX();
+
+    // ==========================================
+    // 2. 场景、相机、渲染器与灯光初始化
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0.3, 1.4, 11.8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0.3, 0.5, 0);
+    controls.minDistance = 5.5;
+    controls.maxDistance = 20;
+    controls.maxPolarAngle = Math.PI * 0.78;
+    controls.minPolarAngle = Math.PI * 0.12;
+
+    // 柔和环境光与立体主副光源
+    const ambientLight = new THREE.AmbientLight(0xf6ffe8, 1.15);
+    scene.add(ambientLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfffbeb, 2.2);
+    dirLight.position.set(6, 12, 8);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 1;
+    dirLight.shadow.camera.far = 30;
+    const d = 7;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.0005;
+    scene.add(dirLight);
+
+    const rimLight = new THREE.DirectionalLight(0x98f5ff, 1.0);
+    rimLight.position.set(-7, 5, -6);
+    scene.add(rimLight);
+
+    const bounceLight = new THREE.DirectionalLight(0xb5f584, 0.65);
+    bounceLight.position.set(0, -6, 3);
+    scene.add(bounceLight);
+
+    // 底部柔和阴影接收托盘（透明阴影平面）
+    const shadowPlaneGeo = new THREE.PlaneGeometry(30, 30);
+    const shadowPlaneMat = new THREE.ShadowMaterial({ opacity: 0.14 });
+    const shadowPlane = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+    shadowPlane.rotation.x = -Math.PI / 2;
+    shadowPlane.position.y = -3.85;
+    shadowPlane.receiveShadow = true;
+    scene.add(shadowPlane);
+
+    // ==========================================
+    // 3. 体素构建工具与材质库
+    // ==========================================
+    const VOXEL_SIZE = 0.24;
+    const sharedVoxelGeo = new RoundedBoxGeometry(
+      VOXEL_SIZE * 0.96,
+      VOXEL_SIZE * 0.96,
+      VOXEL_SIZE * 0.96,
+      2,
+      0.038
+    );
+
+    const materialCache = new Map();
+    function getVoxelMat(hex, opts = {}) {
+      const key = `${hex}_${opts.roughness ?? 0.32}_${opts.metalness ?? 0.05}_${opts.transparent ?? false}_${opts.opacity ?? 1}_${opts.emissive ?? 0}`;
+      if (materialCache.has(key)) return materialCache.get(key);
+      const mat = new THREE.MeshStandardMaterial({
+        color: hex,
+        roughness: opts.roughness ?? 0.32,
+        metalness: opts.metalness ?? 0.05,
+        transparent: opts.transparent ?? false,
+        opacity: opts.opacity ?? 1.0,
+        emissive: opts.emissive ?? 0x000000,
+        emissiveIntensity: opts.emissiveIntensity ?? 0.0
+      });
+      materialCache.set(key, mat);
+      return mat;
+    }
+
+    function addVoxel(parent, x, y, z, mat, scale = 1) {
+      const mesh = new THREE.Mesh(sharedVoxelGeo, mat);
+      mesh.position.set(x * VOXEL_SIZE, y * VOXEL_SIZE, z * VOXEL_SIZE);
+      if (scale !== 1) mesh.scale.setScalar(scale);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+      return mesh;
+    }
+
+    // 金属挂扣通用材质
+    const goldMetalMat = new THREE.MeshStandardMaterial({
+      color: 0xf7c948,
+      roughness: 0.2,
+      metalness: 0.88
+    });
+    const silverMetalMat = new THREE.MeshStandardMaterial({
+      color: 0xdce3ea,
+      roughness: 0.25,
+      metalness: 0.85
+    });
+
+    // 构建顶部挂件金属环与锁链
+    function createKeychainHardware(anchorX, topY) {
+      const root = new THREE.Group();
+      root.position.set(anchorX, topY, 0);
+      scene.add(root);
+
+      // 顶部大圆扣环
+      const splitRing = new THREE.Mesh(
+        new THREE.TorusGeometry(0.48, 0.085, 16, 36),
+        goldMetalMat
+      );
+      splitRing.position.y = 0.45;
+      splitRing.castShadow = true;
+      root.add(splitRing);
+
+      // 旋转挂钩头
+      const claspCyl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.13, 0.15, 0.22, 16),
+        goldMetalMat
+      );
+      claspCyl.position.y = -0.02;
+      root.add(claspCyl);
+
+      // 挂件摆动支点组
+      const pivotGroup = new THREE.Group();
+      root.add(pivotGroup);
+
+      // 3节金属链条环
+      for (let i = 0; i < 3; i++) {
+        const link = new THREE.Mesh(
+          new THREE.TorusGeometry(0.18, 0.048, 12, 24),
+          goldMetalMat
+        );
+        link.position.y = -0.25 - i * 0.26;
+        if (i % 2 === 1) link.rotation.y = Math.PI / 2;
+        link.castShadow = true;
+        pivotGroup.add(link);
+      }
+
+      // 旋入玩偶头顶的羊眼钉
+      const eyePin = new THREE.Mesh(
+        new THREE.TorusGeometry(0.13, 0.04, 12, 20),
+        silverMetalMat
+      );
+      eyePin.position.y = -1.0;
+      eyePin.rotation.y = Math.PI / 2;
+      pivotGroup.add(eyePin);
+
+      const screwBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.12, 0.14, 0.14, 14),
+        silverMetalMat
+      );
+      screwBase.position.y = -1.14;
+      pivotGroup.add(screwBase);
+
+      return { root, pivotGroup, splitRing };
+    }
+
+    // ==========================================
+    // 4. 构建 3D 体素豌豆射手挂件 (主角)
+    // ==========================================
+    const peashooterHardware = createKeychainHardware(-1.35, 3.85);
+    const peaSwingPivot = peashooterHardware.pivotGroup;
+
+    const peashooterRoot = new THREE.Group();
+    peashooterRoot.position.set(0, -2.55, 0);
+    peaSwingPivot.add(peashooterRoot);
+
+    // 豌豆射手动态换色材质（支持经典绿、寒冰蓝、烈火橙切换）
+    const peaMainMat = new THREE.MeshStandardMaterial({ color: 0x56c828, roughness: 0.28, metalness: 0.05 });
+    const peaLightMat = new THREE.MeshStandardMaterial({ color: 0x82e647, roughness: 0.28, metalness: 0.05 });
+    const peaDarkMat = new THREE.MeshStandardMaterial({ color: 0x389c14, roughness: 0.32, metalness: 0.05 });
+    const stemMat = new THREE.MeshStandardMaterial({ color: 0x3ca318, roughness: 0.35, metalness: 0.04 });
+    const leafMat = new THREE.MeshStandardMaterial({ color: 0x62d42e, roughness: 0.3, metalness: 0.05 });
+
+    const eyeBlackMat = getVoxelMat(0x161b14, { roughness: 0.12, metalness: 0.15 });
+    const eyeWhiteMat = getVoxelMat(0xffffff, { roughness: 0.1, metalness: 0.05 });
+    const mouthInsideMat = getVoxelMat(0x142b09, { roughness: 0.85, metalness: 0 });
+    const cheekBlushMat = getVoxelMat(0xff7b9c, { roughness: 0.4, transparent: true, opacity: 0.85 });
+
+    // 4.1 头部总成（面向 +X 方向，方便攻击右侧的僵尸挂件）
+    const headGroup = new THREE.Group();
+    headGroup.position.set(0, 0.48, 0);
+    peashooterRoot.add(headGroup);
+
+    // 头部球体体素 (7x7x7 圆润体素球)
+    for (let x = -3; x <= 3; x++) {
+      for (let y = -3; y <= 3; y++) {
+        for (let z = -3; z <= 3; z++) {
+          const distSq = x * x + y * y + z * z;
+          if (distSq <= 11.5 && distSq >= 4.2) {
+            // 留出前方(+X)嘴巴连接处
+            if (x === 3 && Math.abs(y) <= 1 && Math.abs(z) <= 1) continue;
+            let mat = peaMainMat;
+            if (y >= 2) mat = peaLightMat;
+            else if (y <= -2) mat = peaDarkMat;
+            addVoxel(headGroup, x, y, z, mat);
+          }
+        }
+      }
+    }
+
+    // 眼睛与灵动高光组（分布在 Z 轴两侧：+Z 和 -Z）
+    const eyesGroup = new THREE.Group();
+    headGroup.add(eyesGroup);
+    const pupilMeshes = [];
+    const blushMeshes = [];
+
+    [-1, 1].forEach((side) => {
+      const zPos = side * 3.15;
+      // 2x3 黑色大眼珠
+      for (let ex = 0; ex <= 1; ex++) {
+        for (let ey = 0; ey <= 2; ey++) {
+          addVoxel(eyesGroup, ex, ey, zPos, eyeBlackMat, 0.95);
+        }
+      }
+      // 眼神白色高光体素
+      const highlight = addVoxel(eyesGroup, 1.18, 1.65, zPos + side * 0.22, eyeWhiteMat, 0.58);
+      const subHighlight = addVoxel(eyesGroup, 0.25, 0.35, zPos + side * 0.2, eyeWhiteMat, 0.34);
+      pupilMeshes.push({ mesh: highlight, baseX: 1.18 * VOXEL_SIZE, baseY: 1.65 * VOXEL_SIZE });
+      pupilMeshes.push({ mesh: subHighlight, baseX: 0.25 * VOXEL_SIZE, baseY: 0.35 * VOXEL_SIZE });
+
+      // 粉嫩腮红体素（摸摸头时亮起）
+      const blush = addVoxel(eyesGroup, 1.1, -0.7, side * 2.95, cheekBlushMat, 0.72);
+      blush.visible = false;
+      blushMeshes.push(blush);
+    });
+
+    // 4.2 喇叭形嘴巴/炮管组 (Snout Group - 独立缩放实现蓄力喷射动画)
+    const snoutGroup = new THREE.Group();
+    snoutGroup.position.set(3 * VOXEL_SIZE, -0.2 * VOXEL_SIZE, 0);
+    headGroup.add(snoutGroup);
+
+    // 炮管颈部 (x = 0, 1)
+    for (let sx = 0; sx <= 1; sx++) {
+      for (let sy = -1; sy <= 1; sy++) {
+        for (let sz = -1; sz <= 1; sz++) {
+          if (sy === 0 && sz === 0) {
+            if (sx === 0) addVoxel(snoutGroup, sx, sy, sz, mouthInsideMat);
+            continue;
+          }
+          addVoxel(snoutGroup, sx, sy, sz, peaMainMat);
+        }
+      }
+    }
+
+    // 喇叭口外翻厚唇环 (x = 2, 3)
+    for (let sy = -2; sy <= 2; sy++) {
+      for (let sz = -2; sz <= 2; sz++) {
+        const r2 = sy * sy + sz * sz;
+        if (r2 >= 2 && r2 <= 6) {
+          addVoxel(snoutGroup, 2, sy, sz, peaLightMat);
+          addVoxel(snoutGroup, 2.6, sy * 0.92, sz * 0.92, peaLightMat, 0.88);
+        } else if (r2 < 2) {
+          addVoxel(snoutGroup, 1.5, sy, sz, mouthInsideMat);
+        }
+      }
+    }
+
+    // 4.3 后脑勺小呆毛叶片 (Head Leaf)
+    const headLeafGroup = new THREE.Group();
+    headLeafGroup.position.set(-2.6 * VOXEL_SIZE, 1.8 * VOXEL_SIZE, 0);
+    headGroup.add(headLeafGroup);
+
+    const leafCoords = [
+      [0, 0, 0], [-1, 0.5, 0], [-2, 0.9, 0], [-3, 0.6, 0], [-3.8, 0.1, 0],
+      [-1.5, 0.7, 0.8], [-2.5, 0.7, 0.8],
+      [-1.5, 0.7, -0.8], [-2.5, 0.7, -0.8]
+    ];
+    leafCoords.forEach(([lx, ly, lz], idx) => {
+      addVoxel(headLeafGroup, lx, ly, lz, idx < 5 ? peaLightMat : leafMat, 0.88);
+    });
+
+    // 4.4 寒冰射手专属：冰晶后冠（切换到寒冰模式时显示）
+    const iceCrownGroup = new THREE.Group();
+    iceCrownGroup.visible = false;
+    headGroup.add(iceCrownGroup);
+    const iceCrystalMat = getVoxelMat(0x9be7ff, { roughness: 0.1, metalness: 0.2, transparent: true, opacity: 0.88, emissive: 0x1976d2, emissiveIntensity: 0.25 });
+    const iceSpikes = [
+      [-2.5, 2.5, 1.2], [-3.2, 3.1, 1.5],
+      [-2.5, 2.5, -1.2], [-3.2, 3.1, -1.5],
+      [-3.2, 1.2, 1.6], [-3.8, 1.4, 2.1],
+      [-3.2, 1.2, -1.6], [-3.8, 1.4, -2.1],
+      [-2.0, 3.3, 0], [-2.7, 4.0, 0]
+    ];
+    iceSpikes.forEach(([ix, iy, iz]) => {
+      addVoxel(iceCrownGroup, ix, iy, iz, iceCrystalMat, 0.86);
+    });
+
+    // 4.5 烈火豌豆专属：火焰粒子冠（切换到烈火模式时显示）
+    const fireCrownGroup = new THREE.Group();
+    fireCrownGroup.visible = false;
+    headGroup.add(fireCrownGroup);
+    const fireCoreMat = getVoxelMat(0xfff176, { roughness: 0.15, emissive: 0xff9800, emissiveIntensity: 0.8 });
+    const fireOuterMat = getVoxelMat(0xff5722, { roughness: 0.2, emissive: 0xd84315, emissiveIntensity: 0.6 });
+    const fireCrestCoords = [
+      [-1.5, 3.5, 0], [-2.2, 4.2, 0], [-0.5, 3.7, 0.8], [-0.5, 3.7, -0.8],
+      [-2.8, 3.2, 1.1], [-2.8, 3.2, -1.1], [-3.5, 2.2, 0]
+    ];
+    const fireCrownVoxels = [];
+    fireCrestCoords.forEach(([fx, fy, fz], i) => {
+      const m = addVoxel(fireCrownGroup, fx, fy, fz, i % 2 === 0 ? fireCoreMat : fireOuterMat, 0.9);
+      fireCrownVoxels.push({ mesh: m, baseY: fy * VOXEL_SIZE, phase: i * 0.9 });
+    });
+
+    // 4.6 能量豆大招专属：机枪射手战术头盔 (Gatling Pea Helmet)
+    const helmetGroup = new THREE.Group();
+    helmetGroup.visible = false;
+    headGroup.add(helmetGroup);
+    const helmetDarkMat = getVoxelMat(0x2f4f2f, { roughness: 0.45, metalness: 0.35 });
+    const helmetBandMat = getVoxelMat(0x5c4033, { roughness: 0.6, metalness: 0.1 });
+    const gunBarrelMat = getVoxelMat(0x3a3f45, { roughness: 0.3, metalness: 0.8 });
+
+    for (let hx = -3.2; hx <= 2.2; hx += 1) {
+      for (let hy = 1.2; hy <= 3.8; hy += 1) {
+        for (let hz = -3.4; hz <= 3.4; hz += 1) {
+          const dist = hx * hx + hy * hy + hz * hz;
+          if (dist >= 9 && dist <= 16.5) {
+            addVoxel(helmetGroup, hx, hy, hz, hy < 1.8 ? helmetBandMat : helmetDarkMat, 0.98);
+          }
+        }
+      }
+    }
+    // 炮管口四联装机枪管
+    [[-0.6, -0.6], [-0.6, 0.6], [0.6, -0.6], [0.6, 0.6]].forEach(([gy, gz]) => {
+      addVoxel(helmetGroup, 5.8, gy - 0.2, gz, gunBarrelMat, 0.65);
+      addVoxel(helmetGroup, 6.4, gy - 0.2, gz, gunBarrelMat, 0.65);
+    });
+
+    // 4.7 茎秆与四片卷曲底座叶片 + 迷你草坪挂件底座
+    const stemGroup = new THREE.Group();
+    peashooterRoot.add(stemGroup);
+
+    const stemPath = [
+      [0, -0.4, 0],
+      [-0.35, -1.3, 0],
+      [-0.5, -2.2, 0],
+      [-0.25, -3.1, 0],
+      [0, -4.0, 0],
+      [0, -4.8, 0]
+    ];
+    stemPath.forEach(([sx, sy, sz]) => {
+      addVoxel(stemGroup, sx, sy, sz, stemMat, 1.08);
+      addVoxel(stemGroup, sx + 0.45, sy, sz, stemMat, 0.88);
+    });
+
+    // 底部四片活力叶片
+    const baseLeavesGroup = new THREE.Group();
+    baseLeavesGroup.position.set(0, -4.9 * VOXEL_SIZE, 0);
+    peashooterRoot.add(baseLeavesGroup);
+
+    for (let dir = 0; dir < 4; dir++) {
+      const leafArm = new THREE.Group();
+      leafArm.rotation.y = (dir * Math.PI) / 2 + Math.PI / 4;
+      baseLeavesGroup.add(leafArm);
+
+      const leafVoxels = [
+        [1, 0.2, 0], [2, 0.4, 0], [3, 0.1, 0],
+        [1.5, 0.3, 0.7], [2.4, 0.2, 0.7],
+        [1.5, 0.3, -0.7], [2.4, 0.2, -0.7]
+      ];
+      leafVoxels.forEach(([lx, ly, lz]) => {
+        addVoxel(leafArm, lx, ly, lz, leafMat, 0.92);
+      });
+    }
+
+    // 迷你 PvZ 棋盘草坪方块底座
+    const turfGroup = new THREE.Group();
+    turfGroup.position.set(0, -5.8 * VOXEL_SIZE, 0);
+    peashooterRoot.add(turfGroup);
+
+    const grassLightMat = getVoxelMat(0x76d63e, { roughness: 0.4 });
+    const grassDarkMat = getVoxelMat(0x5bb827, { roughness: 0.4 });
+    const soilMat = getVoxelMat(0x6e472b, { roughness: 0.65 });
+    const soilDarkMat = getVoxelMat(0x54341d, { roughness: 0.7 });
+
+    for (let tx = -2; tx <= 2; tx++) {
+      for (let tz = -2; tz <= 2; tz++) {
+        if (Math.abs(tx) === 2 && Math.abs(tz) === 2) continue; // 圆角草坪块
+        const isChecker = (tx + tz) % 2 === 0;
+        addVoxel(turfGroup, tx, 0, tz, isChecker ? grassLightMat : grassDarkMat);
+        addVoxel(turfGroup, tx, -1, tz, isChecker ? soilMat : soilDarkMat);
+      }
+    }
+
+    // ==========================================
+    // 5. 构建右侧互动标靶：3D体素僵尸挂件 (Zombie Charm)
+    // ==========================================
+    const zombieHardware = createKeychainHardware(2.65, 3.85);
+    const zombieSwingPivot = zombieHardware.pivotGroup;
+
+    const zombieRoot = new THREE.Group();
+    zombieRoot.position.set(0, -2.55, 0);
+    zombieSwingPivot.add(zombieRoot);
+
+    const zSkinMat = getVoxelMat(0x7fa37c, { roughness: 0.38 });
+    const zSkinDarkMat = getVoxelMat(0x638560, { roughness: 0.42 });
+    const zEyeYellowMat = getVoxelMat(0xfff3b0, { roughness: 0.15 });
+    const zEyeRedMat = getVoxelMat(0xd62828, { roughness: 0.15 });
+    const zMouthMat = getVoxelMat(0x3b1f2b, { roughness: 0.7 });
+    const zToothMat = getVoxelMat(0xfff8d6, { roughness: 0.25 });
+    const zSuitMat = getVoxelMat(0x4a3b32, { roughness: 0.55 });
+    const zTieMat = getVoxelMat(0xc92a2a, { roughness: 0.4 });
+
+    const zombieHeadGroup = new THREE.Group();
+    zombieHeadGroup.position.set(0, 0.35, 0);
+    zombieRoot.add(zombieHeadGroup);
+
+    // 僵尸方块头 (5x6x5)
+    for (let x = -2; x <= 2; x++) {
+      for (let y = -2; y <= 3; y++) {
+        for (let z = -2; z <= 2; z++) {
+          if (Math.abs(x) === 2 && Math.abs(z) === 2 && (y === -2 || y === 3)) continue;
+          addVoxel(zombieHeadGroup, x, y, z, y < 0 ? zSkinDarkMat : zSkinMat);
+        }
+      }
+    }
+
+    // 僵尸朝向左侧(-X)看豌豆射手：一大一小呆萌凸眼
+    // 左眼 (+Z侧) 大眼
+    addVoxel(zombieHeadGroup, -2.35, 1.2, 1.1, zEyeYellowMat, 1.15);
+    addVoxel(zombieHeadGroup, -2.65, 1.2, 1.1, zEyeRedMat, 0.52);
+    // 右眼 (-Z侧) 小眼
+    addVoxel(zombieHeadGroup, -2.25, 1.0, -1.1, zEyeYellowMat, 0.88);
+    addVoxel(zombieHeadGroup, -2.5, 1.0, -1.1, zEyeRedMat, 0.42);
+
+    // 僵尸嘴巴与稀疏门牙
+    for (let mz = -1; mz <= 1; mz++) {
+      addVoxel(zombieHeadGroup, -2.15, -0.8, mz, zMouthMat, 0.85);
+    }
+    addVoxel(zombieHeadGroup, -2.28, -0.55, 0.6, zToothMat, 0.52);
+    addVoxel(zombieHeadGroup, -2.28, -1.05, -0.5, zToothMat, 0.52);
+
+    // 僵尸迷你西装底座与红领带
+    const zombieBodyGroup = new THREE.Group();
+    zombieBodyGroup.position.set(0, -3.2 * VOXEL_SIZE, 0);
+    zombieRoot.add(zombieBodyGroup);
+    for (let bx = -1; bx <= 1; bx++) {
+      for (let by = -2; by <= 0; by++) {
+        for (let bz = -2; bz <= 2; bz++) {
+          if (Math.abs(bz) === 2 && by === 0) continue;
+          addVoxel(zombieBodyGroup, bx, by, bz, zSuitMat);
+        }
+      }
+    }
+    addVoxel(zombieBodyGroup, -1.35, -0.3, 0, zTieMat, 0.72);
+    addVoxel(zombieBodyGroup, -1.35, -1.1, 0, zTieMat, 0.78);
+    addVoxel(zombieBodyGroup, -1.35, -1.8, 0, zTieMat, 0.65);
+
+    // 僵尸可切换防具：1. 经典橙色路障 (Cone)  2. 经典灰铁桶 (Bucket)
+    const coneGroup = new THREE.Group();
+    coneGroup.position.set(0, 3.6 * VOXEL_SIZE, 0);
+    zombieHeadGroup.add(coneGroup);
+    const coneOrangeMat = getVoxelMat(0xff6d00, { roughness: 0.35 });
+    const coneStripeMat = getVoxelMat(0xfff8e7, { roughness: 0.3 });
+
+    // 路障底座与锥体
+    for (let cx = -2; cx <= 2; cx++) {
+      for (let cz = -2; cz <= 2; cz++) {
+        if (Math.abs(cx) >= 2 || Math.abs(cz) >= 2) {
+          addVoxel(coneGroup, cx, 0, cz, coneOrangeMat, 0.92);
+        }
+      }
+    }
+    for (let cy = 1; cy <= 4; cy++) {
+      const rad = cy <= 2 ? 1 : 0;
+      const mat = cy === 2 ? coneStripeMat : coneOrangeMat;
+      for (let cx = -rad; cx <= rad; cx++) {
+        for (let cz = -rad; cz <= rad; cz++) {
+          addVoxel(coneGroup, cx, cy, cz, mat, cy === 4 ? 0.85 : 1.0);
+        }
+      }
+    }
+
+    const bucketGroup = new THREE.Group();
+    bucketGroup.position.set(0, 3.4 * VOXEL_SIZE, 0);
+    bucketGroup.visible = false;
+    zombieHeadGroup.add(bucketGroup);
+    const bucketMetalMat = getVoxelMat(0xb0bac5, { roughness: 0.28, metalness: 0.72 });
+    const bucketRimMat = getVoxelMat(0x8d99a6, { roughness: 0.32, metalness: 0.78 });
+    const PaintStainMat = getVoxelMat(0xd62828, { roughness: 0.4 });
+
+    for (let by = 0; by <= 4; by++) {
+      for (let bx = -2; bx <= 2; bx++) {
+        for (let bz = -2; bz <= 2; bz++) {
+          if (by < 4 && Math.abs(bx) < 2 && Math.abs(bz) < 2) continue;
+          let m = by === 0 ? bucketRimMat : bucketMetalMat;
+          if (bx === -2 && by >= 1 && by <= 2 && bz === 1) m = PaintStainMat; // 铁桶上的经典红漆斑点
+          addVoxel(bucketGroup, bx, by, bz, m, 0.96);
+        }
+      }
+    }
+
+    // 僵尸头顶眩晕小星星（受击时旋转闪烁）
+    const dizzyStarsGroup = new THREE.Group();
+    dizzyStarsGroup.position.set(0, 8.8 * VOXEL_SIZE, 0);
+    dizzyStarsGroup.visible = false;
+    zombieHeadGroup.add(dizzyStarsGroup);
+    const starMat = getVoxelMat(0xffea00, { roughness: 0.15, emissive: 0xffb300, emissiveIntensity: 0.6 });
+    for (let i = 0; i < 4; i++) {
+      const angle = (i * Math.PI) / 2;
+      addVoxel(dizzyStarsGroup, Math.cos(angle) * 2.2, 0, Math.sin(angle) * 2.2, starMat, 0.65);
+    }
+
+    // ==========================================
+    // 6. 状态管理、物理摆动与子弹/粒子池
+    // ==========================================
+    const state = {
+      mode: 'classic', // 'classic' | 'ice' | 'fire'
+      armor: 'cone',   // 'cone' | 'bucket' | 'none'
+      hits: 0,
+      sun: 150,
+      isUltActive: false,
+      ultTimer: 0,
+      ultShootCooldown: 0,
+      // 豌豆挂件摆动物理 (弹簧阻尼摆)
+      peaSwingZ: 0,
+      peaVelZ: 0,
+      peaSwingX: 0,
+      peaVelX: 0,
+      // 僵尸挂件摆动物理
+      zomSwingZ: 0,
+      zomVelZ: 0,
+      zomSwingX: 0,
+      zomVelX: 0,
+      zomDizzyTimer: 0,
+      zomFreezeTimer: 0,
+      // 豌豆蓄力吐豆与摸头动画
+      shootRecoil: 0,
+      happyTimer: 0,
+      pointerNDC: new THREE.Vector2(0, 0)
+    };
+
+    const projectiles = [];
+    const particles = [];
+
+    // 配色主题定义
+    const THEMES = {
+      classic: {
+        main: 0x56c828,
+        light: 0x82e647,
+        dark: 0x389c14,
+        peaColor: 0x69e032,
+        peaEmissive: 0x1b5e20,
+        label: '🟢 经典豌豆'
+      },
+      ice: {
+        main: 0x29b6f6,
+        light: 0x81d4fa,
+        dark: 0x0288d1,
+        peaColor: 0x80deea,
+        peaEmissive: 0x00bcd4,
+        label: '❄️ 寒冰射手'
+      },
+      fire: {
+        main: 0xff7043,
+        light: 0xffab40,
+        dark: 0xd84315,
+        peaColor: 0xffca28,
+        peaEmissive: 0xff3d00,
+        label: '🔥 烈火豌豆'
+      }
+    };
+
+    function setPeashooterMode(mode) {
+      state.mode = mode;
+      const t = THEMES[mode];
+      peaMainMat.color.setHex(t.main);
+      peaLightMat.color.setHex(t.light);
+      peaDarkMat.color.setHex(t.dark);
+
+      iceCrownGroup.visible = mode === 'ice';
+      fireCrownGroup.visible = mode === 'fire';
+
+      // 给挂件一个轻快弹跳反馈
+      state.peaVelZ += 0.08;
+      sfx.playCuteChime();
+
+      document.querySelectorAll('.mode-btn').forEach((btn) => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+      });
+    }
+
+    // 切换僵尸防具
+    function cycleZombieArmor() {
+      const order = ['cone', 'bucket', 'none'];
+      const nextIdx = (order.indexOf(state.armor) + 1) % order.length;
+      state.armor = order[nextIdx];
+
+      coneGroup.visible = state.armor === 'cone';
+      bucketGroup.visible = state.armor === 'bucket';
+
+      state.zomVelZ -= 0.12;
+      sfx.playJingle();
+
+      const names = { cone: '📐 路障僵尸', bucket: '🪣 铁桶僵尸', none: '🧟 普通僵尸' };
+      spawnFloatingText(new THREE.Vector3(2.65, 2.2, 0), names[state.armor], '#ffe066');
+    }
+
+    // 生成屏幕 2D 浮动暴击/互动提示文字
+    const floatingContainer = document.getElementById('floating-labels');
+    function spawnFloatingText(worldPos, text, color = '#ffffff') {
+      const vec = worldPos.clone().project(camera);
+      const x = (vec.x * 0.5 + 0.5) * window.innerWidth;
+      const y = (-vec.y * 0.5 + 0.5) * window.innerHeight;
+
+      const el = document.createElement('div');
+      el.className = 'float-text';
+      el.textContent = text;
+      el.style.left = `${x + (Math.random() - 0.5) * 32}px`;
+      el.style.top = `${y + (Math.random() - 0.5) * 20}px`;
+      el.style.color = color;
+      floatingContainer.appendChild(el);
+
+      setTimeout(() => {
+        el.remove();
+      }, 950);
+    }
+
+    // 生成体素粒子爆发（炮口喷射、命中碎裂、爱心粒子）
+    function spawnVoxelBurst(origin, colorHex, count = 14, speedScale = 1.0) {
+      const mat = getVoxelMat(colorHex, { roughness: 0.25 });
+      for (let i = 0; i < count; i++) {
+        const mesh = new THREE.Mesh(sharedVoxelGeo, mat);
+        mesh.position.copy(origin);
+        const s = (0.35 + Math.random() * 0.45) * 0.85;
+        mesh.scale.setScalar(s);
+        scene.add(mesh);
+
+        const angle1 = Math.random() * Math.PI * 2;
+        const angle2 = (Math.random() - 0.3) * Math.PI;
+        const spd = (2.2 + Math.random() * 4.2) * speedScale;
+        particles.push({
+          mesh,
+          vel: new THREE.Vector3(
+            Math.cos(angle1) * Math.cos(angle2) * spd,
+            Math.sin(angle2) * spd + 1.8,
+            Math.sin(angle1) * Math.cos(angle2) * spd
+          ),
+          rotVel: new THREE.Vector3(
+            (Math.random() - 0.5) * 12,
+            (Math.random() - 0.5) * 12,
+            (Math.random() - 0.5) * 12
+          ),
+          life: 1.0,
+          decay: 1.4 + Math.random() * 0.8
+        });
+      }
+    }
+
+    // 构造一颗 3D 体素豌豆子弹并发射
+    function shootPea(pitchOffset = 0) {
+      const theme = THEMES[state.mode];
+
+      // 计算炮口世界坐标
+      const muzzleLocal = new THREE.Vector3(3.1 * VOXEL_SIZE, 0, 0);
+      const muzzleWorld = snoutGroup.localToWorld(muzzleLocal.clone());
+
+      // 创建 3D 体素豌豆球组合
+      const peaGroup = new THREE.Group();
+      peaGroup.position.copy(muzzleWorld);
+      scene.add(peaGroup);
+
+      const pMat = getVoxelMat(theme.peaColor, {
+        roughness: 0.18,
+        emissive: theme.peaEmissive,
+        emissiveIntensity: state.mode === 'fire' ? 0.65 : 0.2
+      });
+
+      // 十字圆润体素豌豆团
+      const coreCoords = [
+        [0, 0, 0], [0.65, 0, 0], [-0.65, 0, 0],
+        [0, 0.65, 0], [0, -0.65, 0], [0, 0, 0.65], [0, 0, -0.65]
+      ];
+      coreCoords.forEach(([px, py, pz], idx) => {
+        addVoxel(peaGroup, px, py, pz, pMat, idx === 0 ? 1.15 : 0.78);
+      });
+
+      // 炮口微小闪光粒子
+      spawnVoxelBurst(muzzleWorld, theme.light, 5, 0.55);
+
+      // 发射方向：朝向右侧僵尸挂件当前位置，略带随机弹道散射
+      const targetWorld = new THREE.Vector3();
+      zombieHeadGroup.getWorldPosition(targetWorld);
+      const dir = targetWorld.sub(muzzleWorld).normalize();
+      dir.y += (Math.random() - 0.5) * 0.08;
+      dir.z += (Math.random() - 0.5) * 0.08;
+      dir.normalize();
+
+      projectiles.push({
+        group: peaGroup,
+        vel: dir.multiplyScalar(13.5),
+        mode: state.mode,
+        age: 0
+      });
+
+      // 豌豆射手后坐力摆动与嘴巴喷射形变
+      state.peaVelZ -= 0.095;
+      state.peaVelX += (Math.random() - 0.5) * 0.04;
+      state.shootRecoil = 1.0;
+
+      sfx.playPop(pitchOffset);
+    }
+
+    // 摸摸豌豆射手头顶叶片互动
+    function petPeashooter() {
+      state.happyTimer = 1.8;
+      state.peaVelZ += 0.11;
+      state.peaVelX += 0.07;
+      sfx.playCuteChime();
+
+      blushMeshes.forEach((b) => (b.visible = true));
+
+      const headWorld = new THREE.Vector3();
+      headGroup.getWorldPosition(headWorld);
+      headWorld.y += 0.9;
+
+      spawnVoxelBurst(headWorld, 0xff6b9d, 12, 0.75);
+      spawnFloatingText(headWorld, '💚 心情+100!', '#ff5c8a');
+
+      state.sun += 25;
+      document.getElementById('sun-counter').textContent = state.sun;
+    }
+
+    // 喂食能量豆：触发机枪豌豆暴走大招
+    const ultBtn = document.getElementById('btn-ult');
+    function triggerPlantFoodUlt() {
+      if (state.isUltActive) return;
+      state.isUltActive = true;
+      state.ultTimer = 3.2; // 持续3.2秒高射速机枪弹幕
+      state.ultShootCooldown = 0;
+
+      helmetGroup.visible = true;
+      ultBtn.classList.add('active-ult');
+      ultBtn.textContent = '🔥 机枪暴走中...';
+
+      sfx.playPowerUp();
+
+      const headWorld = new THREE.Vector3();
+      headGroup.getWorldPosition(headWorld);
+      spawnVoxelBurst(headWorld, 0x76ff03, 22, 1.15);
+      spawnFloatingText(headWorld.add(new THREE.Vector3(0, 1.1, 0)), '⚡ 能量豆觉醒：机枪连射！', '#64dd17');
+    }
+
+    // 晃动整个挂件
+    function shakeCharms() {
+      state.peaVelZ += (Math.random() > 0.5 ? 1 : -1) * 0.26;
+      state.peaVelX += (Math.random() - 0.5) * 0.22;
+      state.zomVelZ += (Math.random() > 0.5 ? 1 : -1) * 0.24;
+      state.zomVelX += (Math.random() - 0.5) * 0.2;
+      sfx.playJingle();
+    }
+
+    // ==========================================
+    // 7. 绑定 UI 按钮、键盘与 3D 射线点击事件
+    // ==========================================
+    document.querySelectorAll('.mode-btn').forEach((btn) => {
+      btn.addEventListener('click', () => setPeashooterMode(btn.dataset.mode));
+    });
+
+    document.getElementById('btn-shoot').addEventListener('click', () => shootPea());
+    document.getElementById('btn-ult').addEventListener('click', () => triggerPlantFoodUlt());
+    document.getElementById('btn-pet').addEventListener('click', () => petPeashooter());
+    document.getElementById('btn-zombie-hat').addEventListener('click', () => cycleZombieArmor());
+    document.getElementById('btn-shake').addEventListener('click', () => shakeCharms());
+
+    const soundBtn = document.getElementById('sound-toggle');
+    soundBtn.addEventListener('click', () => {
+      sfx.enabled = !sfx.enabled;
+      soundBtn.textContent = sfx.enabled ? '🔊 音效: 开' : '🔇 音效: 关';
+    });
+
+    // 空格键快捷发射豌豆
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space') {
+        e.preventDefault();
+        shootPea();
+      }
+    });
+
+    // Raycaster 3D 部位精准互动
+    const raycaster = new THREE.Raycaster();
+    let pointerDownPos = new THREE.Vector2();
+
+    window.addEventListener('pointermove', (e) => {
+      state.pointerNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+      state.pointerNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    });
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos.set(e.clientX, e.clientY);
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      // 区分拖拽旋转与点击互动
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moveDist > 8) return;
+
+      const mouse = new THREE.Vector2(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        -(e.clientY / window.innerHeight) * 2 + 1
+      );
+      raycaster.setFromCamera(mouse, camera);
+
+      // 1. 检测是否点击了头顶小呆毛叶片或底座叶片 -> 触发摸摸头
+      const leafHits = raycaster.intersectObjects([headLeafGroup, baseLeavesGroup], true);
+      if (leafHits.length > 0) {
+        petPeashooter();
+        return;
+      }
+
+      // 2. 检测是否点击了豌豆射手头部或炮管 -> 发射豌豆
+      const peaHits = raycaster.intersectObjects([headGroup, stemGroup, turfGroup], true);
+      if (peaHits.length > 0) {
+        shootPea();
+        return;
+      }
+
+      // 3. 检测是否点击了右侧僵尸挂件 -> 切换防具并晃动
+      const zomHits = raycaster.intersectObjects([zombieRoot], true);
+      if (zomHits.length > 0) {
+        cycleZombieArmor();
+        return;
+      }
+
+      // 4. 检测是否点击了顶部金属环 -> 晃动挂件叮当响
+      const chainHits = raycaster.intersectObjects([peashooterHardware.root, zombieHardware.root], true);
+      if (chainHits.length > 0) {
+        shakeCharms();
+      }
+    });
+
+    // 窗口自适应
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ==========================================
+    // 8. 动画主循环 (60FPS 物理与粒子更新)
+    // ==========================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      controls.update();
+
+      // --- 8.1 能量豆机枪大招连射逻辑 ---
+      if (state.isUltActive) {
+        state.ultTimer -= dt;
+        state.ultShootCooldown -= dt;
+        if (state.ultShootCooldown <= 0) {
+          state.ultShootCooldown = 0.085; // 每秒约12发高速豌豆
+          shootPea((Math.random() - 0.5) * 3);
+        }
+        if (state.ultTimer <= 0) {
+          state.isUltActive = false;
+          helmetGroup.visible = false;
+          ultBtn.classList.remove('active-ult');
+          ultBtn.textContent = '⚡ 喂能量豆 (机枪大招)';
+        }
+      }
+
+      // --- 8.2 挂件弹簧阻尼摆动物理 ---
+      const springK = 26.0;
+      const damping = 4.2;
+
+      // 豌豆射手挂件摆动 + 轻微自然呼吸微摆
+      const idleSwayZ = Math.sin(elapsed * 1.8) * 0.025;
+      const accPeaZ = -springK * (state.peaSwingZ - idleSwayZ) - damping * state.peaVelZ;
+      state.peaVelZ += accPeaZ * dt;
+      state.peaSwingZ += state.peaVelZ * dt;
+
+      const accPeaX = -springK * state.peaSwingX - damping * state.peaVelX;
+      state.peaVelX += accPeaX * dt;
+      state.peaSwingX += state.peaVelX * dt;
+
+      peaSwingPivot.rotation.z = state.peaSwingZ;
+      peaSwingPivot.rotation.x = state.peaSwingX;
+
+      // 僵尸挂件摆动物理
+      const idleZomZ = Math.sin(elapsed * 1.6 + 1.2) * 0.025;
+      const accZomZ = -springK * (state.zomSwingZ - idleZomZ) - damping * state.zomVelZ;
+      state.zomVelZ += accZomZ * dt;
+      state.zomSwingZ += state.zomVelZ * dt;
+
+      const accZomX = -springK * state.zomSwingX - damping * state.zomVelX;
+      state.zomVelX += accZomX * dt;
+      state.zomSwingX += state.zomVelX * dt;
+
+      zombieSwingPivot.rotation.z = state.zomSwingZ;
+      zombieSwingPivot.rotation.x = state.zomSwingX;
+
+      // --- 8.3 豌豆射手面部与身体细节动画 ---
+      // 呼吸律动与开心弹跳
+      let bounceY = Math.sin(elapsed * 3.4) * 0.06;
+      if (state.happyTimer > 0) {
+        state.happyTimer -= dt;
+        bounceY += Math.abs(Math.sin(elapsed * 14)) * 0.16;
+        headLeafGroup.rotation.z = Math.sin(elapsed * 22) * 0.35;
+        if (state.happyTimer <= 0) {
+          blushMeshes.forEach((b) => (b.visible = false));
+        }
+      } else {
+        headLeafGroup.rotation.z = Math.sin(elapsed * 3.4) * 0.1;
+      }
+      headGroup.position.y = 0.48 + bounceY;
+
+      // 鼠标目光跟随（头部轻微转向光标 + 瞳孔高光灵动偏移）
+      const targetRotY = state.pointerNDC.x * 0.22;
+      const targetRotZ = state.pointerNDC.y * 0.16;
+      headGroup.rotation.y = THREE.MathUtils.lerp(headGroup.rotation.y, targetRotY, 0.1);
+      headGroup.rotation.z = THREE.MathUtils.lerp(headGroup.rotation.z, targetRotZ, 0.1);
+
+      pupilMeshes.forEach((p) => {
+        p.mesh.position.x = p.baseX + state.pointerNDC.x * 0.035;
+        p.mesh.position.y = p.baseY + state.pointerNDC.y * 0.035;
+      });
+
+      // 发射豌豆时的炮管伸缩弹性形变
+      if (state.shootRecoil > 0) {
+        state.shootRecoil = Math.max(0, state.shootRecoil - dt * 6.5);
+        const s = Math.sin(state.shootRecoil * Math.PI);
+        snoutGroup.scale.set(1 - 0.28 * s, 1 + 0.28 * s, 1 + 0.28 * s);
+        headGroup.scale.set(1 + 0.1 * s, 1 + 0.12 * s, 1 + 0.12 * s);
+      } else {
+        snoutGroup.scale.set(1, 1, 1);
+        headGroup.scale.set(1, 1, 1);
+      }
+
+      // 烈火豌豆模式下火焰冠律动
+      if (state.mode === 'fire') {
+        fireCrownVoxels.forEach((fv) => {
+          fv.mesh.position.y = fv.baseY + Math.sin(elapsed * 10 + fv.phase) * 0.06;
+        });
+      }
+
+      // --- 8.4 僵尸受击眩晕与寒冰减速特效 ---
+      if (state.zomDizzyTimer > 0) {
+        state.zomDizzyTimer -= dt;
+        dizzyStarsGroup.visible = true;
+        dizzyStarsGroup.rotation.y += dt * 7.5;
+      } else {
+        dizzyStarsGroup.visible = false;
+      }
+
+      if (state.zomFreezeTimer > 0) {
+        state.zomFreezeTimer -= dt;
+        zSkinMat.color.setHex(0x52b7ff);
+      } else {
+        zSkinMat.color.setHex(0x7fa37c);
+      }
+
+      // --- 8.5 更新飞行中的豌豆子弹与碰撞检测 ---
+      const zomWorldPos = new THREE.Vector3();
+      zombieHeadGroup.getWorldPosition(zomWorldPos);
+
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.age += dt;
+        p.group.position.addScaledVector(p.vel, dt);
+        p.group.rotation.x += dt * 8;
+        p.group.rotation.z -= dt * 10;
+
+        // 寒冰/烈火豌豆飞行拖尾微粒
+        if (Math.random() < 0.45) {
+          const trailColor = p.mode === 'ice' ? 0xb3e5fc : p.mode === 'fire' ? 0xff9800 : 0xaeea00;
+          spawnVoxelBurst(p.group.position, trailColor, 1, 0.25);
+        }
+
+        // 检测与右侧僵尸挂件的碰撞
+        const distToZom = p.group.position.distanceTo(zomWorldPos);
+        if (distToZom < 0.95) {
+          // 命中僵尸！
+          state.hits++;
+          document.getElementById('hit-counter').textContent = state.hits;
+
+          // 给僵尸挂件施加明显的受击后仰冲量
+          state.zomVelZ += 0.19;
+          state.zomVelX += (Math.random() - 0.5) * 0.14;
+          state.zomDizzyTimer = 1.1;
+
+          // 防具帽子受击弹跳
+          if (state.armor === 'cone') {
+            coneGroup.position.y = (3.6 + 1.1) * VOXEL_SIZE;
+          } else if (state.armor === 'bucket') {
+            bucketGroup.position.y = (3.4 + 0.9) * VOXEL_SIZE;
+          }
+
+          sfx.playHit(state.armor);
+
+          // 不同属性豌豆的命中特效与飘字
+          if (p.mode === 'ice') {
+            state.zomFreezeTimer = 2.0;
+            spawnVoxelBurst(p.group.position, 0x80deea, 16, 0.95);
+            spawnFloatingText(zomWorldPos, '❄️ 冰冻减速 -25', '#4fc3f7');
+          } else if (p.mode === 'fire') {
+            spawnVoxelBurst(p.group.position, 0xff5722, 20, 1.15);
+            spawnFloatingText(zomWorldPos, '🔥 烈焰暴击 -40!', '#ff7043');
+          } else {
+            spawnVoxelBurst(p.group.position, 0x76ff03, 14, 0.9);
+            const popWords = ['💥 POP! -20', '🎯 命中! -20', '✨ BONK! -20'];
+            spawnFloatingText(
+              zomWorldPos,
+              popWords[state.hits % popWords.length],
+              '#aeea00'
+            );
+          }
+
+          // 每命中 10 次奖励阳光
+          if (state.hits % 5 === 0) {
+            state.sun += 25;
+            document.getElementById('sun-counter').textContent = state.sun;
+          }
+
+          scene.remove(p.group);
+          projectiles.splice(i, 1);
+          continue;
+        }
+
+        // 超出射程清理
+        if (p.age > 1.8) {
+          scene.remove(p.group);
+          projectiles.splice(i, 1);
+        }
+      }
+
+      // 防具帽子位置平滑回落
+      coneGroup.position.y = THREE.MathUtils.lerp(coneGroup.position.y, 3.6 * VOXEL_SIZE, 0.18);
+      bucketGroup.position.y = THREE.MathUtils.lerp(bucketGroup.position.y, 3.4 * VOXEL_SIZE, 0.18);
+
+      // --- 8.6 更新体素碎裂粒子 ---
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.life -= dt * pt.decay;
+        if (pt.life <= 0) {
+          scene.remove(pt.mesh);
+          particles.splice(i, 1);
+          continue;
+        }
+        pt.vel.y -= 14.0 * dt; // 重力下落
+        pt.mesh.position.addScaledVector(pt.vel, dt);
+        pt.mesh.rotation.x += pt.rotVel.x * dt;
+        pt.mesh.rotation.y += pt.rotVel.y * dt;
+        pt.mesh.scale.setScalar(Math.max(0.01, pt.life * 0.45));
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+  <script src="../prompt-panel.js" data-id="peashooter-web"></script>
+</body>
+</html>
