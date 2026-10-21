@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>版本对比 · 3D 作品</title>
+  <style>
+    :root {
+      --bg-outer: #dfe8cc;
+      --bg-cream: #fbf4e2;
+      --bg-card: #fffaf0;
+      --ink: #3a2e24;
+      --highlight: #f3d77a;
+      --highlight-hover: #f7e08e;
+      --secondary-bg: #fffaf0;
+      --secondary-hover: #f3e8cc;
+      --topbar-grad: linear-gradient(#a6cc7a, #8cbc63);
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-outer);
+      color: var(--ink);
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    body {
+      min-height: 100vh;
+      padding: 24px 16px 48px;
+    }
+
+    .gallery-shell {
+      max-width: 1200px;
+      margin: 0 auto;
+      background-color: var(--bg-cream);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 6px 0 var(--ink);
+      overflow: hidden;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 20px;
+      background: var(--topbar-grad);
+      border-bottom: 2px solid var(--ink);
+      font-weight: bold;
+      flex-wrap: wrap;
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .topbar-title {
+      margin: 0;
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--ink);
+      letter-spacing: 0.02em;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      appearance: none;
+      -webkit-appearance: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 1.2;
+      color: var(--ink);
+      background-color: var(--highlight);
+      border: 2px solid var(--ink);
+      border-radius: 14px;
+      box-shadow: 0 3px 0 var(--ink);
+      padding: 8px 14px;
+      cursor: pointer;
+      text-decoration: none;
+      user-select: none;
+      -webkit-user-select: none;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      background-color: var(--highlight-hover);
+    }
+
+    .btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 0 0 var(--ink);
+    }
+
+    .btn-secondary {
+      background-color: var(--secondary-bg);
+    }
+
+    .btn-secondary:hover {
+      background-color: var(--secondary-hover);
+    }
+
+    .btn-topbar {
+      background-color: var(--bg-cream);
+      padding: 7px 12px;
+      font-size: 13.5px;
+    }
+
+    .btn-topbar:hover {
+      background-color: var(--highlight);
+    }
+
+    .compare-main {
+      padding: 20px 22px 28px;
+    }
+
+    .scene-meta-box {
+      margin-bottom: 18px;
+      padding: 16px 18px;
+      background-color: var(--bg-card);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 3px 0 rgba(58, 46, 36, 0.12);
+    }
+
+    .scene-meta-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 6px;
+    }
+
+    .scene-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .source-link {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: underline;
+    }
+
+    .scene-desc {
+      margin: 0 0 12px;
+      font-size: 14.5px;
+      color: var(--ink);
+      opacity: 0.92;
+      line-height: 1.5;
+    }
+
+    .prompt-section {
+      display: none;
+      margin-top: 12px;
+      padding: 12px;
+      background-color: var(--bg-cream);
+      border: 2px solid var(--ink);
+      border-radius: 12px;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .prompt-section.is-open {
+      display: flex;
+    }
+
+    .prompt-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .prompt-label {
+      font-size: 13px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .btn-copy {
+      padding: 5px 12px;
+      font-size: 12.5px;
+      border-radius: 10px;
+    }
+
+    .prompt-pre {
+      margin: 0;
+      padding: 12px;
+      max-height: 280px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--ink);
+      background-color: var(--bg-card);
+      border: 1.5px solid var(--ink);
+      border-radius: 10px;
+    }
+
+    .prompt-diff-box {
+      font-size: 12px;
+      line-height: 1.55;
+      padding: 10px 12px;
+      background-color: var(--bg-card);
+      border: 1.5px dashed var(--ink);
+      border-radius: 10px;
+      color: var(--ink);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    /* 对比网格 */
+    .compare-grid {
+      display: grid;
+      gap: 16px;
+      width: 100%;
+      margin-top: 18px;
+    }
+
+    @media (min-width: 900px) {
+      .compare-grid[data-count="1"] {
+        grid-template-columns: 1fr;
+        max-width: 820px;
+        margin-left: auto;
+        margin-right: auto;
+      }
+      .compare-grid[data-count="2"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .compare-grid[data-count="3"] {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .compare-grid[data-count="4"],
+      .compare-grid[data-count="5"] {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (min-width: 1400px) {
+      .compare-grid[data-count="4"] {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 899px) {
+      .compare-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+      .compare-tile {
+        height: 60vh;
+        min-height: 400px;
+      }
+    }
+
+    /* 对比 Tile */
+    .compare-tile {
+      background-color: var(--bg-card);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 4px 0 var(--ink);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      height: 580px;
+      position: relative;
+    }
+
+    .tile-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px 12px;
+      background-color: var(--bg-cream);
+      border-bottom: 2px solid var(--ink);
+      flex-wrap: wrap;
+    }
+
+    .tile-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 9px;
+      border: 2px solid var(--ink);
+      border-radius: 999px;
+      background: var(--highlight);
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.2;
+      white-space: nowrap;
+    }
+
+    .badge.is-web { background: #bcd9f5; }
+    .badge.is-flash { background: #bfe6c8; }
+    .badge.is-deepseek { background: #c9c3f2; }
+    .badge.is-opus { background: #f2c6a8; }
+
+    .tile-note {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink);
+      opacity: 0.85;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+
+    .tile-actions {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .tile-chat {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink);
+      text-decoration: underline;
+      white-space: nowrap;
+      margin-right: 2px;
+    }
+
+    .tile-btn {
+      padding: 5px 9px;
+      font-size: 12px;
+      min-height: 30px;
+      border-radius: 10px;
+    }
+
+    .tile-frame-wrap {
+      flex: 1;
+      position: relative;
+      background-color: #0d0b09;
+      min-height: 0;
+    }
+
+    .tile-frame-wrap iframe {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    /* 全屏状态 */
+    .tile-exit-fs-btn {
+      display: none;
+    }
+
+    .compare-tile:fullscreen,
+    .compare-tile:-webkit-full-screen {
+      width: 100vw !important;
+      height: 100vh !important;
+      border-radius: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      background: #0d0b09 !important;
+    }
+
+    .compare-tile.is-pseudo-fs {
+      position: fixed !important;
+      inset: 0 !important;
+      width: 100vw !important;
+      height: 100vh !important;
+      height: 100dvh !important;
+      z-index: 99999 !important;
+      margin: 0 !important;
+      border-radius: 0 !important;
+      border: 0 !important;
+      box-shadow: none !important;
+      background: #0d0b09 !important;
+    }
+
+    body.has-pseudo-fs {
+      overflow: hidden !important;
+    }
+
+    .compare-tile:fullscreen .tile-fs-btn,
+    .compare-tile:-webkit-full-screen .tile-fs-btn,
+    .compare-tile.is-pseudo-fs .tile-fs-btn {
+      display: none !important;
+    }
+
+    .compare-tile:fullscreen .tile-exit-fs-btn,
+    .compare-tile:-webkit-full-screen .tile-exit-fs-btn,
+    .compare-tile.is-pseudo-fs .tile-exit-fs-btn {
+      display: inline-flex !important;
+    }
+
+    .empty-notice {
+      padding: 36px 20px;
+      text-align: center;
+      background-color: var(--bg-card);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      font-size: 16px;
+      font-weight: 700;
+      margin-top: 20px;
+      box-shadow: 0 4px 0 var(--ink);
+    }
+
+    @media (max-width: 720px) {
+      body {
+        padding: 12px 10px 32px;
+      }
+      .topbar {
+        padding: 10px 12px;
+      }
+      .topbar-title {
+        font-size: 18px;
+      }
+      .compare-main {
+        padding: 14px 12px 20px;
+      }
+      .scene-meta-box {
+        padding: 12px 14px;
+      }
+      .scene-title {
+        font-size: 19px;
+      }
+      .tile-note {
+        max-width: 140px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .tile-note {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="gallery-shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <a class="btn btn-topbar" id="back-gallery" href="../">← 回到画廊</a>
+        <h1 class="topbar-title" id="bar-title">🧊 版本对比</h1>
+      </div>
+      <div class="topbar-actions">
+        <a class="btn" id="play-collection" href="../collection/">▶ 在合集中播放</a>
+      </div>
+    </header>
+
+    <main class="compare-main" id="main-content">
+      <div id="scene-container"></div>
+    </main>
+  </div>
+
+  <script src="../catalog.js"></script>
+  <script>
+    (function () {
+      'use strict';
+
+      const MODELS = window.GALLERY_MODELS || {};
+      const ORDER = window.GALLERY_MODEL_ORDER || ['cli', 'web', 'flash', 'deepseek', 'opus'];
+      const CATS = window.GALLERY_CATEGORIES || [];
+
+      const params = new URLSearchParams(location.search);
+      const sid = params.get('s');
+      let catId = params.get('c');
+
+      // 查找场景与分类
+      let scene = null;
+      let category = null;
+
+      if (catId) {
+        category = CATS.find((c) => c.id === catId);
+        if (category) {
+          scene = (category.scenes || []).find((s) => s.id === sid);
+        }
+      }
+
+      if (!scene && sid) {
+        for (const c of CATS) {
+          const found = (c.scenes || []).find((s) => s.id === sid);
+          if (found) {
+            scene = found;
+            category = c;
+            catId = c.id;
+            break;
+          }
+        }
+      }
+
+      const backLink = document.getElementById('back-gallery');
+      const playLink = document.getElementById('play-collection');
+      const container = document.getElementById('scene-container');
+
+      if (!scene) {
+        document.title = '未找到场景 · 3D 作品';
+        backLink.href = '../';
+        playLink.style.display = 'none';
+        container.innerHTML =
+          '<div class="empty-notice">' +
+          '<p>未找到该 3D 场景或该场景尚未上线。</p>' +
+          '<p><a class="btn" href="../">← 回到 3D 作品</a></p>' +
+          '</div>';
+        return;
+      }
+
+      catId = catId || 'classic';
+      document.title = scene.title + ' · 版本对比';
+      backLink.href = '../#cat-' + encodeURIComponent(catId);
+      playLink.href = '../collection/?c=' + encodeURIComponent(catId) + '&s=' + encodeURIComponent(scene.id);
+
+      // 可用版本
+      const avail = ORDER.filter((m) => (scene.models || []).indexOf(m) !== -1 && MODELS[m]);
+      const firstModel = avail[0] || 'deepseek';
+      const firstSuffix = MODELS[firstModel] ? MODELS[firstModel].suffix : '';
+
+      // 复制功能
+      async function copyText(text) {
+        if (!text) return false;
+        if (
+          typeof navigator !== 'undefined' &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === 'function'
+        ) {
+          try {
+            await navigator.clipboard.writeText(text);
+            return true;
+          } catch (err) {}
+        }
+        try {
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.setAttribute('readonly', 'readonly');
+          textarea.style.position = 'fixed';
+          textarea.style.top = '-9999px';
+          textarea.style.left = '-9999px';
+          textarea.style.width = '1px';
+          textarea.style.height = '1px';
+          textarea.style.opacity = '0';
+          textarea.style.pointerEvents = 'none';
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          textarea.setSelectionRange(0, textarea.value.length);
+          const ok = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          return !!ok;
+        } catch (err) {
+          return false;
+        }
+      }
+
+      const promptCache = new Map();
+      const promptInflight = new Map();
+
+      function loadPromptText(idWithSuffix) {
+        if (promptCache.has(idWithSuffix)) {
+          return Promise.resolve(promptCache.get(idWithSuffix));
+        }
+        if (promptInflight.has(idWithSuffix)) {
+          return promptInflight.get(idWithSuffix);
+        }
+        const p = fetch('../prompts/' + idWithSuffix + '.txt')
+          .then((res) => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.text();
+          })
+          .then((txt) => {
+            promptCache.set(idWithSuffix, txt);
+            promptInflight.delete(idWithSuffix);
+            return txt;
+          })
+          .catch(() => {
+            promptInflight.delete(idWithSuffix);
+            return '';
+          });
+        promptInflight.set(idWithSuffix, p);
+        return p;
+      }
+
+      function filterPromptLines(text) {
+        return text.split('\n').filter((l) => !l.includes('data-id='));
+      }
+
+      async function computePromptDiff(sceneObj, availList) {
+        if (availList.length <= 1) {
+          return '各版本使用同一提示词';
+        }
+        const texts = await Promise.all(
+          availList.map((m) => {
+            const suf = MODELS[m] ? MODELS[m].suffix : ('-' + m);
+            return loadPromptText(sceneObj.id + suf);
+          })
+        );
+        const baseLines = filterPromptLines(texts[0]);
+        const diffEntries = [];
+
+        for (let i = 1; i < availList.length; i++) {
+          const m = availList[i];
+          const linesM = filterPromptLines(texts[i]);
+          const differs = [];
+          const maxLen = Math.max(baseLines.length, linesM.length);
+          for (let li = 0; li < maxLen; li++) {
+            const l0 = baseLines[li] !== undefined ? baseLines[li].trim() : '';
+            const lm = linesM[li] !== undefined ? linesM[li].trim() : '';
+            if (l0 !== lm && lm) {
+              differs.push(linesM[li].trim());
+            }
+          }
+          if (differs.length > 0) {
+            diffEntries.push({
+              badge: (MODELS[m] && MODELS[m].badge) || m,
+              lines: differs
+            });
+          }
+        }
+
+        if (diffEntries.length === 0) {
+          return '各版本使用同一提示词';
+        }
+
+        let out = '各版本提示词差异：\n';
+        diffEntries.forEach((entry) => {
+          out += '• ' + entry.badge + '：' + entry.lines.join('；') + '\n';
+        });
+        return out.trim();
+      }
+
+      // 构建场景 Meta 区块
+      const metaBox = document.createElement('div');
+      metaBox.className = 'scene-meta-box';
+
+      const head = document.createElement('div');
+      head.className = 'scene-meta-head';
+
+      const titleEl = document.createElement('h1');
+      titleEl.className = 'scene-title';
+      titleEl.textContent = scene.title;
+      head.appendChild(titleEl);
+
+      if (scene.source) {
+        const srcLink = document.createElement('a');
+        srcLink.className = 'source-link';
+        srcLink.href = scene.source;
+        srcLink.target = '_blank';
+        srcLink.rel = 'noopener';
+        srcLink.textContent = '原帖 ↗';
+        head.appendChild(srcLink);
+      }
+
+      const descEl = document.createElement('p');
+      descEl.className = 'scene-desc';
+      descEl.textContent = scene.description;
+
+      const togglePromptBtn = document.createElement('button');
+      togglePromptBtn.type = 'button';
+      togglePromptBtn.className = 'btn btn-secondary';
+      togglePromptBtn.setAttribute('aria-expanded', 'false');
+      togglePromptBtn.textContent = '📜 查看提示词';
+
+      const promptSection = document.createElement('div');
+      promptSection.className = 'prompt-section';
+
+      const promptToolbar = document.createElement('div');
+      promptToolbar.className = 'prompt-toolbar';
+
+      const promptLabel = document.createElement('span');
+      promptLabel.className = 'prompt-label';
+      promptLabel.textContent = '场景生成提示词';
+
+      const copyBtn = document.createElement('button');
+      copyBtn.type = 'button';
+      copyBtn.className = 'btn btn-copy';
+      copyBtn.textContent = '复制';
+
+      promptToolbar.appendChild(promptLabel);
+      promptToolbar.appendChild(copyBtn);
+
+      const preEl = document.createElement('pre');
+      preEl.className = 'prompt-pre';
+      preEl.textContent = '正在加载提示词…';
+
+      const diffBox = document.createElement('div');
+      diffBox.className = 'prompt-diff-box';
+      diffBox.textContent = '正在对比各版本提示词…';
+
+      promptSection.appendChild(promptToolbar);
+      promptSection.appendChild(preEl);
+      promptSection.appendChild(diffBox);
+
+      let promptLoaded = false;
+      async function ensurePromptLoaded() {
+        if (promptLoaded) return;
+        promptLoaded = true;
+        const firstText = await loadPromptText(scene.id + firstSuffix);
+        preEl.textContent = firstText || '未能加载提示词文本。';
+        const diffResult = await computePromptDiff(scene, avail);
+        diffBox.textContent = diffResult;
+      }
+
+      let isExpanded = false;
+      togglePromptBtn.addEventListener('click', () => {
+        isExpanded = !isExpanded;
+        promptSection.classList.toggle('is-open', isExpanded);
+        togglePromptBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+        if (isExpanded) {
+          ensurePromptLoaded();
+        }
+      });
+
+      let copyTimer = null;
+      copyBtn.addEventListener('click', async () => {
+        await ensurePromptLoaded();
+        const firstText = promptCache.get(scene.id + firstSuffix) || '';
+        const ok = await copyText(firstText);
+        if (copyTimer) clearTimeout(copyTimer);
+        copyBtn.textContent = ok ? '已复制' : '复制失败';
+        copyTimer = setTimeout(() => {
+          copyBtn.textContent = '复制';
+          copyTimer = null;
+        }, 1500);
+      });
+
+      metaBox.appendChild(head);
+      metaBox.appendChild(descEl);
+      metaBox.appendChild(togglePromptBtn);
+      metaBox.appendChild(promptSection);
+      container.appendChild(metaBox);
+
+      // 全屏管理
+      let activePseudoTile = null;
+
+      function enterPseudoFs(tile) {
+        activePseudoTile = tile;
+        tile.classList.add('is-pseudo-fs');
+        document.body.classList.add('has-pseudo-fs');
+        updateTileFsButtons(tile, true);
+      }
+
+      function exitPseudoFs() {
+        if (activePseudoTile) {
+          activePseudoTile.classList.remove('is-pseudo-fs');
+          updateTileFsButtons(activePseudoTile, false);
+          activePseudoTile = null;
+        }
+        document.body.classList.remove('has-pseudo-fs');
+      }
+
+      function updateTileFsButtons(tile, isFs) {
+        const fsBtn = tile.querySelector('.tile-fs-btn');
+        const exitBtn = tile.querySelector('.tile-exit-fs-btn');
+        if (fsBtn) fsBtn.style.display = isFs ? 'none' : 'inline-flex';
+        if (exitBtn) exitBtn.style.display = isFs ? 'inline-flex' : 'none';
+      }
+
+      async function requestTileFs(tile) {
+        const req = tile.requestFullscreen || tile.webkitRequestFullscreen;
+        if (req) {
+          try {
+            await req.call(tile);
+          } catch (e) {
+            enterPseudoFs(tile);
+          }
+        } else {
+          enterPseudoFs(tile);
+        }
+      }
+
+      async function exitAllFs() {
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        if (fsEl) {
+          try {
+            if (document.exitFullscreen) {
+              await document.exitFullscreen();
+            } else if (document.webkitExitFullscreen) {
+              await document.webkitExitFullscreen();
+            }
+          } catch (e) {}
+        }
+        exitPseudoFs();
+      }
+
+      function onFullscreenChange() {
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        document.querySelectorAll('.compare-tile').forEach((t) => {
+          const isFs = (t === fsEl) || t.classList.contains('is-pseudo-fs');
+          updateTileFsButtons(t, isFs);
+        });
+      }
+
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+      document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          exitAllFs();
+        }
+      });
+
+      // 构建对比网格
+      const grid = document.createElement('div');
+      grid.className = 'compare-grid';
+      grid.dataset.count = String(avail.length);
+
+      avail.forEach((m) => {
+        const mm = MODELS[m];
+        const suffix = mm.suffix !== undefined ? mm.suffix : ('-' + m);
+        const tile = document.createElement('div');
+        tile.className = 'compare-tile';
+        tile.id = 'tile-' + m;
+
+        const tileBar = document.createElement('div');
+        tileBar.className = 'tile-bar';
+
+        const tileLeft = document.createElement('div');
+        tileLeft.className = 'tile-left';
+
+        const badge = document.createElement('span');
+        badge.className = 'badge' + (mm.badgeClass ? ' ' + mm.badgeClass : '');
+        badge.textContent = mm.badge;
+
+        const note = document.createElement('span');
+        note.className = 'tile-note';
+        note.title = mm.note;
+        note.textContent = mm.note;
+
+        tileLeft.appendChild(badge);
+        tileLeft.appendChild(note);
+
+        const tileActions = document.createElement('div');
+        tileActions.className = 'tile-actions';
+
+        if (scene.chats && scene.chats[m]) {
+          const chatA = document.createElement('a');
+          chatA.className = 'tile-chat';
+          chatA.href = scene.chats[m];
+          chatA.target = '_blank';
+          chatA.rel = 'noopener';
+          chatA.textContent = '💬 对话记录';
+          tileActions.appendChild(chatA);
+        }
+
+        const openA = document.createElement('a');
+        openA.className = 'btn btn-secondary tile-btn';
+        openA.href = '../' + scene.id + suffix + '/';
+        openA.target = '_blank';
+        openA.rel = 'noopener';
+        openA.textContent = '↗ 单独打开';
+
+        const fsBtn = document.createElement('button');
+        fsBtn.type = 'button';
+        fsBtn.className = 'btn tile-btn tile-fs-btn';
+        fsBtn.title = '全屏查看';
+        fsBtn.textContent = '⛶ 全屏';
+        fsBtn.addEventListener('click', () => {
+          requestTileFs(tile);
+        });
+
+        const exitBtn = document.createElement('button');
+        exitBtn.type = 'button';
+        exitBtn.className = 'btn btn-secondary tile-btn tile-exit-fs-btn';
+        exitBtn.title = '退出全屏';
+        exitBtn.textContent = '✕ 退出全屏';
+        exitBtn.addEventListener('click', () => {
+          exitAllFs();
+        });
+
+        tileActions.appendChild(openA);
+        tileActions.appendChild(fsBtn);
+        tileActions.appendChild(exitBtn);
+
+        tileBar.appendChild(tileLeft);
+        tileBar.appendChild(tileActions);
+
+        const frameWrap = document.createElement('div');
+        frameWrap.className = 'tile-frame-wrap';
+
+        const iframe = document.createElement('iframe');
+        iframe.src = '../' + scene.id + suffix + '/';
+        iframe.loading = 'lazy';
+        iframe.allow = 'fullscreen; autoplay';
+        iframe.setAttribute('allowfullscreen', '');
+        iframe.title = scene.title + ' · ' + mm.short;
+
+        frameWrap.appendChild(iframe);
+        tile.appendChild(tileBar);
+        tile.appendChild(frameWrap);
+
+        grid.appendChild(tile);
+      });
+
+      container.appendChild(grid);
+    })();
+  </script>
+</body>
+</html>

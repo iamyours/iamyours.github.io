@@ -29,6 +29,7 @@
       font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
       line-height: 1.6;
       -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
     }
 
     body {
@@ -88,12 +89,13 @@
       border: 2px solid var(--ink);
       border-radius: 14px;
       box-shadow: 0 3px 0 var(--ink);
-      padding: 9px 16px;
+      padding: 8px 14px;
       cursor: pointer;
       text-decoration: none;
       user-select: none;
       -webkit-user-select: none;
       transition: transform 0.08s ease, box-shadow 0.08s ease, background-color 0.15s ease;
+      white-space: nowrap;
     }
 
     .btn:hover {
@@ -137,16 +139,96 @@
       font-weight: 600;
       color: var(--ink);
       box-shadow: 0 3px 0 rgba(58, 46, 36, 0.12);
+      line-height: 1.6;
     }
 
-    /* 卡片网格：宽屏 2 列，手机 1 列 */
+    /* 分类导航 */
+    .cat-nav {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      margin: -4px 0 24px;
+      font-size: 14px;
+      font-weight: 800;
+    }
+
+    .cat-nav-label {
+      color: var(--ink);
+      font-weight: 800;
+      font-size: 14px;
+    }
+
+    .cat-nav .btn {
+      padding: 6px 12px;
+      font-size: 13.5px;
+    }
+
+    /* 分类区块 */
+    .category-section {
+      margin-top: 36px;
+      scroll-margin-top: 16px;
+    }
+
+    .category-section:first-of-type {
+      margin-top: 12px;
+    }
+
+    .category-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px 16px;
+      margin: 0 0 18px;
+      padding: 14px 18px;
+      background: var(--topbar-grad);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 4px 0 var(--ink);
+    }
+
+    .category-titles {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .category-title {
+      margin: 0;
+      font-size: 22px;
+      font-weight: 800;
+    }
+
+    .category-desc {
+      margin: 2px 0 0;
+      font-size: 13.5px;
+      font-weight: 600;
+      opacity: 0.9;
+    }
+
+    /* 卡片网格：桌面 3 列，平板 2 列，390px 手机单列 */
     .scene-grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 22px;
-      align-items: start;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+      align-items: stretch;
     }
 
+    @media (max-width: 960px) {
+      .scene-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .scene-grid {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+
+    /* 单张场景卡片 */
     .scene-card {
       background-color: var(--bg-card);
       border: 2px solid var(--ink);
@@ -168,6 +250,8 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      text-decoration: none;
+      cursor: pointer;
     }
 
     .thumb-fallback-label {
@@ -178,21 +262,21 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 16px;
+      padding: 14px;
       text-align: center;
       color: var(--ink);
       font-weight: 800;
-      font-size: 18px;
+      font-size: 16px;
       opacity: 0.85;
       pointer-events: none;
     }
 
     .thumb-fallback-label span.thumb-id {
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-      padding: 2px 10px;
+      padding: 2px 8px;
       border-radius: 999px;
-      background-color: rgba(255, 250, 240, 0.78);
+      background-color: rgba(255, 250, 240, 0.85);
       border: 1.5px solid var(--ink);
     }
 
@@ -216,47 +300,110 @@
     }
 
     .card-body {
-      padding: 18px 18px 20px;
+      padding: 16px 16px 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
       flex: 1;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
     }
 
     .scene-title {
       margin: 0;
-      font-size: 20px;
+      font-size: 18px;
       font-weight: 800;
       color: var(--ink);
       line-height: 1.3;
     }
 
+    .scene-title-link {
+      color: inherit;
+      text-decoration: none;
+    }
+
+    .scene-title-link:hover {
+      text-decoration: underline;
+    }
+
+    .source-link {
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--ink);
+      opacity: 0.8;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .source-link:hover {
+      text-decoration: underline;
+      opacity: 1;
+    }
+
     .scene-desc {
       margin: 0;
-      font-size: 14px;
+      font-size: 13.5px;
       color: var(--ink);
-      opacity: 0.92;
+      opacity: 0.9;
+      line-height: 1.5;
       min-height: 2.8em;
     }
+
+    /* 可用版本徽章 */
+    .scene-badges {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+
+    .model-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      font-size: 11.5px;
+      font-weight: 800;
+      color: var(--ink);
+      background-color: var(--highlight);
+      border: 1.5px solid var(--ink);
+      border-radius: 999px;
+      line-height: 1.2;
+    }
+
+    .model-badge.is-web { background-color: #bcd9f5; }
+    .model-badge.is-flash { background-color: #bfe6c8; }
+    .model-badge.is-deepseek { background-color: #c9c3f2; }
+    .model-badge.is-opus { background-color: #f2c6a8; }
 
     .card-actions {
       display: flex;
       align-items: center;
       flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 2px;
+      gap: 8px;
+      margin-top: auto;
+      padding-top: 4px;
     }
 
-    /* 可展开/收起的提示词区域 */
+    .card-actions .btn {
+      padding: 7px 12px;
+      font-size: 13px;
+    }
+
+    /* 提示词折叠区域 */
     .prompt-section {
       display: none;
-      margin-top: 6px;
-      padding: 12px;
+      margin-top: 8px;
+      padding: 10px;
       background-color: var(--bg-cream);
       border: 2px solid var(--ink);
-      border-radius: 14px;
+      border-radius: 12px;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
 
     .prompt-section.is-open {
@@ -268,199 +415,47 @@
       align-items: center;
       justify-content: space-between;
       gap: 8px;
-      flex-wrap: wrap;
     }
 
     .prompt-label {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 800;
       color: var(--ink);
     }
 
     .btn-copy {
-      padding: 5px 12px;
-      font-size: 13px;
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 10px;
     }
 
     .prompt-pre {
       margin: 0;
-      padding: 12px;
-      max-height: 320px;
+      padding: 10px;
+      max-height: 240px;
       overflow-y: auto;
       overflow-x: hidden;
       white-space: pre-wrap;
       word-break: break-word;
       font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-      font-size: 12.5px;
-      line-height: 1.6;
+      font-size: 12px;
+      line-height: 1.55;
       color: var(--ink);
       background-color: var(--bg-card);
-      border: 2px solid var(--ink);
-      border-radius: 12px;
+      border: 1.5px solid var(--ink);
+      border-radius: 10px;
     }
 
-    /* 每个场景一组：CLI 版 与 Gemini 网页版并排 */
-    .scene-groups {
-      display: flex;
-      flex-direction: column;
-      gap: 26px;
-    }
-
-    .scene-group-head {
-      display: flex;
-      align-items: baseline;
-      flex-wrap: wrap;
-      gap: 4px 12px;
-      margin: 0 0 12px;
-      padding-bottom: 8px;
-      border-bottom: 2px dashed rgba(58, 46, 36, 0.35);
-    }
-
-    .scene-group-title {
-      margin: 0;
-      font-size: 21px;
-      font-weight: 800;
-    }
-
-    .scene-group-desc {
-      margin: 0;
-      font-size: 14px;
-      opacity: 0.85;
-    }
-
-    .variant-badge {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      z-index: 2;
-      font-size: 12.5px;
-      font-weight: 800;
-      padding: 3px 10px;
-      border: 2px solid var(--ink);
-      border-radius: 999px;
-      box-shadow: 0 2px 0 var(--ink);
-      background-color: var(--highlight);
+    .prompt-diff-box {
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 8px 10px;
+      background-color: var(--bg-card);
+      border: 1.5px dashed var(--ink);
+      border-radius: 10px;
       color: var(--ink);
-    }
-
-    .variant-badge.is-web {
-      background-color: #bcd9f5;
-    }
-
-    .variant-badge.is-deepseek {
-      background-color: #c9c3f2;
-    }
-
-    .variant-badge.is-flash {
-      background-color: #bfe6c8;
-    }
-
-    .variant-badge.is-opus {
-      background-color: #f2c6a8;
-    }
-
-    /* 多于 2 个版本的组：3 个 → 宽屏 3 列；4 个 → 2×2 */
-    .scene-grid[data-count="3"] {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
-    }
-
-    .scene-grid[data-count="3"],
-    .scene-grid[data-count="4"] {
-      align-items: stretch;
-    }
-
-    .scene-grid[data-count="3"] .card-actions,
-    .scene-grid[data-count="4"] .card-actions {
-      margin-top: auto;
-    }
-
-    .scene-grid[data-count="3"] .card-body {
-      padding: 14px 14px 16px;
-    }
-
-    .scene-grid[data-count="3"] .scene-title {
-      font-size: 17px;
-    }
-
-    .scene-grid[data-count="3"] .card-actions .btn {
-      padding: 8px 12px;
-      font-size: 13px;
-    }
-
-    @media (max-width: 960px) and (min-width: 721px) {
-      .scene-grid[data-count="3"] {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    /* 第二批：三个合集 */
-    .cat-nav {
-      display: flex;
-      align-items: center;
-      flex-wrap: wrap;
-      gap: 8px 10px;
-      margin: -8px 0 24px;
-      font-size: 14px;
-      font-weight: 800;
-    }
-
-    .cat-nav .btn {
-      padding: 6px 12px;
-      font-size: 13.5px;
-    }
-
-    .category-section {
-      margin-top: 40px;
-      scroll-margin-top: 16px;
-    }
-
-    .category-head {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 10px 16px;
-      margin: 0 0 18px;
-      padding: 14px 18px;
-      background: var(--topbar-grad);
-      border: 2px solid var(--ink);
-      border-radius: 16px;
-      box-shadow: 0 4px 0 var(--ink);
-    }
-
-    .category-title {
-      margin: 0;
-      font-size: 24px;
-      font-weight: 800;
-    }
-
-    .category-desc {
-      margin: 2px 0 0;
-      font-size: 14px;
-      font-weight: 600;
-      opacity: 0.85;
-    }
-
-    .category-section .scene-groups {
-      gap: 22px;
-    }
-
-    .source-link {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--ink);
-      opacity: 0.8;
-    }
-
-    .scene-grid[data-count="1"] .scene-card {
-      grid-column: 1 / 2;
-    }
-
-    .chat-link {
-      font-size: 13px;
-      font-weight: 700;
-      color: var(--ink);
+      word-break: break-word;
+      white-space: pre-wrap;
     }
 
     @media (max-width: 720px) {
@@ -477,13 +472,15 @@
       }
 
       .gallery-main {
-        padding: 16px 14px 22px;
+        padding: 16px 12px 22px;
       }
 
-      .scene-grid,
-      .scene-grid[data-count] {
-        grid-template-columns: 1fr;
-        gap: 18px;
+      .category-head {
+        padding: 12px 14px;
+      }
+
+      .category-title {
+        font-size: 20px;
       }
 
       .scene-desc {
@@ -501,13 +498,10 @@
 
     <main class="gallery-main">
       <p class="intro-banner">
-        这些 3D 场景都由 AI 根据提示词生成，纯代码程序化建模，可以拖动旋转、缩放。每个场景三个版本并排：<b>CLI 版</b>（Gemini 通过 Antigravity CLI 生成）、<b>Gemini 网页版（4 Argon）</b>和 <b>DeepSeek V4.1 Flash</b>（ModelScope API），需求相同，方便对比。鹈鹕还多了一个 <b>Claude Opus 5.5</b>（Antigravity CLI）版本。
-        下面新增三个合集（体素世界、机械与载具、星球与宇宙），题材来自 X 上的热门提示词，每个场景由 <b>Gemini 网页版（4 Argon）</b>、<b>Gemini 网页版（3.8 Flash）</b>和 <b>DeepSeek V4.1 Flash</b> 用同一提示词分别生成，点「▶ 播放合集」可以连续播放。
+        每个场景一张卡片，同一提示词由不同模型生成的版本点「<b>对比全部版本</b>」并排实时运行、每个版本可单独全屏；四个合集可「<b>▶ 播放合集</b>」连续播放；Gemini 网页版（4 Argon / 3.8 Flash）会陆续补上。
       </p>
 
-      <nav class="cat-nav" id="cat-nav" aria-label="新增合集"></nav>
-
-      <div id="scene-groups" class="scene-groups"></div>
+      <nav class="cat-nav" id="cat-nav" aria-label="分类导航"></nav>
 
       <div id="category-sections"></div>
     </main>
@@ -515,441 +509,376 @@
 
   <script src="catalog.js"></script>
   <script>
-    // 场景列表（写成 JS 数组，方便以后扩展）
-    const SCENES = [
-      {
-        id: 'pelican',
-        geminiChat: 'https://gemini.google.com/app/2bdb9ed47de306b3',
-        // 只属于这个场景的额外版本：目录 <id><suffix>/、提示词 prompts/<id><suffix>.txt、缩略图 thumbs/<id><suffix>.jpg
-        extraVariants: [
-          {
-            suffix: '-opus',
-            badge: 'Antigravity · Opus 5.5',
-            badgeClass: 'is-opus',
-            note: '同一提示词，在 Antigravity CLI 里改用 Claude Opus 5.5 (High) 生成。'
+    (function () {
+      'use strict';
+
+      const MODELS = window.GALLERY_MODELS || {};
+      const ORDER = window.GALLERY_MODEL_ORDER || ['cli', 'web', 'flash', 'deepseek', 'opus'];
+      const CATS = window.GALLERY_CATEGORIES || [];
+
+      // 复制功能
+      async function copyText(text) {
+        if (!text) return false;
+        if (
+          typeof navigator !== 'undefined' &&
+          navigator.clipboard &&
+          typeof navigator.clipboard.writeText === 'function'
+        ) {
+          try {
+            await navigator.clipboard.writeText(text);
+            return true;
+          } catch (err) {
+            // 回退
           }
-        ],
-        title: '鹈鹕骑自行车',
-        description: '社区经典基准题：鹈鹕踩着脚踏沿环形小路骑行，腿、曲柄、车轮联动。',
-        gradient: 'linear-gradient(135deg, #d8efc2 0%, #f7e3a1 55%, #f5c396 100%)'
-      },
-      {
-        id: 'midautumn',
-        geminiChat: 'https://gemini.google.com/app/35d65d970fa10510',
-        title: '中秋月夜水榭',
-        description: '满月、金桂花雨、水榭倒影与灯笼暖光，一个静谧的中秋角落。',
-        gradient: 'linear-gradient(135deg, #c7d4ec 0%, #e4d5ec 50%, #f6dca6 100%)'
-      },
-      {
-        id: 'jet-engine',
-        geminiChat: 'https://gemini.google.com/app/f1ba4d863a744b23',
-        title: '交互式喷气发动机',
-        description: '风扇与轴旋转，点「分解」看各级部件沿轴线展开，悬停查看作用。',
-        gradient: 'linear-gradient(135deg, #cde4ec 0%, #dfeaf2 50%, #f5d9a8 100%)'
-      },
-      {
-        id: 'temple',
-        geminiChat: 'https://gemini.google.com/app/56fe4c1689886f30',
-        title: '天坛祈年殿',
-        description: '三重蓝色琉璃圆顶与汉白玉台基，可一键爆炸 / 重组。',
-        gradient: 'linear-gradient(135deg, #bfd8ee 0%, #e5ecf4 52%, #f4d599 100%)'
-      },
-      {
-        id: 'sunset-voxel',
-        geminiChat: 'https://gemini.google.com/app/dad27eee792fcd35',
-        title: '永恒日落 · 体素世界',
-        description: '程序生成的方块海岸，一颗低悬海面的橙色落日。',
-        gradient: 'linear-gradient(135deg, #f7c59f 0%, #f7dca8 50%, #bfe1d9 100%)'
-      }
-    ];
-
-    // 每个场景两个版本：CLI 版（目录 <id>/）与 Gemini 网页版（目录 <id>-web/）
-    const VARIANTS = [
-      {
-        suffix: '',
-        badge: 'CLI 版',
-        badgeClass: '',
-        note: 'Gemini 通过 Antigravity CLI 生成。'
-      },
-      {
-        suffix: '-web',
-        badge: 'Gemini 网页版（4 Argon）',
-        badgeClass: 'is-web',
-        note: '同样的需求，在 Gemini 网页上用 4 Argon（思考：高）生成。'
-      },
-      {
-        suffix: '-deepseek',
-        badge: 'DeepSeek V4.1 Flash',
-        badgeClass: 'is-deepseek',
-        note: '同样的需求，直接调用 ModelScope API 上的 DeepSeek-V4.1-Flash 生成。'
-      }
-    ];
-
-    // 复制功能（与 prompt-panel.js 共用同一逻辑）
-    async function copyText(text) {
-      if (!text) return false;
-      if (
-        typeof navigator !== 'undefined' &&
-        navigator.clipboard &&
-        typeof navigator.clipboard.writeText === 'function'
-      ) {
+        }
         try {
-          await navigator.clipboard.writeText(text);
-          return true;
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.setAttribute('readonly', 'readonly');
+          textarea.style.position = 'fixed';
+          textarea.style.top = '-9999px';
+          textarea.style.left = '-9999px';
+          textarea.style.width = '1px';
+          textarea.style.height = '1px';
+          textarea.style.opacity = '0';
+          textarea.style.pointerEvents = 'none';
+          document.body.appendChild(textarea);
+          textarea.focus();
+          textarea.select();
+          textarea.setSelectionRange(0, textarea.value.length);
+          const ok = document.execCommand('copy');
+          document.body.removeChild(textarea);
+          return !!ok;
         } catch (err) {
-          // 回退为隐藏 textarea + document.execCommand('copy')
+          return false;
         }
       }
-      try {
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.setAttribute('readonly', 'readonly');
-        textarea.style.position = 'fixed';
-        textarea.style.top = '-9999px';
-        textarea.style.left = '-9999px';
-        textarea.style.width = '1px';
-        textarea.style.height = '1px';
-        textarea.style.opacity = '0';
-        textarea.style.pointerEvents = 'none';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        textarea.setSelectionRange(0, textarea.value.length);
-        const ok = document.execCommand('copy');
-        document.body.removeChild(textarea);
-        return !!ok;
-      } catch (err) {
-        return false;
-      }
-    }
 
-    const promptCache = new Map();
-    const promptInflight = new Map();
+      const promptCache = new Map();
+      const promptInflight = new Map();
 
-    function loadPrompt(id) {
-      if (promptCache.has(id)) {
-        return Promise.resolve(promptCache.get(id));
-      }
-      if (promptInflight.has(id)) {
-        return promptInflight.get(id);
-      }
-      const p = fetch('prompts/' + id + '.txt')
-        .then((res) => {
-          if (!res.ok) throw new Error('HTTP ' + res.status);
-          return res.text();
-        })
-        .then((txt) => {
-          promptCache.set(id, txt);
-          promptInflight.delete(id);
-          return txt;
-        })
-        .catch(() => {
-          promptInflight.delete(id);
-          return '';
-        });
-      promptInflight.set(id, p);
-      return p;
-    }
-
-    function createSceneCard(base, variant, playHref) {
-      const scene = Object.assign({}, base, {
-        id: base.id + variant.suffix,
-        title: base.title + ' · ' + variant.badge,
-        description: variant.note
-      });
-      const card = document.createElement('article');
-      card.className = 'scene-card';
-      card.dataset.sceneId = scene.id;
-
-      // 缩略图区域
-      const thumbWrap = document.createElement('div');
-      thumbWrap.className = 'thumb-wrap';
-      if (scene.gradient) {
-        thumbWrap.style.background = scene.gradient;
-      }
-
-      const fallbackLabel = document.createElement('div');
-      fallbackLabel.className = 'thumb-fallback-label';
-      const fallbackTitle = document.createElement('span');
-      fallbackTitle.textContent = '🧊 ' + scene.title;
-      const fallbackId = document.createElement('span');
-      fallbackId.className = 'thumb-id';
-      fallbackId.textContent = scene.id;
-      fallbackLabel.appendChild(fallbackTitle);
-      fallbackLabel.appendChild(fallbackId);
-
-      const img = document.createElement('img');
-      img.className = 'scene-thumb';
-      img.src = 'thumbs/' + scene.id + '.jpg';
-      img.alt = scene.title;
-      img.loading = 'lazy';
-      img.addEventListener('error', () => {
-        img.classList.add('is-error');
-      });
-
-      thumbWrap.appendChild(fallbackLabel);
-      thumbWrap.appendChild(img);
-
-      const badgeEl = document.createElement('span');
-      badgeEl.className = 'variant-badge ' + variant.badgeClass;
-      badgeEl.textContent = variant.badge;
-      thumbWrap.appendChild(badgeEl);
-
-      // 卡片内容区域
-      const body = document.createElement('div');
-      body.className = 'card-body';
-
-      const titleEl = document.createElement('h3');
-      titleEl.className = 'scene-title';
-      titleEl.textContent = variant.badge;
-
-      const descEl = document.createElement('p');
-      descEl.className = 'scene-desc';
-      descEl.textContent = scene.description;
-
-      const actionsEl = document.createElement('div');
-      actionsEl.className = 'card-actions';
-
-      const enterLink = document.createElement('a');
-      enterLink.className = 'btn';
-      enterLink.href = scene.id + '/';
-      enterLink.textContent = '进入场景 →';
-
-      const togglePromptBtn = document.createElement('button');
-      togglePromptBtn.type = 'button';
-      togglePromptBtn.className = 'btn btn-secondary';
-      togglePromptBtn.setAttribute('aria-expanded', 'false');
-      togglePromptBtn.textContent = '📜 查看提示词';
-
-      actionsEl.appendChild(enterLink);
-      if (playHref) {
-        const playLink = document.createElement('a');
-        playLink.className = 'btn btn-secondary';
-        playLink.href = playHref;
-        playLink.textContent = '▶ 单独播放';
-        actionsEl.appendChild(playLink);
-      }
-      actionsEl.appendChild(togglePromptBtn);
-
-      if ((variant.suffix === '-web' || variant.suffix === '-flash') && base.geminiChat) {
-        const chatLink = document.createElement('a');
-        chatLink.className = 'chat-link';
-        chatLink.href = base.geminiChat;
-        chatLink.target = '_blank';
-        chatLink.rel = 'noopener';
-        chatLink.textContent = '💬 Gemini 对话记录';
-        actionsEl.appendChild(chatLink);
-      }
-
-      // 提示词展开区域
-      const promptSection = document.createElement('div');
-      promptSection.className = 'prompt-section';
-
-      const promptToolbar = document.createElement('div');
-      promptToolbar.className = 'prompt-toolbar';
-
-      const promptLabel = document.createElement('span');
-      promptLabel.className = 'prompt-label';
-      promptLabel.textContent = '场景生成提示词';
-
-      const copyBtn = document.createElement('button');
-      copyBtn.type = 'button';
-      copyBtn.className = 'btn btn-copy';
-      copyBtn.textContent = '复制';
-
-      promptToolbar.appendChild(promptLabel);
-      promptToolbar.appendChild(copyBtn);
-
-      const preEl = document.createElement('pre');
-      preEl.className = 'prompt-pre';
-      preEl.textContent = '正在加载提示词…';
-
-      promptSection.appendChild(promptToolbar);
-      promptSection.appendChild(preEl);
-
-      async function ensurePromptRendered() {
-        const text = await loadPrompt(scene.id);
-        preEl.textContent = text || '未能加载提示词文本。';
-        return text;
-      }
-
-      let isExpanded = false;
-      togglePromptBtn.addEventListener('click', () => {
-        isExpanded = !isExpanded;
-        promptSection.classList.toggle('is-open', isExpanded);
-        togglePromptBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-        if (isExpanded) {
-          ensurePromptRendered();
+      function loadPromptText(idWithSuffix) {
+        if (promptCache.has(idWithSuffix)) {
+          return Promise.resolve(promptCache.get(idWithSuffix));
         }
-      });
-
-      let copyTimer = null;
-      copyBtn.addEventListener('click', async () => {
-        const text = promptCache.has(scene.id)
-          ? promptCache.get(scene.id)
-          : await ensurePromptRendered();
-        const ok = await copyText(text);
-        if (copyTimer) clearTimeout(copyTimer);
-        copyBtn.textContent = ok ? '已复制' : '复制失败';
-        copyTimer = setTimeout(() => {
-          copyBtn.textContent = '复制';
-          copyTimer = null;
-        }, 1500);
-      });
-
-      body.appendChild(titleEl);
-      body.appendChild(descEl);
-      body.appendChild(actionsEl);
-      body.appendChild(promptSection);
-
-      card.appendChild(thumbWrap);
-      card.appendChild(body);
-
-      return card;
-    }
-
-    function renderGallery() {
-      const groups = document.getElementById('scene-groups');
-      if (!groups) return;
-      const frag = document.createDocumentFragment();
-      SCENES.forEach((scene) => {
-        const section = document.createElement('section');
-        section.className = 'scene-group';
-        section.dataset.group = scene.id;
-
-        const head = document.createElement('div');
-        head.className = 'scene-group-head';
-        const h = document.createElement('h2');
-        h.className = 'scene-group-title';
-        h.textContent = scene.title;
-        const d = document.createElement('p');
-        d.className = 'scene-group-desc';
-        d.textContent = scene.description;
-        head.appendChild(h);
-        head.appendChild(d);
-
-        const grid = document.createElement('div');
-        const variants = VARIANTS.concat(scene.extraVariants || []);
-        grid.className = 'scene-grid';
-        grid.dataset.count = String(variants.length);
-        variants.forEach((variant) => {
-          grid.appendChild(createSceneCard(scene, variant));
-        });
-
-        section.appendChild(head);
-        section.appendChild(grid);
-        frag.appendChild(section);
-      });
-      groups.appendChild(frag);
-    }
-
-    // 第二批：按类别渲染合集（数据来自 catalog.js）
-    function renderCategories() {
-      const host = document.getElementById('category-sections');
-      const nav = document.getElementById('cat-nav');
-      const cats = window.GALLERY_CATEGORIES || [];
-      const models = window.GALLERY_MODELS || {};
-      const order = window.GALLERY_MODEL_ORDER || [];
-      if (!host || !cats.length) return;
-
-      if (nav) {
-        const label = document.createElement('span');
-        label.textContent = '新增合集：';
-        nav.appendChild(label);
-        cats.forEach((cat) => {
-          const a = document.createElement('a');
-          a.className = 'btn btn-secondary';
-          a.href = '#cat-' + cat.id;
-          a.textContent = cat.emoji + ' ' + cat.title;
-          nav.appendChild(a);
-        });
+        if (promptInflight.has(idWithSuffix)) {
+          return promptInflight.get(idWithSuffix);
+        }
+        const p = fetch('prompts/' + idWithSuffix + '.txt')
+          .then((res) => {
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            return res.text();
+          })
+          .then((txt) => {
+            promptCache.set(idWithSuffix, txt);
+            promptInflight.delete(idWithSuffix);
+            return txt;
+          })
+          .catch(() => {
+            promptInflight.delete(idWithSuffix);
+            return '';
+          });
+        promptInflight.set(idWithSuffix, p);
+        return p;
       }
 
-      const frag = document.createDocumentFragment();
-      cats.forEach((cat) => {
-        const section = document.createElement('section');
-        section.className = 'category-section';
-        section.id = 'cat-' + cat.id;
+      function filterPromptLines(text) {
+        return text.split('\n').filter((l) => !l.includes('data-id='));
+      }
 
-        const head = document.createElement('div');
-        head.className = 'category-head';
-        const titles = document.createElement('div');
-        const h = document.createElement('h2');
-        h.className = 'category-title';
-        h.textContent = cat.emoji + ' ' + cat.title;
-        const d = document.createElement('p');
-        d.className = 'category-desc';
-        const count = cat.scenes.filter((s) => s.models && s.models.length).length;
-        d.textContent = cat.description + '（' + count + ' 个场景）';
-        titles.appendChild(h);
-        titles.appendChild(d);
-        const play = document.createElement('a');
-        play.className = 'btn';
-        play.href = 'collection/?c=' + encodeURIComponent(cat.id);
-        play.textContent = '▶ 播放合集';
-        head.appendChild(titles);
-        head.appendChild(play);
-        section.appendChild(head);
+      async function computePromptDiff(scene, avail) {
+        if (avail.length <= 1) {
+          return '各版本使用同一提示词';
+        }
+        const texts = await Promise.all(
+          avail.map((m) => {
+            const suf = MODELS[m] ? MODELS[m].suffix : ('-' + m);
+            return loadPromptText(scene.id + suf);
+          })
+        );
+        const baseLines = filterPromptLines(texts[0]);
+        const diffEntries = [];
 
-        const groups = document.createElement('div');
-        groups.className = 'scene-groups';
-        cat.scenes.forEach((scene) => {
-          const avail = order.filter((m) => (scene.models || []).indexOf(m) !== -1 && models[m]);
-          if (!avail.length) return;
-          const group = document.createElement('section');
-          group.className = 'scene-group';
-          group.dataset.group = scene.id;
-
-          const gh = document.createElement('div');
-          gh.className = 'scene-group-head';
-          const gt = document.createElement('h3');
-          gt.className = 'scene-group-title';
-          gt.textContent = scene.title;
-          const gd = document.createElement('p');
-          gd.className = 'scene-group-desc';
-          gd.textContent = scene.description;
-          gh.appendChild(gt);
-          gh.appendChild(gd);
-          if (scene.source) {
-            const src = document.createElement('a');
-            src.className = 'source-link';
-            src.href = scene.source;
-            src.target = '_blank';
-            src.rel = 'noopener';
-            src.textContent = '原帖 ↗';
-            gh.appendChild(src);
+        for (let i = 1; i < avail.length; i++) {
+          const m = avail[i];
+          const linesM = filterPromptLines(texts[i]);
+          const differs = [];
+          const maxLen = Math.max(baseLines.length, linesM.length);
+          for (let li = 0; li < maxLen; li++) {
+            const l0 = baseLines[li] !== undefined ? baseLines[li].trim() : '';
+            const lm = linesM[li] !== undefined ? linesM[li].trim() : '';
+            if (l0 !== lm && lm) {
+              differs.push(linesM[li].trim());
+            }
           }
+          if (differs.length > 0) {
+            diffEntries.push({
+              badge: (MODELS[m] && MODELS[m].badge) || m,
+              lines: differs
+            });
+          }
+        }
+
+        if (diffEntries.length === 0) {
+          return '各版本使用同一提示词';
+        }
+
+        let out = '各版本提示词差异：\n';
+        diffEntries.forEach((entry) => {
+          out += '• ' + entry.badge + '：' + entry.lines.join('；') + '\n';
+        });
+        return out.trim();
+      }
+
+      function createSceneCard(scene, catId) {
+        const avail = ORDER.filter((m) => (scene.models || []).indexOf(m) !== -1 && MODELS[m]);
+        const firstModel = avail[0] || 'deepseek';
+        const firstSuffix = MODELS[firstModel] ? MODELS[firstModel].suffix : '';
+        const compareHref = 'compare/?s=' + encodeURIComponent(scene.id) + '&c=' + encodeURIComponent(catId);
+
+        const card = document.createElement('article');
+        card.className = 'scene-card';
+        card.dataset.sceneId = scene.id;
+
+        // 缩略图
+        const thumbWrap = document.createElement('a');
+        thumbWrap.className = 'thumb-wrap';
+        thumbWrap.href = compareHref;
+        thumbWrap.title = '对比全部版本';
+        if (scene.gradient) {
+          thumbWrap.style.background = scene.gradient;
+        }
+
+        const fallbackLabel = document.createElement('div');
+        fallbackLabel.className = 'thumb-fallback-label';
+        const fallbackTitle = document.createElement('span');
+        fallbackTitle.textContent = '🧊 ' + scene.title;
+        const fallbackId = document.createElement('span');
+        fallbackId.className = 'thumb-id';
+        fallbackId.textContent = scene.id;
+        fallbackLabel.appendChild(fallbackTitle);
+        fallbackLabel.appendChild(fallbackId);
+
+        const img = document.createElement('img');
+        img.className = 'scene-thumb';
+        img.src = 'thumbs/' + scene.id + firstSuffix + '.jpg';
+        img.alt = scene.title;
+        img.loading = 'lazy';
+        img.addEventListener('error', () => {
+          img.classList.add('is-error');
+        });
+
+        thumbWrap.appendChild(fallbackLabel);
+        thumbWrap.appendChild(img);
+
+        // 卡片主体
+        const body = document.createElement('div');
+        body.className = 'card-body';
+
+        const head = document.createElement('div');
+        head.className = 'card-head';
+
+        const titleEl = document.createElement('h3');
+        titleEl.className = 'scene-title';
+        const titleLink = document.createElement('a');
+        titleLink.className = 'scene-title-link';
+        titleLink.href = compareHref;
+        titleLink.textContent = scene.title;
+        titleEl.appendChild(titleLink);
+        head.appendChild(titleEl);
+
+        if (scene.source) {
+          const srcLink = document.createElement('a');
+          srcLink.className = 'source-link';
+          srcLink.href = scene.source;
+          srcLink.target = '_blank';
+          srcLink.rel = 'noopener';
+          srcLink.textContent = '原帖 ↗';
+          head.appendChild(srcLink);
+        }
+
+        const descEl = document.createElement('p');
+        descEl.className = 'scene-desc';
+        descEl.textContent = scene.description;
+
+        // 可用版本徽章
+        const badgesEl = document.createElement('div');
+        badgesEl.className = 'scene-badges';
+        badgesEl.setAttribute('aria-label', '可用版本');
+        avail.forEach((m) => {
+          const mm = MODELS[m];
+          const b = document.createElement('span');
+          b.className = 'model-badge' + (mm.badgeClass ? ' ' + mm.badgeClass : '');
+          b.textContent = mm.short;
+          badgesEl.appendChild(b);
+        });
+
+        // 按钮组
+        const actionsEl = document.createElement('div');
+        actionsEl.className = 'card-actions';
+
+        const compareBtn = document.createElement('a');
+        compareBtn.className = 'btn';
+        compareBtn.href = compareHref;
+        compareBtn.textContent = '⚖️ 对比全部版本';
+
+        const togglePromptBtn = document.createElement('button');
+        togglePromptBtn.type = 'button';
+        togglePromptBtn.className = 'btn btn-secondary';
+        togglePromptBtn.setAttribute('aria-expanded', 'false');
+        togglePromptBtn.textContent = '📜 查看提示词';
+
+        actionsEl.appendChild(compareBtn);
+        actionsEl.appendChild(togglePromptBtn);
+
+        // 提示词展开区
+        const promptSection = document.createElement('div');
+        promptSection.className = 'prompt-section';
+
+        const promptToolbar = document.createElement('div');
+        promptToolbar.className = 'prompt-toolbar';
+
+        const promptLabel = document.createElement('span');
+        promptLabel.className = 'prompt-label';
+        promptLabel.textContent = '场景生成提示词';
+
+        const copyBtn = document.createElement('button');
+        copyBtn.type = 'button';
+        copyBtn.className = 'btn btn-copy';
+        copyBtn.textContent = '复制';
+
+        promptToolbar.appendChild(promptLabel);
+        promptToolbar.appendChild(copyBtn);
+
+        const preEl = document.createElement('pre');
+        preEl.className = 'prompt-pre';
+        preEl.textContent = '正在加载提示词…';
+
+        const diffBox = document.createElement('div');
+        diffBox.className = 'prompt-diff-box';
+        diffBox.textContent = '正在对比各版本提示词…';
+
+        promptSection.appendChild(promptToolbar);
+        promptSection.appendChild(preEl);
+        promptSection.appendChild(diffBox);
+
+        let promptLoaded = false;
+        async function ensurePromptLoaded() {
+          if (promptLoaded) return;
+          promptLoaded = true;
+          const firstText = await loadPromptText(scene.id + firstSuffix);
+          preEl.textContent = firstText || '未能加载提示词文本。';
+          const diffResult = await computePromptDiff(scene, avail);
+          diffBox.textContent = diffResult;
+        }
+
+        let isExpanded = false;
+        togglePromptBtn.addEventListener('click', () => {
+          isExpanded = !isExpanded;
+          promptSection.classList.toggle('is-open', isExpanded);
+          togglePromptBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+          if (isExpanded) {
+            ensurePromptLoaded();
+          }
+        });
+
+        let copyTimer = null;
+        copyBtn.addEventListener('click', async () => {
+          await ensurePromptLoaded();
+          const firstText = promptCache.get(scene.id + firstSuffix) || '';
+          const ok = await copyText(firstText);
+          if (copyTimer) clearTimeout(copyTimer);
+          copyBtn.textContent = ok ? '已复制' : '复制失败';
+          copyTimer = setTimeout(() => {
+            copyBtn.textContent = '复制';
+            copyTimer = null;
+          }, 1500);
+        });
+
+        body.appendChild(head);
+        body.appendChild(descEl);
+        body.appendChild(badgesEl);
+        body.appendChild(actionsEl);
+        body.appendChild(promptSection);
+
+        card.appendChild(thumbWrap);
+        card.appendChild(body);
+
+        return card;
+      }
+
+      function renderApp() {
+        const host = document.getElementById('category-sections');
+        const nav = document.getElementById('cat-nav');
+        if (!host || !CATS.length) return;
+
+        if (nav) {
+          nav.innerHTML = '';
+          const label = document.createElement('span');
+          label.className = 'cat-nav-label';
+          label.textContent = '合集分类：';
+          nav.appendChild(label);
+          CATS.forEach((cat) => {
+            const a = document.createElement('a');
+            a.className = 'btn btn-secondary';
+            a.href = '#cat-' + cat.id;
+            a.textContent = cat.emoji + ' ' + cat.title;
+            nav.appendChild(a);
+          });
+        }
+
+        const frag = document.createDocumentFragment();
+        CATS.forEach((cat) => {
+          const section = document.createElement('section');
+          section.className = 'category-section';
+          section.id = 'cat-' + cat.id;
+
+          const head = document.createElement('div');
+          head.className = 'category-head';
+
+          const titles = document.createElement('div');
+          titles.className = 'category-titles';
+          const h = document.createElement('h2');
+          h.className = 'category-title';
+          h.textContent = cat.emoji + ' ' + cat.title;
+          const d = document.createElement('p');
+          d.className = 'category-desc';
+          const activeScenes = (cat.scenes || []).filter((s) => s.models && s.models.length > 0);
+          d.textContent = cat.description + '（' + activeScenes.length + ' 个场景）';
+          titles.appendChild(h);
+          titles.appendChild(d);
+
+          const play = document.createElement('a');
+          play.className = 'btn';
+          play.href = 'collection/?c=' + encodeURIComponent(cat.id);
+          play.textContent = '▶ 播放合集';
+
+          head.appendChild(titles);
+          head.appendChild(play);
+          section.appendChild(head);
 
           const grid = document.createElement('div');
           grid.className = 'scene-grid';
-          grid.dataset.count = String(avail.length);
-          avail.forEach((m) => {
-            const mm = models[m];
-            const variant = { suffix: '-' + m, badge: mm.badge, badgeClass: mm.badgeClass, note: mm.note };
-            const href = 'collection/?c=' + encodeURIComponent(cat.id) +
-              '&s=' + encodeURIComponent(scene.id) + '&m=' + encodeURIComponent(m);
-            const base = Object.assign({}, scene, { geminiChat: (scene.chats || {})[m] });
-            grid.appendChild(createSceneCard(base, variant, href));
+          activeScenes.forEach((scene) => {
+            grid.appendChild(createSceneCard(scene, cat.id));
           });
 
-          group.appendChild(gh);
-          group.appendChild(grid);
-          groups.appendChild(group);
+          section.appendChild(grid);
+          frag.appendChild(section);
         });
-        section.appendChild(groups);
-        frag.appendChild(section);
-      });
-      host.appendChild(frag);
 
-      // 带 #cat-xxx 打开时，渲染完成后再定位一次
-      if (location.hash && location.hash.indexOf('#cat-') === 0) {
-        const target = document.getElementById(location.hash.slice(1));
-        if (target) target.scrollIntoView();
+        host.appendChild(frag);
+
+        if (location.hash && location.hash.indexOf('#cat-') === 0) {
+          const target = document.getElementById(location.hash.slice(1));
+          if (target) {
+            setTimeout(() => target.scrollIntoView(), 50);
+          }
+        }
       }
-    }
 
-    renderGallery();
-    renderCategories();
+      renderApp();
+    })();
   </script>
 </body>
 </html>
