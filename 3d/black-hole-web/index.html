@@ -1,0 +1,1207 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>卡冈图雅 · 交互式黑洞与引力透镜可视化</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #f5efe6;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      background: #000000;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* 左上角返回按钮：半透明奶油色圆角小按钮 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 14px;
+      background: rgba(255, 248, 231, 0.78);
+      color: #231c14;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 250, 240, 0.9);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 250, 238, 0.94);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(255, 190, 110, 0.3);
+    }
+
+    /* 右上角控制面板 */
+    .control-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 20;
+      width: 268px;
+      padding: 16px 18px;
+      background: rgba(12, 10, 8, 0.72);
+      border: 1px solid rgba(255, 196, 130, 0.24);
+      border-radius: 14px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.75), inset 0 1px 0 rgba(255, 230, 190, 0.12);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      color: #f3e9dc;
+    }
+
+    .panel-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #ffd7a3;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 195, 130, 0.16);
+    }
+
+    .panel-title span.sub {
+      font-size: 10px;
+      font-weight: 500;
+      color: rgba(255, 215, 163, 0.6);
+      letter-spacing: 0.5px;
+    }
+
+    .control-row {
+      margin-bottom: 11px;
+    }
+
+    .control-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      margin-bottom: 5px;
+      color: rgba(245, 235, 222, 0.9);
+    }
+
+    .control-val {
+      font-variant-numeric: tabular-nums;
+      font-size: 11px;
+      color: #ffb86b;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffbf75;
+      border: 2px solid #fff6ea;
+      box-shadow: 0 0 10px rgba(255, 165, 65, 0.85);
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.16);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffbf75;
+      border: 2px solid #fff6ea;
+      box-shadow: 0 0 10px rgba(255, 165, 65, 0.85);
+      cursor: pointer;
+    }
+
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding-top: 8px;
+      margin-top: 4px;
+      border-top: 1px solid rgba(255, 195, 130, 0.14);
+      font-size: 12px;
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 40px;
+      height: 21px;
+      cursor: pointer;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background-color: rgba(255, 255, 255, 0.18);
+      border-radius: 999px;
+      transition: 0.25s ease;
+    }
+
+    .slider::before {
+      content: "";
+      position: absolute;
+      height: 15px;
+      width: 15px;
+      left: 3px;
+      bottom: 3px;
+      background-color: #fff6eb;
+      border-radius: 50%;
+      transition: 0.25s ease;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+    }
+
+    .switch input:checked + .slider {
+      background: linear-gradient(90deg, #ff7e29, #ffbe6b);
+      box-shadow: 0 0 12px rgba(255, 150, 55, 0.45);
+    }
+
+    .switch input:checked + .slider::before {
+      transform: translateX(19px);
+    }
+
+    /* 底部现象说明小字 */
+    .phenomenon-bar {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      max-width: 92vw;
+      padding: 7px 18px;
+      border-radius: 999px;
+      background: rgba(8, 7, 6, 0.66);
+      border: 1px solid rgba(255, 198, 135, 0.2);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      font-size: 12px;
+      line-height: 1.5;
+      letter-spacing: 0.4px;
+      color: rgba(250, 236, 218, 0.88);
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+    }
+
+    .phenomenon-bar strong {
+      color: #ffbe73;
+      font-weight: 600;
+    }
+
+    @media (max-width: 640px) {
+      .control-panel {
+        width: 224px;
+        padding: 12px 14px;
+        top: 14px;
+        right: 12px;
+      }
+      .back-btn {
+        top: 14px;
+        left: 12px;
+        padding: 6px 11px;
+        font-size: 12px;
+      }
+      .phenomenon-bar {
+        font-size: 11px;
+        padding: 6px 12px;
+        bottom: 12px;
+        white-space: normal;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:640px){#phenomenon-text{bottom:76px}}</style>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div id="canvas-container"></div>
+
+  <aside class="control-panel" aria-label="黑洞参数控制面板">
+    <div class="panel-title">
+      <span>卡冈图雅 · 观测台</span>
+      <span class="sub">GARGANTUA</span>
+    </div>
+
+    <div class="control-row">
+      <div class="control-header">
+        <label for="mass-slider">黑洞质量</label>
+        <span class="control-val" id="mass-val">1.00 M☉</span>
+      </div>
+      <input id="mass-slider" type="range" min="0.50" max="1.80" step="0.02" value="1.00" />
+    </div>
+
+    <div class="control-row">
+      <div class="control-header">
+        <label for="brightness-slider">吸积盘亮度</label>
+        <span class="control-val" id="brightness-val">1.25</span>
+      </div>
+      <input id="brightness-slider" type="range" min="0.25" max="2.50" step="0.05" value="1.25" />
+    </div>
+
+    <div class="control-row">
+      <div class="control-header">
+        <label for="speed-slider">旋转速度</label>
+        <span class="control-val" id="speed-val">1.00x</span>
+      </div>
+      <input id="speed-slider" type="range" min="0.00" max="2.80" step="0.05" value="1.00" />
+    </div>
+
+    <div class="control-row">
+      <div class="control-header">
+        <label for="particles-slider">粒子数量</label>
+        <span class="control-val" id="particles-val">3200</span>
+      </div>
+      <input id="particles-slider" type="range" min="400" max="6000" step="100" value="3200" />
+    </div>
+
+    <div class="toggle-row">
+      <label for="lensing-toggle">透镜效果</label>
+      <label class="switch">
+        <input id="lensing-toggle" type="checkbox" checked />
+        <span class="slider"></span>
+      </label>
+    </div>
+  </aside>
+
+  <div class="phenomenon-bar" id="phenomenon-text">
+    <strong>引力透镜与多普勒集束：</strong>事件视界内光线无法逃逸呈绝对纯黑，外围环绕锐利光子环；吸积盘背面经强引力弯折在黑洞上下方同时可见，迎面旋转侧因多普勒效应显著更亮。
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+    // ==========================================
+    // 1. 全局参数状态与 UI 绑定
+    // ==========================================
+    const state = {
+      mass: 1.00,
+      diskBrightness: 1.25,
+      rotationSpeed: 1.00,
+      particleCount: 3200,
+      lensingEnabled: true
+    };
+
+    const massSlider = document.getElementById('mass-slider');
+    const massVal = document.getElementById('mass-val');
+    const brightnessSlider = document.getElementById('brightness-slider');
+    const brightnessVal = document.getElementById('brightness-val');
+    const speedSlider = document.getElementById('speed-slider');
+    const speedVal = document.getElementById('speed-val');
+    const particlesSlider = document.getElementById('particles-slider');
+    const particlesVal = document.getElementById('particles-val');
+    const lensingToggle = document.getElementById('lensing-toggle');
+    const phenomenonText = document.getElementById('phenomenon-text');
+
+    // ==========================================
+    // 2. 场景、相机与渲染器初始化
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: false,
+      powerPreference: 'high-performance',
+      stencil: false,
+      depth: false
+    });
+    renderer.setPixelRatio(dpr);
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x000000, 1);
+    container.appendChild(renderer.domElement);
+
+    // 3D 场景专门用于渲染环绕等离子体粒子（随后送入引力透镜后处理管线）
+    const particleScene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(
+      48,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      200
+    );
+    // 初始机位：微倾角观测，凸显《星际穿越》卡冈图雅的非对称弯曲吸积盘
+    camera.position.set(-0.8, 1.55, 11.2);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.enablePan = false;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 26.0;
+    controls.update();
+
+    // 吸积盘与等离子体共同的倾斜平面法向量（营造电影感倾角）
+    const diskTiltEuler = new THREE.Euler(0.11, 0.0, -0.18, 'XYZ');
+    const diskBasisMatrix = new THREE.Matrix4().makeRotationFromEuler(diskTiltEuler);
+    const diskInvBasisMatrix = diskBasisMatrix.clone().invert();
+    const diskNormalWorld = new THREE.Vector3(0, 1, 0).applyEuler(diskTiltEuler).normalize();
+
+    // ==========================================
+    // 3. 环绕等离子体粒子系统（Points + 加法混合 + 螺旋坠入拖尾）
+    // ==========================================
+    const MAX_PARTICLES = 6000;
+    const TRAIL_STEPS = 5; // 每个等离子体团包含5个拖尾采样点，形成柔和螺旋尾迹
+    const TOTAL_POINTS = MAX_PARTICLES * TRAIL_STEPS;
+
+    const pRadius0 = new Float32Array(TOTAL_POINTS);
+    const pAngle0 = new Float32Array(TOTAL_POINTS);
+    const pHeight0 = new Float32Array(TOTAL_POINTS);
+    const pSpeed = new Float32Array(TOTAL_POINTS);
+    const pInfallRate = new Float32Array(TOTAL_POINTS);
+    const pTrailLag = new Float32Array(TOTAL_POINTS);
+    const pTrailFade = new Float32Array(TOTAL_POINTS);
+    const pTempSeed = new Float32Array(TOTAL_POINTS);
+    const dummyPositions = new Float32Array(TOTAL_POINTS * 3);
+
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      // 初始半径分布在视界外围至外吸积盘之间
+      const u = Math.random();
+      const r0 = 2.05 + Math.pow(u, 1.35) * 9.8;
+      const theta0 = Math.random() * Math.PI * 2.0;
+      // 垂直方向呈薄高斯分布，越靠近内圈越薄
+      const h0 = (Math.random() - 0.5) * (Math.random() - 0.5) * (0.28 + 0.09 * r0);
+      const omega = 1.65 / Math.pow(r0, 1.15) * (0.85 + 0.3 * Math.random());
+      const infall = 0.22 + 0.38 * Math.random();
+      const tempSeed = Math.random();
+
+      for (let t = 0; t < TRAIL_STEPS; t++) {
+        const idx = i * TRAIL_STEPS + t;
+        pRadius0[idx] = r0;
+        pAngle0[idx] = theta0;
+        pHeight0[idx] = h0;
+        pSpeed[idx] = omega;
+        pInfallRate[idx] = infall;
+        // 拖尾时间滞后与亮度衰减
+        pTrailLag[idx] = t * 0.042;
+        pTrailFade[idx] = Math.pow(1.0 - t / TRAIL_STEPS, 1.75);
+        pTempSeed[idx] = tempSeed;
+      }
+    }
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(dummyPositions, 3));
+    particleGeometry.setAttribute('aRadius0', new THREE.BufferAttribute(pRadius0, 1));
+    particleGeometry.setAttribute('aAngle0', new THREE.BufferAttribute(pAngle0, 1));
+    particleGeometry.setAttribute('aHeight0', new THREE.BufferAttribute(pHeight0, 1));
+    particleGeometry.setAttribute('aSpeed', new THREE.BufferAttribute(pSpeed, 1));
+    particleGeometry.setAttribute('aInfall', new THREE.BufferAttribute(pInfallRate, 1));
+    particleGeometry.setAttribute('aTrailLag', new THREE.BufferAttribute(pTrailLag, 1));
+    particleGeometry.setAttribute('aTrailFade', new THREE.BufferAttribute(pTrailFade, 1));
+    particleGeometry.setAttribute('aTempSeed', new THREE.BufferAttribute(pTempSeed, 1));
+    particleGeometry.setDrawRange(0, state.particleCount * TRAIL_STEPS);
+
+    const particleMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uMass: { value: state.mass },
+        uRotSpeed: { value: state.rotationSpeed },
+        uBrightness: { value: state.diskBrightness },
+        uPixelRatio: { value: dpr },
+        uDiskBasis: { value: diskBasisMatrix }
+      },
+      vertexShader: /* glsl */ `
+        attribute float aRadius0;
+        attribute float aAngle0;
+        attribute float aHeight0;
+        attribute float aSpeed;
+        attribute float aInfall;
+        attribute float aTrailLag;
+        attribute float aTrailFade;
+        attribute float aTempSeed;
+
+        uniform float uTime;
+        uniform float uMass;
+        uniform float uRotSpeed;
+        uniform float uPixelRatio;
+        uniform mat4 uDiskBasis;
+
+        varying float vAlpha;
+        varying vec3 vColor;
+
+        void main() {
+          float rs = uMass;
+          float rHorizon = 1.28 * rs;
+          float rMax = 11.8 * sqrt(rs);
+          float rMin = rHorizon * 1.02;
+
+          // 计算带拖尾滞后的有效演化时间
+          float effectiveTime = max(0.0, uTime * (0.35 + 0.65 * uRotSpeed) - aTrailLag * (0.4 + 0.9 * uRotSpeed));
+
+          // 螺旋内落半径：周期性从外缘旋转坠入事件视界
+          float span = max(0.5, rMax - rMin);
+          float initialOffset = clamp((aRadius0 * sqrt(rs) - rMin) / span, 0.0, 1.0);
+          float cycle = fract(initialOffset - effectiveTime * aInfall * 0.085);
+          // 越靠近视界坠落越快
+          float r = mix(rMin, rMax, pow(cycle, 0.78));
+
+          // 开普勒差速旋转角（内圈角速度极快）
+          float angularBoost = 1.0 / (pow(r / (2.0 * rs + 0.01), 0.72) + 0.15);
+          float theta = aAngle0 + effectiveTime * aSpeed * 2.6 * angularBoost - aTrailLag * 1.8 * angularBoost;
+
+          // 坠入视界附近时高度向赤道面坍缩
+          float radialNorm = clamp((r - rMin) / span, 0.0, 1.0);
+          float yLocal = aHeight0 * (0.18 + 0.82 * radialNorm) * sin(theta * 1.5 + aTempSeed * 6.28);
+
+          vec3 localPos = vec3(r * cos(theta), yLocal, r * sin(theta));
+          vec3 worldPos = (uDiskBasis * vec4(localPos, 1.0)).xyz;
+
+          // 计算粒子切向速度方向以体现多普勒增亮
+          vec3 localVel = normalize(vec3(-sin(theta), 0.0, cos(theta)));
+          vec3 worldVel = normalize((uDiskBasis * vec4(localVel, 0.0)).xyz);
+          vec3 toCam = normalize(cameraPosition - worldPos);
+          float doppler = dot(worldVel, toCam);
+          float dopplerBoost = pow(clamp(1.0 + 0.55 * doppler, 0.35, 1.9), 2.1);
+
+          // 颜色从内圈炽白/金黄渐变到外圈暗橘红
+          vec3 innerHot = vec3(1.0, 0.95, 0.84);
+          vec3 midGold  = vec3(1.0, 0.58, 0.16);
+          vec3 outerRed = vec3(0.78, 0.16, 0.03);
+          vec3 baseCol = mix(innerHot, midGold, smoothstep(0.0, 0.38, radialNorm));
+          baseCol = mix(baseCol, outerRed, smoothstep(0.35, 0.95, radialNorm));
+
+          // 迎面而来的等离子体略微蓝移增白
+          baseCol = mix(baseCol, vec3(0.95, 0.98, 1.0), clamp(doppler * 0.32, 0.0, 0.35));
+
+          // 靠近视界边缘与外边界时平滑淡入淡出
+          float edgeFade = smoothstep(0.0, 0.06, cycle) * (1.0 - smoothstep(0.88, 1.0, cycle));
+          vAlpha = aTrailFade * edgeFade * dopplerBoost;
+          vColor = baseCol * (0.7 + 0.6 * aTempSeed);
+
+          vec4 mvPosition = modelViewMatrix * vec4(worldPos, 1.0);
+          gl_Position = projectionMatrix * mvPosition;
+
+          float baseSize = mix(4.2, 1.6, radialNorm) * (0.65 + 0.35 * aTrailFade);
+          gl_PointSize = clamp(baseSize * uPixelRatio * (11.0 / max(1.5, -mvPosition.z)), 1.0, 14.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform float uBrightness;
+        varying float vAlpha;
+        varying vec3 vColor;
+
+        void main() {
+          vec2 uv = gl_PointCoord * 2.0 - 1.0;
+          float d2 = dot(uv, uv);
+          if (d2 > 1.0) discard;
+
+          float core = exp(-d2 * 3.8);
+          float alpha = core * vAlpha * clamp(uBrightness, 0.2, 2.5);
+          gl_FragColor = vec4(vColor * alpha * 1.35, alpha);
+        }
+      `,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: THREE.AdditiveBlending
+    });
+
+    const plasmaPoints = new THREE.Points(particleGeometry, particleMaterial);
+    plasmaPoints.frustumCulled = false;
+    particleScene.add(plasmaPoints);
+
+    // ==========================================
+    // 4. 离屏渲染目标：粒子缓冲 + 引力透镜主缓冲
+    // ==========================================
+    function createRenderTarget(w, h) {
+      return new THREE.WebGLRenderTarget(w, h, {
+        minFilter: THREE.LinearFilter,
+        magFilter: THREE.LinearFilter,
+        format: THREE.RGBAFormat,
+        type: THREE.HalfFloatType,
+        depthBuffer: false,
+        stencilBuffer: false
+      });
+    }
+
+    let rtWidth = Math.max(1, Math.floor(window.innerWidth * dpr));
+    let rtHeight = Math.max(1, Math.floor(window.innerHeight * dpr));
+
+    const particleRT = createRenderTarget(rtWidth, rtHeight);
+    const lensingRT = createRenderTarget(rtWidth, rtHeight);
+
+    // ==========================================
+    // 5. 全屏引力透镜与相对论吸积盘 Shader
+    // ==========================================
+    const fsQuadCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const fsQuadGeo = new THREE.PlaneGeometry(2, 2);
+
+    const blackHoleLensingMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        uParticleTex: { value: particleRT.texture },
+        uCameraPos: { value: new THREE.Vector3() },
+        uCamForward: { value: new THREE.Vector3() },
+        uCamRight: { value: new THREE.Vector3() },
+        uCamUp: { value: new THREE.Vector3() },
+        uTanHalfFov: { value: Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5)) },
+        uAspect: { value: window.innerWidth / window.innerHeight },
+        uTime: { value: 0 },
+        uMass: { value: state.mass },
+        uDiskBrightness: { value: state.diskBrightness },
+        uRotSpeed: { value: state.rotationSpeed },
+        uLensingEnabled: { value: 1.0 },
+        uDiskInvBasis: { value: diskInvBasisMatrix },
+        uDiskNormal: { value: diskNormalWorld }
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+
+        varying vec2 vUv;
+
+        uniform sampler2D uParticleTex;
+        uniform vec3 uCameraPos;
+        uniform vec3 uCamForward;
+        uniform vec3 uCamRight;
+        uniform vec3 uCamUp;
+        uniform float uTanHalfFov;
+        uniform float uAspect;
+        uniform float uTime;
+        uniform float uMass;
+        uniform float uDiskBrightness;
+        uniform float uRotSpeed;
+        uniform float uLensingEnabled;
+        uniform mat4 uDiskInvBasis;
+        uniform vec3 uDiskNormal;
+
+        // ------------------------------------------
+        // 程序化哈希与湍流噪声 (无任何外部图片)
+        // ------------------------------------------
+        float hash21(vec2 p) {
+          p = fract(p * vec2(123.34, 456.21));
+          p += dot(p, p + 45.32);
+          return fract(p.x * p.y);
+        }
+
+        float hash31(vec3 p) {
+          p = fract(p * 0.1031);
+          p += dot(p, p.yzx + 33.33);
+          return fract((p.x + p.y) * p.z);
+        }
+
+        float noise2D(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          float a = hash21(i);
+          float b = hash21(i + vec2(1.0, 0.0));
+          float c = hash21(i + vec2(0.0, 1.0));
+          float d = hash21(i + vec2(1.0, 1.0));
+          return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+        }
+
+        float fbm2D(vec2 p) {
+          float v = 0.0;
+          float amp = 0.5;
+          mat2 rot = mat2(0.80, 0.60, -0.60, 0.80);
+          for (int i = 0; i < 4; i++) {
+            v += amp * noise2D(p);
+            p = rot * p * 2.03 + vec2(13.7, 29.1);
+            amp *= 0.5;
+          }
+          return v;
+        }
+
+        vec2 rot2D(vec2 p, float a) {
+          float c = cos(a);
+          float s = sin(a);
+          return vec2(c * p.x - s * p.y, s * p.x + c * p.y);
+        }
+
+        // ------------------------------------------
+        // 程序化星空、银河尘埃带与背景星团（用于展示爱因斯坦环）
+        // ------------------------------------------
+        vec3 sampleProceduralCosmos(vec3 dir, vec3 forwardAxis, float einsteinRingBoost) {
+          vec3 d = normalize(dir);
+
+          // 构造倾斜的银河坐标系
+          vec3 galUp = normalize(vec3(0.32, 0.89, -0.31));
+          vec3 galRight = normalize(cross(galUp, vec3(0.0, 0.0, 1.0)));
+          vec3 galFwd = cross(galRight, galUp);
+
+          float galLat = dot(d, galUp);
+          float galLon = atan(dot(d, galFwd), dot(d, galRight));
+
+          vec2 galUv = vec2(galLon * 1.8, galLat * 4.5);
+          float n1 = fbm2D(galUv * 1.4 + vec2(2.3, -1.1));
+          float n2 = fbm2D(galUv * 3.1 - vec2(4.7, 3.2));
+
+          // 银河主盘发光与暗尘埃带吸收
+          float bandProfile = exp(-abs(galLat + (n1 - 0.5) * 0.16) * 5.2);
+          float dustLane = smoothstep(0.36, 0.68, n2) * exp(-abs(galLat) * 9.5);
+
+          vec3 coreWarm = vec3(0.95, 0.72, 0.46);
+          vec3 armBlue  = vec3(0.28, 0.45, 0.78);
+          vec3 nebulaRed = vec3(0.75, 0.25, 0.35);
+
+          vec3 milkyWay = mix(armBlue, coreWarm, n1) * bandProfile * 0.42;
+          milkyWay += nebulaRed * pow(n2, 3.0) * bandProfile * 0.22;
+          milkyWay *= (1.0 - 0.68 * dustLane);
+
+          // 视线正后方的深空明亮星系核/星团：光线绕过黑洞时直接拉伸为明亮的爱因斯坦环
+          float behindAlign = max(0.0, dot(d, forwardAxis));
+          float bgCluster = pow(behindAlign, 26.0) * (0.65 + 0.75 * n1);
+          vec3 einsteinSource = vec3(0.85, 0.90, 1.0) * bgCluster * (0.75 + 0.95 * einsteinRingBoost);
+
+          // 多尺度程序化恒星点（避免摩尔纹的球面网格采样）
+          vec3 starCol = vec3(0.0);
+          vec3 pStar1 = d * 115.0;
+          vec3 iStar1 = floor(pStar1);
+          vec3 fStar1 = fract(pStar1) - 0.5;
+          float rnd1 = hash31(iStar1);
+          if (rnd1 > 0.968) {
+            vec3 offset1 = (vec3(hash31(iStar1 + 1.1), hash31(iStar1 + 2.2), hash31(iStar1 + 3.3)) - 0.5) * 0.55;
+            float dist2 = dot(fStar1 - offset1, fStar1 - offset1);
+            float starIntensity = exp(-dist2 * 42.0) * smoothstep(0.968, 0.999, rnd1);
+            vec3 tint = mix(vec3(1.0, 0.76, 0.52), vec3(0.72, 0.86, 1.0), hash31(iStar1 + 7.7));
+            starCol += tint * starIntensity * 1.9;
+          }
+
+          vec3 pStar2 = d * 240.0;
+          vec3 iStar2 = floor(pStar2);
+          vec3 fStar2 = fract(pStar2) - 0.5;
+          float rnd2 = hash31(iStar2);
+          if (rnd2 > 0.978) {
+            float dist2 = dot(fStar2, fStar2);
+            float starIntensity = exp(-dist2 * 55.0) * smoothstep(0.978, 0.9995, rnd2);
+            starCol += vec3(0.92, 0.95, 1.0) * starIntensity * 1.15;
+          }
+
+          return milkyWay + einsteinSource + starCol;
+        }
+
+        // ------------------------------------------
+        // 吸积盘发光、湍流噪声与多普勒效应评估
+        // ------------------------------------------
+        vec4 evaluateAccretionDisk(vec3 worldPos, vec3 rayDir, float rs) {
+          // 转换至吸积盘局部坐标系（盘面位于 localPos.y == 0）
+          vec3 localPos = (uDiskInvBasis * vec4(worldPos, 1.0)).xyz;
+          float r = length(localPos.xz);
+
+          float rIn = 1.92 * rs;
+          float rOut = 10.6 * rs;
+          if (r <= rIn || r >= rOut) {
+            return vec4(0.0);
+          }
+
+          float normR = clamp((r - rIn) / (rOut - rIn), 0.0, 1.0);
+
+          // 内外边缘平滑过渡（内圈陡峭锐利，外圈柔和消散）
+          float innerFade = smoothstep(0.0, 0.055, normR);
+          float outerFade = pow(max(0.0, 1.0 - normR), 1.65);
+          float radialEnvelope = innerFade * outerFade;
+
+          // 开普勒差速旋转与螺旋纤维湍流（无极角接缝）
+          float rotPhase = uTime * uRotSpeed;
+          float spiralTwist = 3.4 * log(max(r / rs, 0.2)) - 0.45 * (r / rs);
+
+          vec2 pFast = rot2D(localPos.xz / rs, rotPhase * 1.65 + spiralTwist);
+          vec2 pMid  = rot2D(localPos.xz / rs, rotPhase * 0.92 + spiralTwist * 0.65);
+          vec2 pSlow = rot2D(localPos.xz / rs, rotPhase * 0.45 - spiralTwist * 0.25);
+
+          float turb1 = fbm2D(pFast * 1.45);
+          float turb2 = fbm2D(pMid * 2.85 + vec2(turb1 * 1.3));
+          float turb3 = noise2D(pSlow * 5.2);
+
+          // 同心相对论剪切等离子体流丝
+          float ringFilaments = 0.5 + 0.5 * sin((r / rs) * 15.5 + turb1 * 5.2 - rotPhase * 2.1);
+          float fineFilaments = 0.5 + 0.5 * sin((r / rs) * 34.0 - turb2 * 6.4 + rotPhase * 1.4);
+
+          float density = mix(turb1, turb2, 0.55) * 0.68 + ringFilaments * 0.24 + fineFilaments * 0.18 * turb3;
+          density = smoothstep(0.18, 0.88, density);
+
+          // 颜色从内圈白热、橙黄渐变到外圈暗红
+          vec3 colWhiteHot = vec3(1.00, 0.97, 0.88);
+          vec3 colOrangeYellow = vec3(1.00, 0.60, 0.14);
+          vec3 colFieryRed = vec3(0.88, 0.22, 0.03);
+          vec3 colDarkRed = vec3(0.28, 0.025, 0.004);
+
+          vec3 diskColor = mix(colWhiteHot, colOrangeYellow, smoothstep(0.0, 0.20, normR));
+          diskColor = mix(diskColor, colFieryRed, smoothstep(0.18, 0.56, normR));
+          diskColor = mix(diskColor, colDarkRed, smoothstep(0.52, 0.96, normR));
+
+          // 内圈高热亮边增强
+          float innerHotBoost = exp(-normR * 7.5) * 1.35;
+          diskColor += colWhiteHot * innerHotBoost * 0.45;
+
+          // 相对论多普勒集束效应（靠近我们旋转的一侧显著更亮、色温更高）
+          vec2 tangent2D = normalize(vec2(-localPos.z, localPos.x));
+          // 将切向速度转换回世界空间：利用逆转置/正交关系
+          vec3 localVel = vec3(tangent2D.x, 0.0, tangent2D.y);
+          // 因为 uDiskInvBasis 是正交旋转矩阵的逆，vec4(v,0)*uDiskInvBasis 等价于世界空间旋转
+          vec3 worldVel = normalize((vec4(localVel, 0.0) * uDiskInvBasis).xyz);
+
+          float orbitalBeta = clamp(sqrt(rs / max(1.4 * r, 0.1)) * (0.45 + 0.45 * min(uRotSpeed, 2.0)), 0.0, 0.68);
+          // 光线沿 rayDir 前进，意味着光子朝 -rayDir 飞向摄像机
+          float cosTheta = dot(worldVel, -normalize(rayDir));
+          float dopplerFactor = pow(clamp(1.0 + orbitalBeta * cosTheta * 1.35, 0.28, 2.15), 2.75);
+
+          // 多普勒频移微调色温：迎面侧偏白亮，背离侧偏暗红
+          vec3 dopplerTint = mix(vec3(1.0, 0.62, 0.42), vec3(1.05, 1.04, 1.16), clamp(cosTheta * 0.5 + 0.5, 0.0, 1.0));
+          diskColor *= dopplerTint;
+
+          float emission = (0.32 + 1.45 * density + innerHotBoost) * radialEnvelope * dopplerFactor * uDiskBrightness;
+          float alpha = clamp((0.38 + 0.62 * density) * radialEnvelope * 0.92, 0.0, 0.96);
+
+          return vec4(diskColor * emission, alpha);
+        }
+
+        void main() {
+          vec2 ndc = vUv * 2.0 - 1.0;
+          vec3 rayOrigin = uCameraPos;
+          vec3 rayDir = normalize(
+            uCamForward +
+            ndc.x * uAspect * uTanHalfFov * uCamRight +
+            ndc.y * uTanHalfFov * uCamUp
+          );
+          vec3 initialRayDir = rayDir;
+
+          float rs = uMass;
+          // 事件视界捕获半径
+          float rHorizon = 1.28 * rs;
+          float camDist = length(rayOrigin);
+          // 拉近时增强透镜视觉冲击力
+          float proximityBoost = 1.0 + 1.65 / max(camDist - 1.5 * rs, 1.15);
+
+          vec3 pos = rayOrigin;
+          vec3 dir = rayDir;
+          float minR = 1e6;
+          float totalDeflection = 0.0;
+          bool hitHorizon = false;
+
+          vec3 accumDiskColor = vec3(0.0);
+          float accumDiskAlpha = 0.0;
+
+          // 测地线光线步进（Raymarching）
+          const int MAX_STEPS = 112;
+          for (int i = 0; i < MAX_STEPS; i++) {
+            float r2 = dot(pos, pos);
+            float r = sqrt(r2);
+            minR = min(minR, r);
+
+            // 光线落入事件视界半径：立即终止并标记为纯黑视界
+            if (r <= rHorizon) {
+              hitHorizon = true;
+              break;
+            }
+
+            // 远场逃逸提前终止
+            if (r > max(28.0, camDist * 1.45) && dot(pos, dir) > 0.0) {
+              break;
+            }
+
+            // 自适应步长：视界与光子球附近精细步进，远场加速步进
+            float dt = clamp(0.046 * (r - 0.72 * rHorizon), 0.022, 0.48);
+
+            // 引力透镜弯曲：史瓦西强场测地线偏折方程
+            if (uLensingEnabled > 0.5) {
+              vec3 hVec = cross(pos, dir);
+              float h2 = dot(hVec, hVec);
+              // 包含 r^-5 广义相对论项与近光子球增强项，确保吸积盘背面在黑洞上下方清晰弯折可见
+              float r5 = r2 * r2 * r + 1e-4;
+              float strongField = 1.78 * rs * h2 / r5 + 0.42 * rs * rs * h2 / (r5 * r + 1e-4);
+              vec3 accel = -strongField * pos;
+              vec3 nextDir = normalize(dir + accel * dt);
+              totalDeflection += acos(clamp(dot(dir, nextDir), -1.0, 1.0));
+              dir = nextDir;
+            }
+
+            vec3 nextPos = pos + dir * dt;
+
+            // 检测是否穿过倾斜吸积盘平面（子步长精确插值，消除步进条纹）
+            float h0 = dot(pos, uDiskNormal);
+            float h1 = dot(nextPos, uDiskNormal);
+            if (h0 * h1 <= 0.0) {
+              float frac = abs(h0) / (abs(h0) + abs(h1) + 1e-6);
+              vec3 hitPos = mix(pos, nextPos, frac);
+              vec4 diskSample = evaluateAccretionDisk(hitPos, dir, rs);
+              if (diskSample.a > 0.001) {
+                float weight = (1.0 - accumDiskAlpha) * diskSample.a;
+                accumDiskColor += (1.0 - accumDiskAlpha) * diskSample.rgb;
+                accumDiskAlpha += weight;
+              }
+            }
+
+            // 侧面掠射时的薄等离子体大气层体积辉光（保证完全侧视 0° 时吸积盘依然饱满）
+            float midH = abs(0.5 * (h0 + h1));
+            if (midH < 0.22 * rs && r > 1.85 * rs && r < 9.5 * rs) {
+              float slabWeight = exp(-midH / (0.065 * rs)) * exp(-pow((r - 2.3 * rs) / (2.8 * rs), 2.0));
+              vec3 coronaCol = vec3(1.0, 0.52, 0.12) * slabWeight * dt * 0.26 * uDiskBrightness;
+              accumDiskColor += (1.0 - accumDiskAlpha) * coronaCol;
+            }
+
+            pos = nextPos;
+          }
+
+          // ------------------------------------------
+          // 严格满足：光线落入事件视界内部直接输出纯黑 (#000000)，且 alpha=0 标记不参与 Bloom
+          // ------------------------------------------
+          if (hitHorizon) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0);
+            return;
+          }
+
+          // ------------------------------------------
+          // 视界外侧：明亮细锐的光子环 (Photon Ring)
+          // ------------------------------------------
+          float distToHorizon = max(0.0, (minR - rHorizon) / rs);
+          float sharpRing = exp(-distToHorizon * 44.0) * 2.85;
+          float subRing   = exp(-distToHorizon * 14.0) * 0.72 * smoothstep(0.2, 2.2, totalDeflection);
+          // 结合光线偏折角增强光子环锐度
+          float deflectionRing = exp(- abs(distToHorizon - 0.018) * 75.0) * (0.8 + 0.9 * uLensingEnabled);
+          vec3 photonRingColor = vec3(1.0, 0.93, 0.78) * (sharpRing + subRing + deflectionRing) * uDiskBrightness;
+
+          // ------------------------------------------
+          // 背景星空、银河与爱因斯坦环
+          // ------------------------------------------
+          float einsteinFactor = smoothstep(0.22, 1.35, totalDeflection * proximityBoost) * uLensingEnabled;
+          vec3 bgDirection = (uLensingEnabled > 0.5)
+            ? normalize(mix(initialRayDir, dir, clamp(proximityBoost * 0.92, 1.0, 1.65)))
+            : initialRayDir;
+          vec3 cosmosColor = sampleProceduralCosmos(bgDirection, uCamForward, einsteinFactor);
+
+          // 爱因斯坦环切向增亮光晕（背景星光在临界冲击参数附近聚焦放大）
+          float einsteinMagnification = 1.0 + 1.85 * exp(-pow((minR - 1.68 * rs) / (0.42 * rs), 2.0)) * uLensingEnabled;
+          cosmosColor *= einsteinMagnification;
+
+          // ------------------------------------------
+          // 采样 3D 环绕等离子体粒子（随引力透镜发生径向偏折）
+          // ------------------------------------------
+          vec2 centerVec = vUv - vec2(0.5);
+          float uvRadius = length(centerVec) + 1e-5;
+          float screenDeflect = (0.018 * rs * proximityBoost / (uvRadius + 0.08)) * uLensingEnabled;
+          vec2 lensedParticleUv = clamp(vUv - normalize(centerVec) * screenDeflect * 0.35, 0.001, 0.999);
+          vec3 particleColor = texture2D(uParticleTex, lensedParticleUv).rgb;
+
+          // 合成视界外部最终 HDR 辐射亮度（alpha = 1.0 表示视界外部正常区域）
+          vec3 finalHDR = cosmosColor * (1.0 - 0.85 * accumDiskAlpha) + accumDiskColor + photonRingColor + particleColor;
+          gl_FragColor = vec4(finalHDR, 1.0);
+        }
+      `
+    });
+
+    const lensingQuadMesh = new THREE.Mesh(fsQuadGeo, blackHoleLensingMaterial);
+    const lensingScene = new THREE.Scene();
+    lensingScene.add(lensingQuadMesh);
+
+    // ==========================================
+    // 6. 后处理管线：输入传递 -> UnrealBloomPass -> 视界纯黑掩膜与电影级调色
+    // ==========================================
+    const composer = new EffectComposer(renderer);
+    composer.setPixelRatio(dpr);
+    composer.setSize(window.innerWidth, window.innerHeight);
+
+    // Pass 1: 将已完成的引力透镜 HDR 缓冲送入 EffectComposer
+    const copyInputPass = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: lensingRT.texture }
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse;
+        varying vec2 vUv;
+        void main() {
+          gl_FragColor = texture2D(tDiffuse, vUv);
+        }
+      `
+    });
+    composer.addPass(copyInputPass);
+
+    // Pass 2: UnrealBloomPass 电影级辉光
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(rtWidth, rtHeight),
+      0.88, // 辉光强度
+      0.55, // 辉光扩散半径
+      0.18  // 辉光阈值
+    );
+    composer.addPass(bloomPass);
+
+    // Pass 3: 最终合成与电影级 ACES 调色 Pass
+    // 关键保障：读取 lensingRT 的精确视界掩膜 (alpha < 0.5)，将事件视界内部严格锁定为 #000000，绝不混入任何 Bloom 溢光
+    const finalCompositePass = new ShaderPass({
+      uniforms: {
+        tDiffuse: { value: null },
+        uRawLensingTex: { value: lensingRT.texture }
+      },
+      vertexShader: /* glsl */ `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position.xy, 0.0, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */ `
+        precision highp float;
+        uniform sampler2D tDiffuse;
+        uniform sampler2D uRawLensingTex;
+        varying vec2 vUv;
+
+        // ACES Filmic 电影感色调映射
+        vec3 acesToneMapping(vec3 x) {
+          const float a = 2.51;
+          const float b = 0.03;
+          const float c = 2.43;
+          const float d = 0.59;
+          const float e = 0.14;
+          return clamp((x * (a * x + b)) / (x * (c * x + d) + e), 0.0, 1.0);
+        }
+
+        void main() {
+          vec4 rawSample = texture2D(uRawLensingTex, vUv);
+
+          // 若光线落入事件视界半径（rawSample.a == 0.0），强制输出纯黑 #000000，完全剔除 Bloom 散射影响
+          if (rawSample.a < 0.5) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+          }
+
+          vec3 hdrColor = texture2D(tDiffuse, vUv).rgb;
+
+          // 轻微电影暖金色调平衡与暗角
+          vec2 vigUv = vUv * 2.0 - 1.0;
+          float vignette = 1.0 - 0.18 * dot(vigUv, vigUv);
+          hdrColor *= vignette;
+
+          vec3 mapped = acesToneMapping(hdrColor * 0.95);
+          mapped = pow(mapped, vec3(1.0 / 2.2));
+
+          gl_FragColor = vec4(mapped, 1.0);
+        }
+      `
+    });
+    composer.addPass(finalCompositePass);
+
+    // ==========================================
+    // 7. UI 交互事件与现象说明动态更新
+    // ==========================================
+    function updateCameraMinDistance() {
+      controls.minDistance = Math.max(2.9, state.mass * 2.25);
+    }
+
+    massSlider.addEventListener('input', (e) => {
+      state.mass = parseFloat(e.target.value);
+      massVal.textContent = `${state.mass.toFixed(2)} M☉`;
+      blackHoleLensingMaterial.uniforms.uMass.value = state.mass;
+      particleMaterial.uniforms.uMass.value = state.mass;
+      updateCameraMinDistance();
+      updatePhenomenonDescription();
+    });
+
+    brightnessSlider.addEventListener('input', (e) => {
+      state.diskBrightness = parseFloat(e.target.value);
+      brightnessVal.textContent = state.diskBrightness.toFixed(2);
+      blackHoleLensingMaterial.uniforms.uDiskBrightness.value = state.diskBrightness;
+      particleMaterial.uniforms.uBrightness.value = state.diskBrightness;
+      bloomPass.strength = THREE.MathUtils.clamp(0.55 + state.diskBrightness * 0.28, 0.45, 1.35);
+    });
+
+    speedSlider.addEventListener('input', (e) => {
+      state.rotationSpeed = parseFloat(e.target.value);
+      speedVal.textContent = `${state.rotationSpeed.toFixed(2)}x`;
+      blackHoleLensingMaterial.uniforms.uRotSpeed.value = state.rotationSpeed;
+      particleMaterial.uniforms.uRotSpeed.value = state.rotationSpeed;
+      updatePhenomenonDescription();
+    });
+
+    particlesSlider.addEventListener('input', (e) => {
+      state.particleCount = parseInt(e.target.value, 10);
+      particlesVal.textContent = `${state.particleCount}`;
+      particleGeometry.setDrawRange(0, state.particleCount * TRAIL_STEPS);
+    });
+
+    lensingToggle.addEventListener('change', (e) => {
+      state.lensingEnabled = e.target.checked;
+      blackHoleLensingMaterial.uniforms.uLensingEnabled.value = state.lensingEnabled ? 1.0 : 0.0;
+      updatePhenomenonDescription();
+    });
+
+    let lastCaptionState = '';
+    function updatePhenomenonDescription() {
+      const dist = camera.position.length();
+      const rs = state.mass;
+      const relDist = dist / rs;
+      const camDir = camera.position.clone().normalize();
+      const sinInclination = Math.abs(camDir.dot(diskNormalWorld));
+
+      let nextHtml = '';
+      if (!state.lensingEnabled) {
+        nextHtml = '<strong>平直时空对比模式（引力透镜已关闭）：</strong>光线沿欧氏直线传播，吸积盘背面被黑洞遮挡而不再向上下方弯折，背景星系爱因斯坦环消失。';
+      } else if (relDist < 4.5) {
+        nextHtml = '<strong>抵近强引力场极限观测：</strong>时空曲率急剧攀升，背景银河与恒星被强烈拉伸为环绕视界的爱因斯坦环，纯黑事件视界边缘紧贴炽烈光子环。';
+      } else if (relDist < 7.2) {
+        nextHtml = '<strong>中近距强透镜畸变：</strong>引力透镜效应随距离拉近显著增强，吸积盘背面发出的光线越过黑洞南北极弯折入眼，清晰呈现上下双重光弧。';
+      } else if (sinInclination < 0.24) {
+        nextHtml = '<strong>低倾角赤道面观测：</strong>相对论多普勒集束效应尤为突出——迎面高速旋转侧呈炽白高亮，背离侧呈暗红衰减，吸积盘背面在黑洞上下方对称弯折。';
+      } else if (sinInclination > 0.72) {
+        nextHtml = '<strong>高纬极区俯视观测：</strong>可完整俯瞰等离子体沿测地线螺旋坠入纯黑事件视界，内圈白热湍流与光子环围绕视界形成耀眼光环。';
+      } else {
+        nextHtml = '<strong>卡冈图雅引力透镜效应：</strong>事件视界内光线无法逃逸呈绝对纯黑，外围环绕锐利光子环；吸积盘背面经强引力弯折在黑洞上下方同时可见，迎面侧因多普勒效应显著更亮。';
+      }
+
+      if (nextHtml !== lastCaptionState) {
+        phenomenonText.innerHTML = nextHtml;
+        lastCaptionState = nextHtml;
+      }
+    }
+
+    // ==========================================
+    // 8. 窗口自适应与主渲染循环
+    // ==========================================
+    function onWindowResize() {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      const currentDpr = Math.min(window.devicePixelRatio || 1, 2);
+
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+
+      renderer.setPixelRatio(currentDpr);
+      renderer.setSize(w, h);
+
+      rtWidth = Math.max(1, Math.floor(w * currentDpr));
+      rtHeight = Math.max(1, Math.floor(h * currentDpr));
+
+      particleRT.setSize(rtWidth, rtHeight);
+      lensingRT.setSize(rtWidth, rtHeight);
+
+      composer.setPixelRatio(currentDpr);
+      composer.setSize(w, h);
+      bloomPass.resolution.set(rtWidth, rtHeight);
+
+      blackHoleLensingMaterial.uniforms.uAspect.value = w / h;
+      blackHoleLensingMaterial.uniforms.uTanHalfFov.value = Math.tan(THREE.MathUtils.degToRad(camera.fov * 0.5));
+      particleMaterial.uniforms.uPixelRatio.value = currentDpr;
+    }
+
+    window.addEventListener('resize', onWindowResize);
+
+    const clock = new THREE.Clock();
+    const camForward = new THREE.Vector3();
+    const camRight = new THREE.Vector3();
+    const camUp = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const elapsed = clock.getElapsedTime();
+      controls.update();
+
+      // 提取当前相机正交基向量供全屏光线追踪 Shader 使用
+      camera.getWorldDirection(camForward).normalize();
+      camRight.crossVectors(camForward, camera.up).normalize();
+      camUp.crossVectors(camRight, camForward).normalize();
+
+      blackHoleLensingMaterial.uniforms.uTime.value = elapsed;
+      blackHoleLensingMaterial.uniforms.uCameraPos.value.copy(camera.position);
+      blackHoleLensingMaterial.uniforms.uCamForward.value.copy(camForward);
+      blackHoleLensingMaterial.uniforms.uCamRight.value.copy(camRight);
+      blackHoleLensingMaterial.uniforms.uCamUp.value.copy(camUp);
+
+      particleMaterial.uniforms.uTime.value = elapsed;
+
+      updatePhenomenonDescription();
+
+      // Step 1: 渲染 3D 环绕等离子体粒子至离屏缓冲
+      renderer.setRenderTarget(particleRT);
+      renderer.clear();
+      renderer.render(particleScene, camera);
+
+      // Step 2: 渲染全屏引力透镜与吸积盘光线步进至 lensingRT（视界内部 RGB=0, Alpha=0）
+      renderer.setRenderTarget(lensingRT);
+      renderer.clear();
+      renderer.render(lensingScene, fsQuadCamera);
+
+      // Step 3: 执行 UnrealBloomPass 辉光及最终视界纯黑掩膜合成
+      renderer.setRenderTarget(null);
+      composer.render();
+    }
+
+    animate();
+  </script>
+  <script src="../prompt-panel.js" data-id="black-hole-web"></script>
+</body>
+</html>
