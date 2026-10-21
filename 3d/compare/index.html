@@ -24,61 +24,87 @@
     html, body {
       margin: 0;
       padding: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
       background-color: var(--bg-outer);
       color: var(--ink);
       font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
-      line-height: 1.6;
+      line-height: 1.4;
       -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
     }
 
     body {
-      min-height: 100vh;
-      padding: 24px 16px 48px;
-    }
-
-    .gallery-shell {
-      max-width: 1200px;
-      margin: 0 auto;
-      background-color: var(--bg-cream);
-      border: 2px solid var(--ink);
-      border-radius: 16px;
-      box-shadow: 0 6px 0 var(--ink);
+      display: grid;
+      grid-template-rows: 44px minmax(0, 1fr);
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
       overflow: hidden;
     }
 
+    @media (orientation: landscape) and (max-height: 500px) {
+      body {
+        grid-template-rows: 34px minmax(0, 1fr);
+      }
+    }
+
+    /* 顶部紧凑栏 */
     .topbar {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
-      padding: 12px 20px;
+      gap: 8px;
+      padding: 0 12px;
       background: var(--topbar-grad);
       border-bottom: 2px solid var(--ink);
       font-weight: bold;
-      flex-wrap: wrap;
+      height: 44px;
+      box-sizing: border-box;
+      min-width: 0;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+      .topbar {
+        height: 34px;
+        padding: 0 8px;
+      }
     }
 
     .topbar-left {
       display: flex;
       align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
     }
 
     .topbar-title {
       margin: 0;
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 800;
       color: var(--ink);
-      letter-spacing: 0.02em;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      min-width: 0;
+    }
+
+    @media (orientation: landscape) and (max-height: 500px) {
+      .topbar-title {
+        font-size: 13.5px;
+      }
     }
 
     .topbar-actions {
       display: flex;
       align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
+      gap: 6px;
+      flex-shrink: 0;
     }
 
     .btn {
@@ -87,17 +113,17 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 6px;
+      gap: 4px;
       font-family: inherit;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
       line-height: 1.2;
       color: var(--ink);
       background-color: var(--highlight);
       border: 2px solid var(--ink);
-      border-radius: 14px;
-      box-shadow: 0 3px 0 var(--ink);
-      padding: 8px 14px;
+      border-radius: 12px;
+      box-shadow: 0 2px 0 var(--ink);
+      padding: 5px 10px;
       cursor: pointer;
       text-decoration: none;
       user-select: none;
@@ -111,278 +137,308 @@
     }
 
     .btn:active {
-      transform: translateY(3px);
+      transform: translateY(2px);
       box-shadow: 0 0 0 var(--ink);
-    }
-
-    .btn-secondary {
-      background-color: var(--secondary-bg);
-    }
-
-    .btn-secondary:hover {
-      background-color: var(--secondary-hover);
     }
 
     .btn-topbar {
       background-color: var(--bg-cream);
-      padding: 7px 12px;
-      font-size: 13.5px;
+      padding: 5px 10px;
+      font-size: 12.5px;
     }
 
     .btn-topbar:hover {
       background-color: var(--highlight);
     }
 
+    @media (orientation: landscape) and (max-height: 500px) {
+      .btn-topbar {
+        padding: 3px 7px;
+        font-size: 11.5px;
+        border-radius: 8px;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .topbar {
+        padding: 0 8px;
+        gap: 6px;
+      }
+      .topbar-actions .btn-text,
+      #back-gallery .btn-text {
+        display: none;
+      }
+      .btn-topbar {
+        padding: 5px 8px;
+      }
+    }
+
+    /* 主体区域与版本网格 */
     .compare-main {
-      padding: 20px 22px 28px;
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
+      position: relative;
     }
 
-    .scene-meta-box {
-      margin-bottom: 18px;
-      padding: 16px 18px;
-      background-color: var(--bg-card);
-      border: 2px solid var(--ink);
-      border-radius: 16px;
-      box-shadow: 0 3px 0 rgba(58, 46, 36, 0.12);
+    #scene-container {
+      width: 100%;
+      height: 100%;
+      min-height: 0;
+      min-width: 0;
+      overflow: hidden;
     }
 
-    .scene-meta-head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 6px;
-    }
-
-    .scene-title {
-      margin: 0;
-      font-size: 22px;
-      font-weight: 800;
-      color: var(--ink);
-    }
-
-    .source-link {
-      font-size: 13.5px;
-      font-weight: 700;
-      color: var(--ink);
-      text-decoration: underline;
-    }
-
-    .scene-desc {
-      margin: 0 0 12px;
-      font-size: 14.5px;
-      color: var(--ink);
-      opacity: 0.92;
-      line-height: 1.5;
-    }
-
-    .prompt-section {
-      display: none;
-      margin-top: 12px;
-      padding: 12px;
-      background-color: var(--bg-cream);
-      border: 2px solid var(--ink);
-      border-radius: 12px;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .prompt-section.is-open {
-      display: flex;
-    }
-
-    .prompt-toolbar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .prompt-label {
-      font-size: 13px;
-      font-weight: 800;
-      color: var(--ink);
-    }
-
-    .btn-copy {
-      padding: 5px 12px;
-      font-size: 12.5px;
-      border-radius: 10px;
-    }
-
-    .prompt-pre {
-      margin: 0;
-      padding: 12px;
-      max-height: 280px;
-      overflow-y: auto;
-      overflow-x: hidden;
-      white-space: pre-wrap;
-      word-break: break-word;
-      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
-      font-size: 12px;
-      line-height: 1.6;
-      color: var(--ink);
-      background-color: var(--bg-card);
-      border: 1.5px solid var(--ink);
-      border-radius: 10px;
-    }
-
-    .prompt-diff-box {
-      font-size: 12px;
-      line-height: 1.55;
-      padding: 10px 12px;
-      background-color: var(--bg-card);
-      border: 1.5px dashed var(--ink);
-      border-radius: 10px;
-      color: var(--ink);
-      word-break: break-word;
-      white-space: pre-wrap;
-    }
-
-    /* 对比网格 */
     .compare-grid {
       display: grid;
-      gap: 16px;
       width: 100%;
-      margin-top: 18px;
-    }
-
-    @media (min-width: 900px) {
-      .compare-grid[data-count="1"] {
-        grid-template-columns: 1fr;
-        max-width: 820px;
-        margin-left: auto;
-        margin-right: auto;
-      }
-      .compare-grid[data-count="2"] {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-      .compare-grid[data-count="3"] {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
-      }
-      .compare-grid[data-count="4"],
-      .compare-grid[data-count="5"] {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
-    }
-
-    @media (min-width: 1400px) {
-      .compare-grid[data-count="4"] {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-    }
-
-    @media (max-width: 899px) {
-      .compare-grid {
-        grid-template-columns: 1fr;
-        gap: 16px;
-      }
-      .compare-tile {
-        height: 60vh;
-        min-height: 400px;
-      }
-    }
-
-    /* 对比 Tile */
-    .compare-tile {
-      background-color: var(--bg-card);
-      border: 2px solid var(--ink);
-      border-radius: 16px;
-      box-shadow: 0 4px 0 var(--ink);
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-      height: 580px;
-      position: relative;
-    }
-
-    .tile-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      padding: 8px 12px;
-      background-color: var(--bg-cream);
-      border-bottom: 2px solid var(--ink);
-      flex-wrap: wrap;
-    }
-
-    .tile-left {
-      display: flex;
-      align-items: center;
-      gap: 8px;
+      height: 100%;
       min-width: 0;
-      flex: 1;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 9px;
-      border: 2px solid var(--ink);
-      border-radius: 999px;
-      background: var(--highlight);
-      font-size: 12px;
-      font-weight: 800;
-      color: var(--ink);
-      line-height: 1.2;
-      white-space: nowrap;
-    }
-
-    .badge.is-web { background: #bcd9f5; }
-    .badge.is-flash { background: #bfe6c8; }
-    .badge.is-deepseek { background: #c9c3f2; }
-    .badge.is-opus { background: #f2c6a8; }
-
-    .tile-note {
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--ink);
-      opacity: 0.85;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-width: 240px;
-    }
-
-    .tile-actions {
-      display: flex;
-      align-items: center;
+      min-height: 0;
       gap: 6px;
-      flex-shrink: 0;
+      padding: 6px;
+      box-sizing: border-box;
     }
 
-    .tile-chat {
-      font-size: 12px;
-      font-weight: 700;
-      color: var(--ink);
-      text-decoration: underline;
-      white-space: nowrap;
-      margin-right: 2px;
+    @media (orientation: landscape) and (max-height: 500px) {
+      .compare-grid {
+        gap: 4px;
+        padding: 4px;
+      }
     }
 
-    .tile-btn {
-      padding: 5px 9px;
-      font-size: 12px;
-      min-height: 30px;
-      border-radius: 10px;
+    /* ================= 横屏布局（宽 >= 高） ================= */
+    .compare-grid.is-landscape[data-count="1"],
+    .compare-grid:not(.is-portrait)[data-count="1"] {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
     }
 
-    .tile-frame-wrap {
-      flex: 1;
-      position: relative;
+    .compare-grid.is-landscape[data-count="2"],
+    .compare-grid:not(.is-portrait)[data-count="2"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: 1fr;
+    }
+
+    .compare-grid.is-landscape[data-count="3"],
+    .compare-grid:not(.is-portrait)[data-count="3"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: 1fr;
+    }
+
+    .compare-grid.is-landscape[data-count="4"],
+    .compare-grid:not(.is-portrait)[data-count="4"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+
+    /* n=5 上 3 下 2（用 6 列网格，上排每个跨 2 列，下排每个跨 3 列） */
+    .compare-grid.is-landscape[data-count="5"],
+    .compare-grid:not(.is-portrait)[data-count="5"] {
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+    .compare-grid.is-landscape[data-count="5"] > .compare-tile:nth-child(1),
+    .compare-grid.is-landscape[data-count="5"] > .compare-tile:nth-child(2),
+    .compare-grid.is-landscape[data-count="5"] > .compare-tile:nth-child(3),
+    .compare-grid:not(.is-portrait)[data-count="5"] > .compare-tile:nth-child(1),
+    .compare-grid:not(.is-portrait)[data-count="5"] > .compare-tile:nth-child(2),
+    .compare-grid:not(.is-portrait)[data-count="5"] > .compare-tile:nth-child(3) {
+      grid-column: span 2;
+    }
+    .compare-grid.is-landscape[data-count="5"] > .compare-tile:nth-child(4),
+    .compare-grid.is-landscape[data-count="5"] > .compare-tile:nth-child(5),
+    .compare-grid:not(.is-portrait)[data-count="5"] > .compare-tile:nth-child(4),
+    .compare-grid:not(.is-portrait)[data-count="5"] > .compare-tile:nth-child(5) {
+      grid-column: span 3;
+    }
+
+    /* n>=6 用 3 列自动行 */
+    .compare-grid.is-landscape[data-count="6"],
+    .compare-grid:not(.is-portrait)[data-count="6"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+    .compare-grid.is-landscape[data-count="7"],
+    .compare-grid.is-landscape[data-count="8"],
+    .compare-grid.is-landscape[data-count="9"],
+    .compare-grid:not(.is-portrait)[data-count="7"],
+    .compare-grid:not(.is-portrait)[data-count="8"],
+    .compare-grid:not(.is-portrait)[data-count="9"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+    .compare-grid.is-landscape[data-count="10"],
+    .compare-grid.is-landscape[data-count="11"],
+    .compare-grid.is-landscape[data-count="12"],
+    .compare-grid:not(.is-portrait)[data-count="10"],
+    .compare-grid:not(.is-portrait)[data-count="11"],
+    .compare-grid:not(.is-portrait)[data-count="12"] {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(4, minmax(0, 1fr));
+    }
+    .compare-grid.is-landscape,
+    .compare-grid:not(.is-portrait) {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-rows: repeat(var(--grid-rows, 2), minmax(0, 1fr));
+      grid-auto-rows: minmax(0, 1fr);
+    }
+
+    /* ================= 竖屏布局（宽 < 高） ================= */
+    .compare-grid.is-portrait[data-count="1"] {
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+    }
+
+    /* n=2 上下 2x1 */
+    .compare-grid.is-portrait[data-count="2"] {
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+
+    /* n=3 三行 */
+    .compare-grid.is-portrait[data-count="3"] {
+      grid-template-columns: 1fr;
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+
+    /* n=4 2x2 */
+    .compare-grid.is-portrait[data-count="4"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(2, minmax(0, 1fr));
+    }
+
+    /* n=5 三行 2+2+1（最后一个跨两列） */
+    .compare-grid.is-portrait[data-count="5"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+    .compare-grid.is-portrait[data-count="5"] > .compare-tile:nth-child(5) {
+      grid-column: span 2;
+    }
+
+    /* n>=6 2 列自动行 */
+    .compare-grid.is-portrait[data-count="6"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(3, minmax(0, 1fr));
+    }
+    .compare-grid.is-portrait[data-count="7"],
+    .compare-grid.is-portrait[data-count="8"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(4, minmax(0, 1fr));
+    }
+    .compare-grid.is-portrait[data-count="9"],
+    .compare-grid.is-portrait[data-count="10"] {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(5, minmax(0, 1fr));
+    }
+    .compare-grid.is-portrait {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: repeat(var(--grid-rows, 3), minmax(0, 1fr));
+      grid-auto-rows: minmax(0, 1fr);
+    }
+
+    /* Tile 卡片 */
+    .compare-tile {
       background-color: #0d0b09;
+      border: 2px solid var(--ink);
+      border-radius: 12px;
+      box-shadow: 0 3px 0 var(--ink);
+      overflow: hidden;
+      position: relative;
+      width: 100%;
+      height: 100%;
+      min-width: 0;
       min-height: 0;
     }
 
-    .tile-frame-wrap iframe {
+    .tile-frame {
       position: absolute;
       inset: 0;
       width: 100%;
       height: 100%;
       border: 0;
       display: block;
+    }
+
+    /* 左上角徽章浮层 */
+    .tile-badge-overlay {
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      z-index: 10;
+      pointer-events: auto;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border: 1.5px solid var(--ink);
+      border-radius: 999px;
+      background: rgba(243, 215, 122, 0.92);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      font-size: 11.5px;
+      font-weight: 800;
+      color: var(--ink);
+      line-height: 1.2;
+      white-space: nowrap;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+    }
+
+    .badge.is-web { background: rgba(188, 217, 245, 0.94); }
+    .badge.is-flash { background: rgba(191, 230, 200, 0.94); }
+    .badge.is-deepseek { background: rgba(201, 195, 242, 0.94); }
+    .badge.is-opus { background: rgba(242, 198, 168, 0.94); }
+
+    /* 右上角按钮浮层 */
+    .tile-actions-overlay {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      pointer-events: auto;
+    }
+
+    .tile-icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      padding: 0;
+      background: rgba(251, 244, 226, 0.88);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      border: 1.5px solid var(--ink);
+      border-radius: 6px;
+      color: var(--ink);
+      font-size: 12.5px;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+      transition: transform 0.08s ease, background-color 0.15s ease;
+      user-select: none;
+      -webkit-user-select: none;
+      box-sizing: border-box;
+    }
+
+    .tile-icon-btn:hover {
+      background: var(--highlight);
+      transform: translateY(-1px);
+    }
+
+    .tile-icon-btn:active {
+      transform: translateY(1px);
     }
 
     /* 全屏状态 */
@@ -432,64 +488,243 @@
       display: inline-flex !important;
     }
 
+    /* 提示词抽屉 / 模态框 */
+    .prompt-drawer-mask {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      height: 100dvh;
+      background-color: rgba(58, 46, 36, 0.45);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
+    .prompt-drawer {
+      background-color: var(--bg-cream);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 6px 0 var(--ink);
+      width: 100%;
+      max-width: 680px;
+      max-height: 85vh;
+      max-height: 85dvh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      animation: drawerPop 0.15s ease-out;
+    }
+
+    @keyframes drawerPop {
+      from {
+        transform: scale(0.96);
+        opacity: 0;
+      }
+      to {
+        transform: scale(1);
+        opacity: 1;
+      }
+    }
+
+    .drawer-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--topbar-grad);
+      border-bottom: 2px solid var(--ink);
+    }
+
+    .drawer-title {
+      margin: 0;
+      font-size: 16px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .btn-close-drawer {
+      padding: 3px 8px;
+      font-size: 14px;
+      min-width: 28px;
+      min-height: 28px;
+      border-radius: 8px;
+    }
+
+    .drawer-body {
+      padding: 16px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .drawer-section {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .drawer-section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .drawer-section-title {
+      margin: 0;
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .drawer-desc {
+      margin: 0;
+      font-size: 13.5px;
+      line-height: 1.5;
+      color: var(--ink);
+      opacity: 0.92;
+      background-color: var(--bg-card);
+      border: 1.5px solid var(--ink);
+      border-radius: 10px;
+      padding: 8px 12px;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .prompt-pre {
+      margin: 0;
+      padding: 12px;
+      max-height: 240px;
+      overflow-y: auto;
+      overflow-x: hidden;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier, monospace;
+      font-size: 12px;
+      line-height: 1.6;
+      color: var(--ink);
+      background-color: var(--bg-card);
+      border: 1.5px solid var(--ink);
+      border-radius: 10px;
+    }
+
+    .prompt-diff-box {
+      font-size: 12px;
+      line-height: 1.55;
+      padding: 10px 12px;
+      background-color: var(--bg-card);
+      border: 1.5px dashed var(--ink);
+      border-radius: 10px;
+      color: var(--ink);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .btn-copy {
+      padding: 4px 10px;
+      font-size: 12px;
+      border-radius: 8px;
+    }
+
+    /* 未知场景提示 */
+    .empty-notice-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+
     .empty-notice {
-      padding: 36px 20px;
+      padding: 32px 24px;
       text-align: center;
       background-color: var(--bg-card);
       border: 2px solid var(--ink);
       border-radius: 16px;
+      box-shadow: 0 4px 0 var(--ink);
+      max-width: 440px;
+      width: 100%;
+    }
+
+    .empty-notice-text {
+      margin: 0 0 16px;
       font-size: 16px;
       font-weight: 700;
-      margin-top: 20px;
-      box-shadow: 0 4px 0 var(--ink);
-    }
-
-    @media (max-width: 720px) {
-      body {
-        padding: 12px 10px 32px;
-      }
-      .topbar {
-        padding: 10px 12px;
-      }
-      .topbar-title {
-        font-size: 18px;
-      }
-      .compare-main {
-        padding: 14px 12px 20px;
-      }
-      .scene-meta-box {
-        padding: 12px 14px;
-      }
-      .scene-title {
-        font-size: 19px;
-      }
-      .tile-note {
-        max-width: 140px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      .tile-note {
-        display: none;
-      }
+      color: var(--ink);
     }
   </style>
 </head>
 <body>
-  <div class="gallery-shell">
-    <header class="topbar">
-      <div class="topbar-left">
-        <a class="btn btn-topbar" id="back-gallery" href="../">← 回到画廊</a>
-        <h1 class="topbar-title" id="bar-title">🧊 版本对比</h1>
-      </div>
-      <div class="topbar-actions">
-        <a class="btn" id="play-collection" href="../collection/">▶ 在合集中播放</a>
-      </div>
-    </header>
+  <!-- 紧凑头部栏 -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <a class="btn btn-topbar" id="back-gallery" href="../" aria-label="画廊" title="画廊">
+        <span class="btn-icon">←</span>
+        <span class="btn-text">画廊</span>
+      </a>
+      <h1 class="topbar-title" id="bar-title">版本对比</h1>
+    </div>
+    <div class="topbar-actions">
+      <button type="button" class="btn btn-topbar" id="open-prompt-btn" aria-label="提示词" title="提示词">
+        <span class="btn-icon">📜</span>
+        <span class="btn-text">提示词</span>
+      </button>
+      <a class="btn btn-topbar" id="play-collection" href="../collection/" aria-label="合集" title="合集">
+        <span class="btn-icon">▶</span>
+        <span class="btn-text">合集</span>
+      </a>
+      <a class="btn btn-topbar" id="source-link" href="#" target="_blank" rel="noopener" aria-label="原帖" title="原帖" style="display: none;">
+        <span class="btn-icon">🔗</span>
+        <span class="btn-text">原帖</span>
+      </a>
+    </div>
+  </header>
 
-    <main class="compare-main" id="main-content">
-      <div id="scene-container"></div>
-    </main>
+  <!-- 主体网格区域 -->
+  <main class="compare-main" id="main-content">
+    <div id="scene-container"></div>
+  </main>
+
+  <!-- 提示词抽屉 / 模态框 -->
+  <div class="prompt-drawer-mask" id="prompt-drawer-mask" style="display: none;">
+    <div class="prompt-drawer" id="prompt-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <div class="drawer-header">
+        <div class="drawer-header-left">
+          <h2 class="drawer-title" id="drawer-title">📜 场景提示词</h2>
+        </div>
+        <button type="button" class="btn btn-close-drawer" id="close-drawer-btn" aria-label="关闭" title="关闭">✕</button>
+      </div>
+      <div class="drawer-body">
+        <div class="drawer-section">
+          <h3 class="drawer-section-title">场景说明</h3>
+          <div class="drawer-desc" id="drawer-desc"></div>
+        </div>
+
+        <div class="drawer-section">
+          <div class="drawer-section-head">
+            <h3 class="drawer-section-title">基准提示词全文</h3>
+            <button type="button" class="btn btn-copy" id="drawer-copy-btn">复制</button>
+          </div>
+          <pre class="prompt-pre" id="drawer-prompt-pre">正在加载提示词…</pre>
+        </div>
+
+        <div class="drawer-section">
+          <h3 class="drawer-section-title">各版本提示词差异</h3>
+          <div class="prompt-diff-box" id="drawer-diff-box">正在对比各版本提示词…</div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="../catalog.js"></script>
@@ -529,17 +764,33 @@
       }
 
       const backLink = document.getElementById('back-gallery');
+      const barTitle = document.getElementById('bar-title');
       const playLink = document.getElementById('play-collection');
+      const sourceLink = document.getElementById('source-link');
+      const openPromptBtn = document.getElementById('open-prompt-btn');
       const container = document.getElementById('scene-container');
+
+      // 提示词抽屉相关 DOM
+      const drawerMask = document.getElementById('prompt-drawer-mask');
+      const closeDrawerBtn = document.getElementById('close-drawer-btn');
+      const drawerDesc = document.getElementById('drawer-desc');
+      const drawerPromptPre = document.getElementById('drawer-prompt-pre');
+      const drawerDiffBox = document.getElementById('drawer-diff-box');
+      const drawerCopyBtn = document.getElementById('drawer-copy-btn');
 
       if (!scene) {
         document.title = '未找到场景 · 3D 作品';
         backLink.href = '../';
         playLink.style.display = 'none';
+        openPromptBtn.style.display = 'none';
+        sourceLink.style.display = 'none';
+        barTitle.textContent = '版本对比';
         container.innerHTML =
+          '<div class="empty-notice-wrap">' +
           '<div class="empty-notice">' +
-          '<p>未找到该 3D 场景或该场景尚未上线。</p>' +
+          '<p class="empty-notice-text">未找到该 3D 场景或该场景尚未上线。</p>' +
           '<p><a class="btn" href="../">← 回到 3D 作品</a></p>' +
+          '</div>' +
           '</div>';
         return;
       }
@@ -547,12 +798,21 @@
       catId = catId || 'classic';
       document.title = scene.title + ' · 版本对比';
       backLink.href = '../#cat-' + encodeURIComponent(catId);
+      barTitle.textContent = scene.title;
+      barTitle.title = scene.title + (scene.description ? (' — ' + scene.description) : '');
       playLink.href = '../collection/?c=' + encodeURIComponent(catId) + '&s=' + encodeURIComponent(scene.id);
+
+      if (scene.source) {
+        sourceLink.href = scene.source;
+        sourceLink.style.display = 'inline-flex';
+      } else {
+        sourceLink.style.display = 'none';
+      }
 
       // 可用版本
       const avail = ORDER.filter((m) => (scene.models || []).indexOf(m) !== -1 && MODELS[m]);
       const firstModel = avail[0] || 'deepseek';
-      const firstSuffix = MODELS[firstModel] ? MODELS[firstModel].suffix : '';
+      const firstSuffix = MODELS[firstModel] && MODELS[firstModel].suffix !== undefined ? MODELS[firstModel].suffix : '';
 
       // 复制功能
       async function copyText(text) {
@@ -590,6 +850,7 @@
         }
       }
 
+      // 提示词加载与对比
       const promptCache = new Map();
       const promptInflight = new Map();
 
@@ -628,7 +889,7 @@
         }
         const texts = await Promise.all(
           availList.map((m) => {
-            const suf = MODELS[m] ? MODELS[m].suffix : ('-' + m);
+            const suf = MODELS[m] && MODELS[m].suffix !== undefined ? MODELS[m].suffix : ('-' + m);
             return loadPromptText(sceneObj.id + suf);
           })
         );
@@ -666,108 +927,52 @@
         return out.trim();
       }
 
-      // 构建场景 Meta 区块
-      const metaBox = document.createElement('div');
-      metaBox.className = 'scene-meta-box';
-
-      const head = document.createElement('div');
-      head.className = 'scene-meta-head';
-
-      const titleEl = document.createElement('h1');
-      titleEl.className = 'scene-title';
-      titleEl.textContent = scene.title;
-      head.appendChild(titleEl);
-
-      if (scene.source) {
-        const srcLink = document.createElement('a');
-        srcLink.className = 'source-link';
-        srcLink.href = scene.source;
-        srcLink.target = '_blank';
-        srcLink.rel = 'noopener';
-        srcLink.textContent = '原帖 ↗';
-        head.appendChild(srcLink);
-      }
-
-      const descEl = document.createElement('p');
-      descEl.className = 'scene-desc';
-      descEl.textContent = scene.description;
-
-      const togglePromptBtn = document.createElement('button');
-      togglePromptBtn.type = 'button';
-      togglePromptBtn.className = 'btn btn-secondary';
-      togglePromptBtn.setAttribute('aria-expanded', 'false');
-      togglePromptBtn.textContent = '📜 查看提示词';
-
-      const promptSection = document.createElement('div');
-      promptSection.className = 'prompt-section';
-
-      const promptToolbar = document.createElement('div');
-      promptToolbar.className = 'prompt-toolbar';
-
-      const promptLabel = document.createElement('span');
-      promptLabel.className = 'prompt-label';
-      promptLabel.textContent = '场景生成提示词';
-
-      const copyBtn = document.createElement('button');
-      copyBtn.type = 'button';
-      copyBtn.className = 'btn btn-copy';
-      copyBtn.textContent = '复制';
-
-      promptToolbar.appendChild(promptLabel);
-      promptToolbar.appendChild(copyBtn);
-
-      const preEl = document.createElement('pre');
-      preEl.className = 'prompt-pre';
-      preEl.textContent = '正在加载提示词…';
-
-      const diffBox = document.createElement('div');
-      diffBox.className = 'prompt-diff-box';
-      diffBox.textContent = '正在对比各版本提示词…';
-
-      promptSection.appendChild(promptToolbar);
-      promptSection.appendChild(preEl);
-      promptSection.appendChild(diffBox);
-
       let promptLoaded = false;
       async function ensurePromptLoaded() {
+        drawerDesc.textContent = scene.description || '暂无说明';
         if (promptLoaded) return;
         promptLoaded = true;
         const firstText = await loadPromptText(scene.id + firstSuffix);
-        preEl.textContent = firstText || '未能加载提示词文本。';
+        drawerPromptPre.textContent = firstText || '未能加载提示词文本。';
         const diffResult = await computePromptDiff(scene, avail);
-        diffBox.textContent = diffResult;
+        drawerDiffBox.textContent = diffResult;
       }
 
-      let isExpanded = false;
-      togglePromptBtn.addEventListener('click', () => {
-        isExpanded = !isExpanded;
-        promptSection.classList.toggle('is-open', isExpanded);
-        togglePromptBtn.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
-        if (isExpanded) {
-          ensurePromptLoaded();
+      function openDrawer() {
+        drawerMask.style.display = 'flex';
+        ensurePromptLoaded();
+      }
+
+      function closeDrawer() {
+        drawerMask.style.display = 'none';
+      }
+
+      function isDrawerOpen() {
+        return drawerMask.style.display !== 'none';
+      }
+
+      openPromptBtn.addEventListener('click', openDrawer);
+      closeDrawerBtn.addEventListener('click', closeDrawer);
+      drawerMask.addEventListener('click', (e) => {
+        if (e.target === drawerMask) {
+          closeDrawer();
         }
       });
 
       let copyTimer = null;
-      copyBtn.addEventListener('click', async () => {
+      drawerCopyBtn.addEventListener('click', async () => {
         await ensurePromptLoaded();
-        const firstText = promptCache.get(scene.id + firstSuffix) || '';
+        const firstText = promptCache.get(scene.id + firstSuffix) || drawerPromptPre.textContent || '';
         const ok = await copyText(firstText);
         if (copyTimer) clearTimeout(copyTimer);
-        copyBtn.textContent = ok ? '已复制' : '复制失败';
+        drawerCopyBtn.textContent = ok ? '已复制' : '复制失败';
         copyTimer = setTimeout(() => {
-          copyBtn.textContent = '复制';
+          drawerCopyBtn.textContent = '复制';
           copyTimer = null;
         }, 1500);
       });
 
-      metaBox.appendChild(head);
-      metaBox.appendChild(descEl);
-      metaBox.appendChild(togglePromptBtn);
-      metaBox.appendChild(promptSection);
-      container.appendChild(metaBox);
-
-      // 全屏管理
+      // 全屏与伪全屏管理
       let activePseudoTile = null;
 
       function enterPseudoFs(tile) {
@@ -833,99 +1038,230 @@
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
-          exitAllFs();
+          if (isDrawerOpen()) {
+            closeDrawer();
+          } else {
+            exitAllFs();
+          }
         }
       });
 
-      // 构建对比网格
+      // iframe 链接拦截修复：同源下设置 target="_top"，加 MutationObserver，并在捕获阶段 click 兜底
+      function interceptIframeLinks(iframe) {
+        function handleDocument(doc) {
+          if (!doc) return;
+
+          function patchLink(a) {
+            try {
+              if (!a || !a.getAttribute) return;
+              const href = a.getAttribute('href');
+              if (href && !href.startsWith('#') && !a.hasAttribute('target')) {
+                a.setAttribute('target', '_top');
+              }
+            } catch (err) {}
+          }
+
+          try {
+            const links = doc.querySelectorAll('a[href]');
+            for (let i = 0; i < links.length; i++) {
+              patchLink(links[i]);
+            }
+          } catch (err) {}
+
+          try {
+            if (typeof MutationObserver !== 'undefined' && (doc.body || doc.documentElement)) {
+              const observer = new MutationObserver((mutations) => {
+                for (let i = 0; i < mutations.length; i++) {
+                  const mut = mutations[i];
+                  if (mut.type === 'childList') {
+                    for (let j = 0; j < mut.addedNodes.length; j++) {
+                      const node = mut.addedNodes[j];
+                      if (node.nodeType === 1) {
+                        if (node.tagName === 'A' && node.hasAttribute('href')) {
+                          patchLink(node);
+                        }
+                        if (node.querySelectorAll) {
+                          const subLinks = node.querySelectorAll('a[href]');
+                          for (let k = 0; k < subLinks.length; k++) {
+                            patchLink(subLinks[k]);
+                          }
+                        }
+                      }
+                    }
+                  } else if (mut.type === 'attributes' && mut.attributeName === 'href') {
+                    patchLink(mut.target);
+                  }
+                }
+              });
+              observer.observe(doc.body || doc.documentElement, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['href']
+              });
+            }
+          } catch (err) {}
+
+          try {
+            doc.addEventListener(
+              'click',
+              (e) => {
+                try {
+                  const a = e.target && e.target.closest ? e.target.closest('a') : null;
+                  if (!a) return;
+                  const hrefAttr = a.getAttribute('href');
+                  if (!hrefAttr || hrefAttr.startsWith('#') || hrefAttr.startsWith('javascript:')) {
+                    return;
+                  }
+                  const target = a.getAttribute('target');
+                  if (target !== '_blank') {
+                    e.preventDefault();
+                    try {
+                      window.top.location.href = a.href;
+                    } catch (navErr) {
+                      window.location.href = a.href;
+                    }
+                  }
+                } catch (clickErr) {}
+              },
+              true
+            );
+          } catch (err) {}
+        }
+
+        iframe.addEventListener('load', () => {
+          try {
+            const doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+            handleDocument(doc);
+          } catch (err) {}
+        });
+
+        try {
+          const doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document);
+          if (doc && doc.readyState === 'complete') {
+            handleDocument(doc);
+          }
+        } catch (err) {}
+      }
+
+      // 构建版本网格
       const grid = document.createElement('div');
       grid.className = 'compare-grid';
       grid.dataset.count = String(avail.length);
 
+      function updateLayoutOrientation() {
+        const isPortrait = window.innerWidth < window.innerHeight;
+        grid.classList.toggle('is-portrait', isPortrait);
+        grid.classList.toggle('is-landscape', !isPortrait);
+
+        const n = avail.length;
+        let rows = 1;
+        if (isPortrait) {
+          if (n === 1) rows = 1;
+          else if (n === 2) rows = 2;
+          else if (n === 3) rows = 3;
+          else if (n === 4) rows = 2;
+          else if (n === 5) rows = 3;
+          else rows = Math.ceil(n / 2);
+        } else {
+          if (n <= 3) rows = 1;
+          else if (n <= 6) rows = 2;
+          else rows = Math.ceil(n / 3);
+        }
+        grid.style.setProperty('--grid-rows', String(rows));
+      }
+
+      const mql = window.matchMedia('(orientation: portrait)');
+      if (mql.addEventListener) {
+        mql.addEventListener('change', updateLayoutOrientation);
+      } else if (mql.addListener) {
+        mql.addListener(updateLayoutOrientation);
+      }
+      window.addEventListener('resize', updateLayoutOrientation);
+      window.addEventListener('orientationchange', updateLayoutOrientation);
+      updateLayoutOrientation();
+
       avail.forEach((m) => {
-        const mm = MODELS[m];
+        const mm = MODELS[m] || {};
         const suffix = mm.suffix !== undefined ? mm.suffix : ('-' + m);
         const tile = document.createElement('div');
         tile.className = 'compare-tile';
         tile.id = 'tile-' + m;
 
-        const tileBar = document.createElement('div');
-        tileBar.className = 'tile-bar';
-
-        const tileLeft = document.createElement('div');
-        tileLeft.className = 'tile-left';
-
-        const badge = document.createElement('span');
-        badge.className = 'badge' + (mm.badgeClass ? ' ' + mm.badgeClass : '');
-        badge.textContent = mm.badge;
-
-        const note = document.createElement('span');
-        note.className = 'tile-note';
-        note.title = mm.note;
-        note.textContent = mm.note;
-
-        tileLeft.appendChild(badge);
-        tileLeft.appendChild(note);
-
-        const tileActions = document.createElement('div');
-        tileActions.className = 'tile-actions';
-
-        if (scene.chats && scene.chats[m]) {
-          const chatA = document.createElement('a');
-          chatA.className = 'tile-chat';
-          chatA.href = scene.chats[m];
-          chatA.target = '_blank';
-          chatA.rel = 'noopener';
-          chatA.textContent = '💬 对话记录';
-          tileActions.appendChild(chatA);
-        }
-
-        const openA = document.createElement('a');
-        openA.className = 'btn btn-secondary tile-btn';
-        openA.href = '../' + scene.id + suffix + '/';
-        openA.target = '_blank';
-        openA.rel = 'noopener';
-        openA.textContent = '↗ 单独打开';
-
-        const fsBtn = document.createElement('button');
-        fsBtn.type = 'button';
-        fsBtn.className = 'btn tile-btn tile-fs-btn';
-        fsBtn.title = '全屏查看';
-        fsBtn.textContent = '⛶ 全屏';
-        fsBtn.addEventListener('click', () => {
-          requestTileFs(tile);
-        });
-
-        const exitBtn = document.createElement('button');
-        exitBtn.type = 'button';
-        exitBtn.className = 'btn btn-secondary tile-btn tile-exit-fs-btn';
-        exitBtn.title = '退出全屏';
-        exitBtn.textContent = '✕ 退出全屏';
-        exitBtn.addEventListener('click', () => {
-          exitAllFs();
-        });
-
-        tileActions.appendChild(openA);
-        tileActions.appendChild(fsBtn);
-        tileActions.appendChild(exitBtn);
-
-        tileBar.appendChild(tileLeft);
-        tileBar.appendChild(tileActions);
-
-        const frameWrap = document.createElement('div');
-        frameWrap.className = 'tile-frame-wrap';
-
+        // iframe 占满整个 tile
         const iframe = document.createElement('iframe');
-        iframe.src = '../' + scene.id + suffix + '/';
+        iframe.className = 'tile-frame';
+        iframe.src = '../' + encodeURIComponent(scene.id) + suffix + '/';
         iframe.loading = 'lazy';
         iframe.allow = 'fullscreen; autoplay';
         iframe.setAttribute('allowfullscreen', '');
-        iframe.title = scene.title + ' · ' + mm.short;
+        iframe.title = scene.title + ' · ' + (mm.short || mm.badge || m);
+        interceptIframeLinks(iframe);
+        tile.appendChild(iframe);
 
-        frameWrap.appendChild(iframe);
-        tile.appendChild(tileBar);
-        tile.appendChild(frameWrap);
+        // 左上角半透明小浮层
+        const badgeOverlay = document.createElement('div');
+        badgeOverlay.className = 'tile-badge-overlay';
+        if (mm.note) {
+          badgeOverlay.title = mm.note;
+        }
 
+        const badge = document.createElement('span');
+        badge.className = 'badge' + (mm.badgeClass ? ' ' + mm.badgeClass : '');
+        badge.textContent = mm.short || mm.badge || m;
+        badgeOverlay.appendChild(badge);
+        tile.appendChild(badgeOverlay);
+
+        // 右上角小图标按钮浮层
+        const actionsOverlay = document.createElement('div');
+        actionsOverlay.className = 'tile-actions-overlay';
+
+        if (scene.chats && scene.chats[m]) {
+          const chatA = document.createElement('a');
+          chatA.className = 'tile-icon-btn';
+          chatA.href = scene.chats[m];
+          chatA.target = '_blank';
+          chatA.rel = 'noopener';
+          chatA.title = '对话记录';
+          chatA.setAttribute('aria-label', '对话记录');
+          chatA.textContent = '💬';
+          actionsOverlay.appendChild(chatA);
+        }
+
+        const openA = document.createElement('a');
+        openA.className = 'tile-icon-btn';
+        openA.href = '../' + encodeURIComponent(scene.id) + suffix + '/';
+        openA.target = '_blank';
+        openA.rel = 'noopener';
+        openA.title = '单独打开';
+        openA.setAttribute('aria-label', '单独打开');
+        openA.textContent = '↗';
+        actionsOverlay.appendChild(openA);
+
+        const fsBtn = document.createElement('button');
+        fsBtn.type = 'button';
+        fsBtn.className = 'tile-icon-btn tile-fs-btn';
+        fsBtn.title = '全屏';
+        fsBtn.setAttribute('aria-label', '全屏');
+        fsBtn.textContent = '⛶';
+        fsBtn.addEventListener('click', () => {
+          requestTileFs(tile);
+        });
+        actionsOverlay.appendChild(fsBtn);
+
+        const exitBtn = document.createElement('button');
+        exitBtn.type = 'button';
+        exitBtn.className = 'tile-icon-btn tile-exit-fs-btn';
+        exitBtn.title = '退出全屏';
+        exitBtn.setAttribute('aria-label', '退出全屏');
+        exitBtn.textContent = '✕';
+        exitBtn.style.display = 'none';
+        exitBtn.addEventListener('click', () => {
+          exitAllFs();
+        });
+        actionsOverlay.appendChild(exitBtn);
+
+        tile.appendChild(actionsOverlay);
         grid.appendChild(tile);
       });
 
