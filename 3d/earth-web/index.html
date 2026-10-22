@@ -1,0 +1,1997 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D 蔚蓝地球 · 程序化行星渲染系统</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, #050b1a 0%, #02040a 70%, #000000 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #eef4ff;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角固定返回按钮：半透明奶油色圆角小按钮样式 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 248, 234, 0.86);
+      color: #2c261e;
+      font-size: 13.5px;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+      text-decoration: none;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 252, 244, 0.96);
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    }
+
+    .back-btn:active {
+      transform: translateY(0) scale(0.99);
+    }
+
+    /* 顶部标题轻提示 */
+    .header-badge {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 18px;
+      border-radius: 999px;
+      background: rgba(10, 20, 42, 0.55);
+      border: 1px solid rgba(120, 180, 255, 0.22);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 10px #38bdf8, 0 0 20px #38bdf8;
+      animation: pulseGlow 2.4s infinite ease-in-out;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { transform: scale(1); opacity: 0.95; }
+      50% { transform: scale(1.35); opacity: 0.5; }
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      color: #e2eeff;
+    }
+
+    .header-sub {
+      font-size: 11px;
+      color: rgba(176, 208, 255, 0.72);
+      padding-left: 8px;
+      border-left: 1px solid rgba(140, 185, 255, 0.25);
+    }
+
+    /* 右侧控制台面板 */
+    .control-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 25;
+      width: 286px;
+      border-radius: 18px;
+      background: rgba(9, 17, 34, 0.68);
+      border: 1px solid rgba(118, 176, 255, 0.22);
+      box-shadow: 0 16px 42px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      overflow: hidden;
+      transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.25s ease;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 16px;
+      border-bottom: 1px solid rgba(120, 175, 255, 0.14);
+      cursor: pointer;
+    }
+
+    .panel-header-title {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13.5px;
+      font-weight: 600;
+      color: #f0f6ff;
+      letter-spacing: 0.4px;
+    }
+
+    .panel-toggle-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #bbd7ff;
+      font-size: 11px;
+      padding: 3px 9px;
+      border-radius: 99px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .panel-toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .panel-body {
+      padding: 14px 16px 16px;
+      max-height: calc(100vh - 100px);
+      overflow-y: auto;
+      transition: max-height 0.3s ease, padding 0.3s ease, opacity 0.25s ease;
+    }
+
+    .control-panel.collapsed .panel-body {
+      max-height: 0;
+      padding-top: 0;
+      padding-bottom: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: rgba(145, 192, 255, 0.72);
+      margin-bottom: 8px;
+    }
+
+    /* 视角/氛围预设按钮组 */
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 15px;
+    }
+
+    .preset-btn {
+      padding: 7px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(125, 180, 255, 0.2);
+      background: rgba(22, 40, 74, 0.48);
+      color: #d5e6ff;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+    }
+
+    .preset-btn:hover {
+      background: rgba(42, 82, 148, 0.58);
+      border-color: rgba(130, 198, 255, 0.5);
+      color: #ffffff;
+    }
+
+    .preset-btn.active {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.78), rgba(14, 165, 233, 0.78));
+      border-color: rgba(186, 230, 253, 0.85);
+      color: #ffffff;
+      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+    }
+
+    /* 滑块控制项 */
+    .control-row {
+      margin-bottom: 12px;
+    }
+
+    .control-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: #d6e6ff;
+      margin-bottom: 5px;
+    }
+
+    .control-val {
+      font-variant-numeric: tabular-nums;
+      font-size: 11.5px;
+      color: #7dd3fc;
+      font-weight: 600;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 5px;
+      border-radius: 99px;
+      background: rgba(255, 255, 255, 0.14);
+      outline: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      background: #38bdf8;
+      border: 2px solid #ffffff;
+      box-shadow: 0 0 8px rgba(56, 189, 248, 0.8);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* 开关芯片组 */
+    .toggle-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .chip-btn {
+      flex: 1 1 calc(50% - 4px);
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid rgba(135, 185, 255, 0.18);
+      background: rgba(255, 255, 255, 0.05);
+      color: rgba(205, 225, 255, 0.65);
+      font-size: 11.5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.18s ease;
+    }
+
+    .chip-btn .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.28);
+      transition: background 0.18s, box-shadow 0.18s;
+    }
+
+    .chip-btn.on {
+      background: rgba(14, 116, 144, 0.36);
+      border-color: rgba(56, 189, 248, 0.55);
+      color: #f0f9ff;
+    }
+
+    .chip-btn.on .dot {
+      background: #38bdf8;
+      box-shadow: 0 0 6px #38bdf8;
+    }
+
+    /* 左下角遥测状态栏 */
+    .telemetry-bar {
+      position: fixed;
+      bottom: 18px;
+      left: 18px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 15px;
+      border-radius: 12px;
+      background: rgba(8, 15, 30, 0.58);
+      border: 1px solid rgba(118, 176, 255, 0.18);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      font-size: 11.5px;
+      color: rgba(196, 222, 255, 0.85);
+      pointer-events: none;
+    }
+
+    .telemetry-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .telemetry-label {
+      color: rgba(140, 178, 232, 0.65);
+    }
+
+    .telemetry-value {
+      font-variant-numeric: tabular-nums;
+      color: #7dd3fc;
+      font-weight: 600;
+    }
+
+    /* 地标悬浮文字提示 */
+    .city-tooltip {
+      position: fixed;
+      z-index: 22;
+      pointer-events: none;
+      padding: 6px 11px;
+      border-radius: 8px;
+      background: rgba(7, 16, 34, 0.86);
+      border: 1px solid rgba(56, 189, 248, 0.6);
+      color: #f0f9ff;
+      font-size: 12px;
+      font-weight: 500;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      transform: translate(-50%, -135%);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .city-tooltip.visible {
+      opacity: 1;
+    }
+
+    .city-tooltip .coords {
+      font-size: 10.5px;
+      color: #7dd3fc;
+      margin-left: 5px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    @media (max-width: 720px) {
+      .header-badge {
+        display: none;
+      }
+      .control-panel {
+        width: 248px;
+        top: 14px;
+        right: 14px;
+      }
+      .back-btn {
+        top: 14px;
+        left: 14px;
+        padding: 7px 13px;
+        font-size: 12.5px;
+      }
+      .telemetry-bar {
+        bottom: 12px;
+        left: 12px;
+        gap: 10px;
+        padding: 6px 11px;
+        font-size: 10.5px;
+      }
+      .hide-mobile {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div class="header-badge">
+    <span class="pulse-dot"></span>
+    <span class="header-title">地球 · 实时程序化行星引擎</span>
+    <span class="header-sub">拖拽旋转 · 滚轮缩放 · 双击聚焦城市</span>
+  </div>
+
+  <aside class="control-panel" id="controlPanel">
+    <div class="panel-header" id="panelHeader">
+      <div class="panel-header-title">
+        <span>🌍 行星环境控制台</span>
+      </div>
+      <button class="panel-toggle-btn" id="panelToggleBtn" type="button">收起</button>
+    </div>
+    <div class="panel-body">
+      <div class="section-label">氛围模式预设</div>
+      <div class="preset-grid">
+        <button class="preset-btn active" data-preset="day" type="button">☀️ 蔚蓝昼昼</button>
+        <button class="preset-btn" data-preset="night" type="button">🌃 璀璨夜景</button>
+        <button class="preset-btn" data-preset="dawn" type="button">🌅 破晓晨昏</button>
+        <button class="preset-btn" data-preset="cyber" type="button">🛰️ 全球航线</button>
+      </div>
+
+      <div class="section-label">光照与物理参数</div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span>太阳赤经角 (晨昏线)</span>
+          <span class="control-val" id="sunAngleVal">42°</span>
+        </div>
+        <input type="range" id="sunAngleSlider" min="0" max="360" step="1" value="42" />
+      </div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span>地球自转速度</span>
+          <span class="control-val" id="rotSpeedVal">1.0x</span>
+        </div>
+        <input type="range" id="rotSpeedSlider" min="0" max="4" step="0.1" value="1.0" />
+      </div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span>大气流云层密度</span>
+          <span class="control-val" id="cloudVal">72%</span>
+        </div>
+        <input type="range" id="cloudSlider" min="0" max="100" step="1" value="72" />
+      </div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span>瑞利大气与极光强度</span>
+          <span class="control-val" id="atmoVal">100%</span>
+        </div>
+        <input type="range" id="atmoSlider" min="0" max="160" step="2" value="100" />
+      </div>
+
+      <div class="control-row">
+        <div class="control-label-row">
+          <span>山脉地形凹凸浮雕</span>
+          <span class="control-val" id="reliefVal">100%</span>
+        </div>
+        <input type="range" id="reliefSlider" min="0" max="200" step="5" value="100" />
+      </div>
+
+      <div class="section-label" style="margin-top: 12px;">图层与轨道开关</div>
+      <div class="toggle-chips">
+        <button class="chip-btn on" data-toggle="clouds" type="button"><span class="dot"></span>动态云层</button>
+        <button class="chip-btn on" data-toggle="lights" type="button"><span class="dot"></span>城市灯火</button>
+        <button class="chip-btn on" data-toggle="aurora" type="button"><span class="dot"></span>南北极光</button>
+        <button class="chip-btn on" data-toggle="arcs" type="button"><span class="dot"></span>航线地标</button>
+        <button class="chip-btn on" data-toggle="satellites" type="button"><span class="dot"></span>近地卫星</button>
+        <button class="chip-btn on" data-toggle="moon" type="button"><span class="dot"></span>地月伴行</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="telemetry-bar">
+    <div class="telemetry-item">
+      <span class="telemetry-label">轨道高度</span>
+      <span class="telemetry-value" id="hudAlt">18,400 km</span>
+    </div>
+    <div class="telemetry-item hide-mobile">
+      <span class="telemetry-label">日照直射点</span>
+      <span class="telemetry-value" id="hudSubsolar">14.2°N, 42.0°E</span>
+    </div>
+    <div class="telemetry-item">
+      <span class="telemetry-label">帧率</span>
+      <span class="telemetry-value" id="hudFps">60 FPS</span>
+    </div>
+  </div>
+
+  <div class="city-tooltip" id="cityTooltip"></div>
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============================================================================
+    // 1. 全球大陆地理与山脉/气候/城市聚落 程序化种子贴图生成 (2048 x 1024)
+    //    R通道: 大陆海岸线掩码 (配合GLSL 3D分形噪声生成无限精度海岸与岛屿)
+    //    G通道: 高原与山脉隆起权重 (喜马拉雅/青藏、安第斯、落基、阿尔卑斯等)
+    //    B通道: 干旱/荒漠气候权重 (撒哈拉、阿拉伯、塔克拉玛干/戈壁、澳洲内陆等)
+    //    A通道: 人类城市群夜间灯光密度掩码 (东亚、欧洲、北美、南亚、尼罗河等)
+    // ============================================================================
+    function createProceduralGeoTexture() {
+      const W = 2048;
+      const H = 1024;
+
+      // 转换经纬度 (lat: -90..90, lon: -180..180) 为 Canvas 像素坐标
+      const toXY = (lat, lon) => [
+        ((lon + 180) / 360) * W,
+        ((90 - lat) / 180) * H
+      ];
+
+      // 独立创建四个单通道离屏 Canvas，以便利用柔和模糊构建连续距离场
+      const makeChannelCanvas = (blurPx) => {
+        const c = document.createElement('canvas');
+        c.width = W;
+        c.height = H;
+        const ctx = c.getContext('2d');
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, W, H);
+        if (blurPx > 0) {
+          ctx.filter = `blur(${blurPx}px)`;
+        }
+        return { c, ctx };
+      };
+
+      const drawPoly = (ctx, coords, fillStyle) => {
+        ctx.fillStyle = fillStyle;
+        ctx.beginPath();
+        coords.forEach(([lat, lon], idx) => {
+          const [x, y] = toXY(lat, lon);
+          if (idx === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fill();
+      };
+
+      const drawBlob = (ctx, lat, lon, rLat, rLon, intensity = 1.0) => {
+        const [cx, cy] = toXY(lat, lon);
+        const rx = (rLon / 360) * W;
+        const ry = (rLat / 180) * H;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(rx, ry);
+        const grad = ctx.createRadialGradient(0, 0, 0.1, 0, 0, 1.0);
+        grad.addColorStop(0, `rgba(255,255,255,${intensity})`);
+        grad.addColorStop(0.55, `rgba(255,255,255,${intensity * 0.65})`);
+        grad.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, 1.0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      };
+
+      // --- (A) 大陆宏观轮廓通道 (R) ---
+      const land = makeChannelCanvas(8);
+      const lCtx = land.ctx;
+
+      // 欧亚大陆主体 (欧洲 + 俄罗斯 + 中东 + 印度 + 中国 + 东南亚 + 勘察加)
+      const eurasia = [
+        [36, -9], [43, -9], [44, -2], [48, -4], [51, 2], [54, 8], [58, 8],
+        [62, 5], [70, 20], [71, 28], [68, 42], [70, 58], [73, 70], [76, 95],
+        [73, 125], [70, 160], [66, 178], [60, 165], [52, 158], [60, 150],
+        [54, 141], [44, 135], [38, 128], [35, 126], [39, 121], [37, 122],
+        [31, 122], [23, 116], [21, 108], [16, 108], [10, 106], [12, 102],
+        [2, 103], [7, 99], [16, 97], [22, 91], [16, 82], [8, 78], [22, 69],
+        [25, 62], [26, 56], [30, 49], [24, 54], [13, 45], [13, 43], [28, 34],
+        [31, 32], [36, 36], [37, 27], [41, 29], [41, 26], [38, 22], [45, 14],
+        [40, 18], [38, 15], [44, 9], [43, 3], [36, -5]
+      ];
+      drawPoly(lCtx, eurasia, '#ffffff');
+
+      // 非洲大陆
+      const africa = [
+        [36, -6], [37, 10], [32, 15], [31, 32], [22, 37], [12, 44], [11, 51],
+        [2, 45], [-4, 40], [-11, 40], [-20, 35], [-26, 33], [-34, 26], [-35, 19],
+        [-28, 16], [-17, 12], [-6, 12], [4, 9], [5, 1], [4, -8], [11, -16],
+        [15, -17], [21, -17], [28, -13], [35, -6]
+      ];
+      drawPoly(lCtx, africa, '#ffffff');
+
+      // 北美洲
+      const northAmerica = [
+        [71, -165], [70, -140], [72, -125], [69, -95], [63, -78], [52, -56],
+        [45, -61], [43, -70], [39, -74], [35, -75], [25, -80], [29, -84],
+        [29, -95], [22, -97], [21, -87], [16, -86], [9, -79], [8, -77],
+        [14, -92], [19, -105], [24, -109], [31, -114], [23, -110], [33, -118],
+        [38, -123], [48, -125], [58, -136], [61, -150], [55, -163], [60, -166],
+        [66, -168]
+      ];
+      drawPoly(lCtx, northAmerica, '#ffffff');
+
+      // 南美洲
+      const southAmerica = [
+        [11, -75], [10, -62], [6, -52], [0, -50], [-6, -35], [-13, -38],
+        [-23, -42], [-28, -48], [-35, -54], [-38, -58], [-46, -66], [-52, -69],
+        [-55, -67], [-53, -73], [-43, -74], [-33, -72], [-18, -71], [-12, -77],
+        [-5, -81], [2, -79], [8, -77]
+      ];
+      drawPoly(lCtx, southAmerica, '#ffffff');
+
+      // 澳大利亚
+      const australia = [
+        [-12, 131], [-12, 136], [-17, 139], [-11, 142], [-19, 147], [-25, 153],
+        [-33, 152], [-38, 147], [-38, 140], [-35, 136], [-32, 132], [-34, 122],
+        [-34, 115], [-26, 113], [-21, 115], [-18, 122], [-14, 126]
+      ];
+      drawPoly(lCtx, australia, '#ffffff');
+
+      // 格陵兰与南极洲及重要岛屿 (英国、日本、台湾、海南、加里曼丹、苏门答腊、爪哇、马达加斯加、新西兰等)
+      drawPoly(lCtx, [[60,-44],[66,-36],[72,-22],[81,-18],[82,-45],[77,-70],[68,-53]], '#ffffff'); // 格陵兰
+      drawPoly(lCtx, [[-65,-62],[-70,-30],[-69,0],[-67,45],[-66,95],[-66,145],[-74,175],[-77,-165],[-73,-120],[-72,-85],[-64,-60], [-89, -180], [-89, 180]], '#ffffff'); // 南极洲
+      drawPoly(lCtx, [[50,-5],[58,-6],[58,-2],[53,1],[51,1]], '#ffffff'); // 大不列颠
+      drawPoly(lCtx, [[52,-10],[55,-6],[52,-6],[51,-9]], '#ffffff'); // 爱尔兰
+      drawPoly(lCtx, [[63,-23],[66,-22],[66,-14],[63,-15]], '#ffffff'); // 冰岛
+      drawPoly(lCtx, [[31,130],[34,132],[36,136],[41,140],[45,142],[43,145],[36,141],[34,135],[31,131]], '#ffffff'); // 日本列岛
+      drawPoly(lCtx, [[22,120.2],[25.3,121.5],[24.5,121.9],[21.9,120.8]], '#ffffff'); // 台湾岛
+      drawPoly(lCtx, [[18.2,108.6],[20.1,110.5],[19.5,111.0],[18.1,109.6]], '#ffffff'); // 海南岛
+      drawPoly(lCtx, [[6,95],[-6,105],[-5,106],[5,97]], '#ffffff'); // 苏门答腊
+      drawPoly(lCtx, [[-6,106],[-8,114],[-7,114],[-6,107]], '#ffffff'); // 爪哇
+      drawPoly(lCtx, [[7,117],[4,118],[-3,116],[-3,110],[2,109]], '#ffffff'); // 加里曼丹
+      drawPoly(lCtx, [[-1,120],[-5,120],[-4,123],[1,125]], '#ffffff'); // 苏拉威西
+      drawPoly(lCtx, [[-2,132],[-5,141],[-9,148],[-10,150],[-6,141],[-3,134]], '#ffffff'); // 新几内亚
+      drawPoly(lCtx, [[18,120],[13,124],[7,126],[6,122],[14,120]], '#ffffff'); // 菲律宾
+      drawPoly(lCtx, [[9,80],[6,81],[6,79.8],[9,79.8]], '#ffffff'); // 斯里兰卡
+      drawPoly(lCtx, [[-12,49],[-16,50],[-25,47],[-25,44],[-16,45]], '#ffffff'); // 马达加斯加
+      drawPoly(lCtx, [[-35,173],[-39,178],[-46,167],[-44,172],[-37,175]], '#ffffff'); // 新西兰
+      drawPoly(lCtx, [[23,-84],[21,-75],[19,-77],[22,-84]], '#ffffff'); // 古巴
+      drawPoly(lCtx, [[68,-80],[72,-85],[73,-70],[64,-64],[64,-76]], '#ffffff'); // 巴芬岛
+
+      // --- (B) 山脉与高原权重通道 (G) ---
+      const mountain = makeChannelCanvas(14);
+      const mCtx = mountain.ctx;
+      drawBlob(mCtx, 32, 86, 11, 20, 1.0);   // 青藏高原与喜马拉雅山脉
+      drawBlob(mCtx, 39, 73, 7, 10, 0.9);    // 帕米尔与天山
+      drawBlob(mCtx, 34, 52, 7, 12, 0.72);   // 伊朗高原与扎格罗斯山脉
+      drawBlob(mCtx, 46, 10, 4, 8, 0.85);    // 阿尔卑斯山脉
+      drawBlob(mCtx, 42, 44, 4, 7, 0.8);     // 高加索山脉
+      drawBlob(mCtx, 9, 39, 9, 7, 0.75);     // 埃塞俄比亚高原与东非大裂谷
+      drawBlob(mCtx, 48, -114, 18, 11, 0.85);// 北美落基山脉
+      drawBlob(mCtx, 62, -148, 6, 12, 0.85); // 阿拉斯加山脉
+      drawBlob(mCtx, 23, -103, 9, 7, 0.75);  // 墨西哥高原
+      drawBlob(mCtx, -14, -72, 16, 6, 0.95); // 安第斯山脉北中段
+      drawBlob(mCtx, -36, -70, 18, 5, 0.95); // 安第斯山脉南段
+      drawBlob(mCtx, -82, 75, 12, 90, 0.85); // 南极冰盖高原
+      drawBlob(mCtx, 72, -40, 11, 16, 0.85); // 格陵兰冰盖
+
+      // --- (C) 干旱与荒漠气候通道 (B) ---
+      const desert = makeChannelCanvas(18);
+      const dCtx = desert.ctx;
+      drawBlob(dCtx, 23, 12, 11, 28, 1.0);   // 撒哈拉大沙漠
+      drawBlob(dCtx, 23, 46, 9, 13, 0.95);   // 阿拉伯沙漠
+      drawBlob(dCtx, 30, 60, 8, 12, 0.82);   // 伊朗与俾路支荒漠
+      drawBlob(dCtx, 41, 85, 7, 16, 0.92);   // 塔克拉玛干与戈壁荒漠
+      drawBlob(dCtx, 43, 63, 7, 12, 0.78);   // 中亚卡拉库姆荒漠
+      drawBlob(dCtx, -24, 133, 9, 16, 0.92); // 澳大利亚内陆红土荒漠
+      drawBlob(dCtx, -24, 17, 8, 6, 0.85);   // 纳米布与卡拉哈里沙漠
+      drawBlob(dCtx, 33, -112, 8, 9, 0.82);  // 北美索诺兰与莫哈韦荒漠
+      drawBlob(dCtx, -23, -69, 9, 4, 0.9);   // 阿塔卡马沙漠
+      drawBlob(dCtx, -44, -68, 9, 5, 0.72);  // 巴塔哥尼亚荒原
+
+      // --- (D) 全球人类夜间城市灯火聚落通道 (A) ---
+      const cities = makeChannelCanvas(3);
+      const cCtx = cities.ctx;
+      const cityClusters = [
+        // 中国及东亚核心城市带
+        [31.2, 121.5, 4.5, 4.5, 1.0], [30.2, 120.2, 3.2, 3.2, 0.95], [39.9, 116.4, 4.8, 5.2, 1.0],
+        [23.1, 113.3, 4.2, 4.5, 1.0], [30.6, 104.1, 3.5, 3.5, 0.9], [30.6, 114.3, 3.5, 3.8, 0.9],
+        [34.3, 108.9, 3.0, 3.5, 0.85], [36.6, 117.0, 4.2, 4.2, 0.92], [32.0, 118.8, 3.5, 3.8, 0.92],
+        [24.8, 121.2, 2.5, 2.0, 0.95], [41.8, 123.4, 3.2, 3.5, 0.82], [37.5, 127.0, 2.8, 2.8, 0.96],
+        [35.7, 139.7, 3.2, 3.5, 1.0], [34.7, 135.5, 2.8, 3.2, 0.95],
+        // 东南亚与南亚
+        [1.35, 103.8, 2.0, 2.0, 0.95], [13.7, 100.5, 3.0, 3.0, 0.9], [21.0, 105.8, 2.6, 2.6, 0.85],
+        [10.8, 106.7, 2.6, 2.6, 0.85], [-6.2, 107.0, 2.5, 5.5, 0.92], [14.6, 121.0, 2.5, 2.2, 0.85],
+        [28.6, 77.2, 5.0, 6.5, 0.98], [25.5, 83.0, 4.2, 6.5, 0.95], [22.6, 88.4, 3.8, 4.0, 0.92],
+        [19.1, 72.9, 3.8, 3.2, 0.95], [13.0, 77.6, 3.5, 3.8, 0.88], [31.5, 74.3, 3.5, 3.5, 0.88],
+        // 欧洲与中东、北非
+        [51.5, -0.1, 3.8, 4.5, 1.0], [48.8, 2.3, 4.2, 5.0, 0.96], [51.2, 6.8, 4.5, 5.8, 1.0],
+        [45.5, 9.2, 3.5, 4.5, 0.95], [40.4, -3.7, 3.2, 3.8, 0.88], [52.2, 21.0, 3.5, 4.5, 0.85],
+        [55.7, 37.6, 4.0, 5.0, 0.95], [41.0, 29.0, 3.0, 3.5, 0.9], [30.0, 31.2, 3.5, 2.5, 0.98],
+        [25.2, 55.3, 2.6, 3.2, 0.95], [24.7, 46.7, 2.5, 2.8, 0.85], [35.7, 51.4, 2.8, 3.2, 0.88],
+        // 北美与南美、澳洲、南非
+        [40.7, -74.0, 5.2, 5.8, 1.0], [41.9, -87.6, 4.5, 5.5, 0.95], [33.7, -84.4, 4.0, 4.5, 0.88],
+        [28.5, -81.4, 3.2, 2.5, 0.9], [29.7, -95.4, 3.8, 4.2, 0.92], [34.0, -118.2, 3.8, 3.8, 0.98],
+        [37.7, -122.4, 3.0, 2.8, 0.92], [43.7, -79.4, 3.5, 4.5, 0.92], [19.4, -99.1, 3.8, 4.0, 0.95],
+        [-23.5, -46.6, 3.8, 4.2, 0.96], [-22.9, -43.2, 3.0, 3.2, 0.92], [-34.6, -58.4, 3.5, 3.8, 0.92],
+        [-33.4, -70.6, 2.5, 2.2, 0.85], [4.7, -74.1, 2.5, 2.5, 0.82],
+        [-33.8, 151.2, 2.6, 2.6, 0.9], [-37.8, 145.0, 2.4, 2.4, 0.88],
+        [-26.2, 28.0, 2.8, 2.8, 0.88], [6.5, 3.4, 2.8, 3.2, 0.85]
+      ];
+      cityClusters.forEach(([lat, lon, rLat, rLon, inten]) => {
+        drawBlob(cCtx, lat, lon, rLat, rLon, inten);
+      });
+
+      // 合并 R, G, B, A 到一张 RGBA DataTexture
+      const rData = lCtx.getImageData(0, 0, W, H).data;
+      const gData = mCtx.getImageData(0, 0, W, H).data;
+      const bData = dCtx.getImageData(0, 0, W, H).data;
+      const aData = cCtx.getImageData(0, 0, W, H).data;
+
+      const combined = new Uint8Array(W * H * 4);
+      for (let i = 0; i < W * H; i++) {
+        const idx = i * 4;
+        combined[idx]     = rData[idx];     // R: 大陆掩码
+        combined[idx + 1] = gData[idx];     // G: 山脉权重
+        combined[idx + 2] = bData[idx];     // B: 荒漠权重
+        combined[idx + 3] = aData[idx];     // A: 城市灯火权重
+      }
+
+      const texture = new THREE.DataTexture(combined, W, H, THREE.RGBAFormat);
+      texture.wrapS = THREE.RepeatWrapping;
+      texture.wrapT = THREE.ClampToEdgeWrapping;
+      texture.flipY = true;
+      // 禁用 Mipmap 以彻底消除 GLSL 中 atan(x, z) 在 ±180° 国际日期变更线处的导数跳变接缝
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.LinearFilter;
+      texture.magFilter = THREE.LinearFilter;
+      texture.needsUpdate = true;
+      return texture;
+    }
+
+    // ============================================================================
+    // 2. 场景、相机、渲染器与控制器初始化
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 1500);
+    camera.position.set(15.5, 7.2, 18.5);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.055;
+    controls.rotateSpeed = 0.65;
+    controls.zoomSpeed = 0.85;
+    controls.enablePan = false;
+    controls.minDistance = 8.2;
+    controls.maxDistance = 68.0;
+
+    const EARTH_RADIUS = 6.0;
+    const geoTexture = createProceduralGeoTexture();
+
+    // 行星主容器（倾斜地轴 23.44°? 这里我们在行星组上保留轻微黄赤交角感，同时确保经纬度与地标严密对齐）
+    const earthSystemGroup = new THREE.Group();
+    scene.add(earthSystemGroup);
+
+    const earthTiltGroup = new THREE.Group();
+    earthTiltGroup.rotation.z = THREE.MathUtils.degToRad(11.5);
+    earthSystemGroup.add(earthTiltGroup);
+
+    // 地球自转组（包含地表、云层、极光、城市地标与航线）
+    const earthSpinGroup = new THREE.Group();
+    // 初始旋转角度对准东亚与西太平洋视野
+    earthSpinGroup.rotation.y = -1.45;
+    earthTiltGroup.add(earthSpinGroup);
+
+    // ============================================================================
+    // 3. GLSL 3D Simplex Noise 公共函数库 (无接缝 3D 球面采样)
+    // ============================================================================
+    const GLSL_SIMPLEX_NOISE = /* glsl */ `
+      vec4 permute(vec4 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
+      vec4 taylorInvSqrt(vec4 r) { return 1.79284291400159 - 0.85373472095314 * r; }
+
+      float snoise(vec3 v) {
+        const vec2 C = vec2(1.0/6.0, 1.0/3.0);
+        const vec4 D = vec4(0.0, 0.5, 1.0, 2.0);
+
+        vec3 i  = floor(v + dot(v, C.yyy));
+        vec3 x0 = v - i + dot(i, C.xxx);
+
+        vec3 g = step(x0.yzx, x0.xyz);
+        vec3 l = 1.0 - g;
+        vec3 i1 = min(g.xyz, l.zxy);
+        vec3 i2 = max(g.xyz, l.zxy);
+
+        vec3 x1 = x0 - i1 + 1.0 * C.xxx;
+        vec3 x2 = x0 - i2 + 2.0 * C.xxx;
+        vec3 x3 = x0 - 1.0 + 3.0 * C.xxx;
+
+        i = mod(i, 289.0);
+        vec4 p = permute(permute(permute(
+                  i.z + vec4(0.0, i1.z, i2.z, 1.0))
+                + i.y + vec4(0.0, i1.y, i2.y, 1.0))
+                + i.x + vec4(0.0, i1.x, i2.x, 1.0));
+
+        float n_ = 1.0/7.0;
+        vec3 ns = n_ * D.wyz - D.xzx;
+
+        vec4 j = p - 49.0 * floor(p * ns.z * ns.z);
+
+        vec4 x_ = floor(j * ns.z);
+        vec4 y_ = floor(j - 7.0 * x_);
+
+        vec4 x = x_ * ns.x + ns.yyyy;
+        vec4 y = y_ * ns.x + ns.yyyy;
+        vec4 h = 1.0 - abs(x) - abs(y);
+
+        vec4 b0 = vec4(x.xy, y.xy);
+        vec4 b1 = vec4(x.zw, y.zw);
+
+        vec4 s0 = floor(b0)*2.0 + 1.0;
+        vec4 s1 = floor(b1)*2.0 + 1.0;
+        vec4 sh = -step(h, vec4(0.0));
+
+        vec4 a0 = b0.xzyw + s0.xzyw*sh.xxyy;
+        vec4 a1 = b1.xzyw + s1.xzyw*sh.zzww;
+
+        vec3 p0 = vec3(a0.xy, h.x);
+        vec3 p1 = vec3(a0.zw, h.y);
+        vec3 p2 = vec3(a1.xy, h.z);
+        vec3 p3 = vec3(a1.zw, h.w);
+
+        vec4 norm = taylorInvSqrt(vec4(dot(p0,p0), dot(p1,p1), dot(p2,p2), dot(p3,p3)));
+        p0 *= norm.x;
+        p1 *= norm.y;
+        p2 *= norm.z;
+        p3 *= norm.w;
+
+        vec4 m = max(0.6 - vec4(dot(x0,x0), dot(x1,x1), dot(x2,x2), dot(x3,x3)), 0.0);
+        m = m * m;
+        return 42.0 * dot(m*m, vec4(dot(p0,x0), dot(p1,x1), dot(p2,x2), dot(p3,x3)));
+      }
+
+      // 4层分形布朗运动 (FBM)
+      float fbm4(vec3 p) {
+        float v = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 4; i++) {
+          v += a * snoise(p);
+          p = p * 2.07 + vec3(13.7, -9.2, 7.4);
+          a *= 0.5;
+        }
+        return v;
+      }
+
+      // 锐利山脊多分形噪声 (Ridged Multifractal)
+      float ridged3(vec3 p) {
+        float v = 0.0;
+        float a = 0.55;
+        float weight = 1.0;
+        for (int i = 0; i < 3; i++) {
+          float n = 1.0 - abs(snoise(p));
+          n = n * n * weight;
+          weight = clamp(n * 1.8, 0.0, 1.0);
+          v += n * a;
+          p = p * 2.23 + vec3(-5.1, 11.3, 8.9);
+          a *= 0.5;
+        }
+        return v;
+      }
+    `;
+
+    // ============================================================================
+    // 4. 地球核心表面材质 (分形海岸线 + 真实山脉法线凹凸 + 海洋高光 + 极地冰盖 + 夜景灯火)
+    // ============================================================================
+    const earthUniforms = {
+      uGeoMap: { value: geoTexture },
+      uSunDir: { value: new THREE.Vector3(1, 0.2, 0.5).normalize() },
+      uTime: { value: 0 },
+      uCloudDensity: { value: 0.72 },
+      uCloudsEnabled: { value: 1.0 },
+      uLightsEnabled: { value: 1.0 },
+      uReliefScale: { value: 1.0 },
+      uAtmoIntensity: { value: 1.0 }
+    };
+
+    const earthVertexShader = /* glsl */ `
+      varying vec3 vLocalPos;
+      varying vec3 vWorldPos;
+      varying vec3 vWorldNormal;
+
+      void main() {
+        vLocalPos = position;
+        vec4 worldPosition = modelMatrix * vec4(position, 1.0);
+        vWorldPos = worldPosition.xyz;
+        vWorldNormal = normalize(mat3(modelMatrix) * normal);
+        gl_Position = projectionMatrix * viewMatrix * worldPosition;
+      }
+    `;
+
+    const earthFragmentShader = /* glsl */ `
+      uniform sampler2D uGeoMap;
+      uniform vec3 uSunDir;
+      uniform float uTime;
+      uniform float uCloudDensity;
+      uniform float uCloudsEnabled;
+      uniform float uLightsEnabled;
+      uniform float uReliefScale;
+      uniform float uAtmoIntensity;
+
+      varying vec3 vLocalPos;
+      varying vec3 vWorldPos;
+      varying vec3 vWorldNormal;
+
+      const float PI = 3.141592653589793;
+
+      ${GLSL_SIMPLEX_NOISE}
+
+      // 从局部球面单位向量采样宏观地理种子贴图
+      vec4 sampleGeo(vec3 dir) {
+        float lat = asin(clamp(dir.y, -1.0, 1.0));
+        float lon = atan(dir.x, dir.z);
+        float u = lon / (2.0 * PI) + 0.5;
+        float v = lat / PI + 0.5;
+        return texture2D(uGeoMap, vec2(u, v));
+      }
+
+      // 计算 3D 球面某点的地形高度与脊线特征
+      float getTerrainHeight(vec3 dir, float macroLand, float mountainWeight) {
+        float coastNoise = fbm4(dir * 5.2) * 0.22 + snoise(dir * 22.0) * 0.045;
+        float baseElev = (macroLand - 0.42) + coastNoise;
+        float ridges = ridged3(dir * 13.5) * (0.18 + mountainWeight * 0.95);
+        float microDetail = snoise(dir * 56.0) * 0.025;
+        return baseElev + ridges * 0.48 + microDetail;
+      }
+
+      // 计算云层密度（用于在地球表面投射逼真的云层阴影）
+      float sampleCloudShadow(vec3 dir, float time) {
+        vec3 windOffset = vec3(time * 0.012, -time * 0.003, time * 0.009);
+        vec3 p = dir * 3.1 + windOffset;
+        float warp = snoise(p * 1.4 + vec3(2.1, 4.3, -1.7)) * 0.42;
+        float c = fbm4(p + warp);
+        // 赤道与中纬度信风云带增强
+        float latBand = cos(asin(dir.y) * 2.6) * 0.08;
+        float threshold = mix(0.65, -0.18, uCloudDensity);
+        return smoothstep(threshold, threshold + 0.42, c + latBand);
+      }
+
+      void main() {
+        vec3 dir = normalize(vLocalPos);
+        vec3 N = normalize(vWorldNormal);
+        vec3 V = normalize(cameraPosition - vWorldPos);
+        vec3 L = normalize(uSunDir);
+
+        vec4 geo = sampleGeo(dir);
+        float macroLand = geo.r;
+        float mountainWeight = geo.g;
+        float desertWeight = geo.b;
+        float cityMask = geo.a;
+
+        // 精细海岸线与海拔计算
+        float coastFractal = fbm4(dir * 5.2) * 0.22 + snoise(dir * 22.0) * 0.045 + snoise(dir * 56.0) * 0.015;
+        float landSigned = (macroLand - 0.415) + coastFractal;
+        float isLand = smoothstep(-0.008, 0.008, landSigned);
+
+        float ridgeVal = ridged3(dir * 13.5);
+        float elevation = max(0.0, landSigned) + ridgeVal * (0.12 + mountainWeight * 0.85) * isLand;
+
+        // 构建局部切空间用于有限差分地形与海浪法线扰动
+        vec3 upVec = abs(N.y) < 0.99 ? vec3(0.0, 1.0, 0.0) : vec3(1.0, 0.0, 0.0);
+        vec3 T = normalize(cross(upVec, N));
+        vec3 B = cross(N, T);
+
+        vec3 perturbedN = N;
+        if (isLand > 0.02) {
+          float eps = 0.0022;
+          vec3 dirX = normalize(dir + vec3(eps, 0.0, 0.0));
+          vec3 dirZ = normalize(dir + vec3(0.0, 0.0, eps));
+          float h0 = ridgeVal * (0.2 + mountainWeight) + coastFractal * 0.5;
+          float hx = ridged3(dirX * 13.5) * (0.2 + mountainWeight) + fbm4(dirX * 5.2) * 0.11;
+          float hz = ridged3(dirZ * 13.5) * (0.2 + mountainWeight) + fbm4(dirZ * 5.2) * 0.11;
+          vec2 dH = vec2(hx - h0, hz - h0) * (3.6 * uReliefScale * isLand);
+          perturbedN = normalize(N - T * dH.x - B * dH.y);
+        } else {
+          // 海洋微浪法线扰动
+          float w1 = snoise(dir * 95.0 + vec3(uTime * 0.15, 0.0, -uTime * 0.12));
+          float w2 = snoise(dir * 180.0 - vec3(0.0, uTime * 0.18, uTime * 0.14));
+          perturbedN = normalize(N + (T * w1 + B * w2) * 0.016);
+        }
+
+        // 1. 海洋深度着色 (深海海沟 -> 大陆坡 -> 珊瑚浅滩绿松石色)
+        float oceanDepth = clamp(-landSigned * 3.2, 0.0, 1.0);
+        float bathyRidge = ridged3(dir * 8.0) * 0.25;
+        vec3 deepOceanCol = vec3(0.012, 0.048, 0.135);
+        vec3 midOceanCol  = vec3(0.028, 0.125, 0.285);
+        vec3 shelfCol     = vec3(0.055, 0.420, 0.560);
+        vec3 coralCol     = vec3(0.140, 0.680, 0.720);
+
+        vec3 oceanColor = mix(shelfCol, midOceanCol, smoothstep(0.0, 0.35, oceanDepth));
+        oceanColor = mix(oceanColor, deepOceanCol, smoothstep(0.28, 0.85, oceanDepth - bathyRidge * 0.2));
+        float coastalLagoon = smoothstep(0.09, 0.0, oceanDepth) * (0.5 + 0.5 * snoise(dir * 32.0));
+        oceanColor = mix(oceanColor, coralCol, coastalLagoon * 0.68);
+
+        // 2. 陆地生态群落着色 (热带雨林、温带森林、草原、撒哈拉红沙、高山岩石、积雪冰原)
+        float absLat = abs(dir.y);
+        float climateNoise = fbm4(dir * 9.5) * 0.18;
+        float aridity = clamp(desertWeight * 1.15 + climateNoise - mountainWeight * 0.25, 0.0, 1.0);
+        float tropical = smoothstep(0.42, 0.05, absLat) * (1.0 - aridity);
+
+        vec3 rainforestCol = vec3(0.045, 0.210, 0.065);
+        vec3 temperateCol  = vec3(0.115, 0.295, 0.095);
+        vec3 steppeCol     = vec3(0.360, 0.385, 0.180);
+        vec3 desertSandCol = vec3(0.760, 0.585, 0.380);
+        vec3 redDuneCol    = vec3(0.680, 0.410, 0.255);
+        vec3 rockMountain  = vec3(0.265, 0.235, 0.210);
+        vec3 snowCapCol    = vec3(0.940, 0.965, 1.000);
+
+        vec3 vegColor = mix(temperateCol, rainforestCol, tropical);
+        vegColor = mix(vegColor, steppeCol, smoothstep(0.18, 0.52, aridity + absLat * 0.25));
+
+        vec3 sandColor = mix(desertSandCol, redDuneCol, smoothstep(-0.2, 0.4, snoise(dir * 18.0)));
+        vec3 landColor = mix(vegColor, sandColor, smoothstep(0.32, 0.72, aridity));
+
+        // 海岸沙滩过渡
+        float beachBand = smoothstep(0.025, 0.0, landSigned) * isLand;
+        landColor = mix(landColor, vec3(0.78, 0.71, 0.54), beachBand * 0.55);
+
+        // 高山裸岩与高海拔雪线
+        float rockMask = smoothstep(0.22, 0.58, elevation);
+        landColor = mix(landColor, rockMountain, rockMask * 0.88);
+
+        float snowLine = smoothstep(0.52, 0.82, elevation + absLat * 0.48 + climateNoise * 0.2);
+        landColor = mix(landColor, snowCapCol, snowLine);
+
+        // 极地冰盖（南极洲、格陵兰与北极苔原）
+        float polarIce = smoothstep(0.70, 0.84, absLat + coastFractal * 0.25);
+        landColor = mix(landColor, snowCapCol, polarIce);
+
+        // 北极海冰浮冰效果
+        float seaIce = smoothstep(0.86, 0.94, absLat + fbm4(dir * 14.0) * 0.08) * (1.0 - isLand);
+        oceanColor = mix(oceanColor, vec3(0.82, 0.90, 0.97), seaIce * 0.85);
+
+        vec3 surfaceAlbedo = mix(oceanColor, landColor, isLand);
+
+        // 3. 光照计算：昼夜漫反射、晨昏线暮光散射、云层投影与海洋太阳镜面反射
+        float NdotL = dot(perturbedN, L);
+        float sphereNdotL = dot(N, L);
+        float dayFactor = smoothstep(-0.08, 0.16, sphereNdotL);
+        float diffuse = max(0.0, NdotL) * 0.88 + smoothstep(-0.15, 0.25, sphereNdotL) * 0.18;
+
+        // 太阳方向的云层投影
+        float cloudShadow = 0.0;
+        if (uCloudsEnabled > 0.5 && sphereNdotL > -0.1) {
+          vec3 shadowSampleDir = normalize(dir - L * 0.014);
+          cloudShadow = sampleCloudShadow(shadowSampleDir, uTime) * 0.58 * dayFactor;
+        }
+
+        // 晨昏线暖橙红大气散射带
+        float twilightBand = exp(-pow((sphereNdotL - 0.02) * 7.5, 2.0)) * smoothstep(-0.22, 0.1, sphereNdotL);
+        vec3 twilightTint = vec3(1.0, 0.42, 0.15) * twilightBand * 0.42;
+
+        // 海洋菲涅尔与太阳高光反射 (Blinn-Phong 双层高光)
+        vec3 H = normalize(L + V);
+        float NdotH = max(0.0, dot(perturbedN, H));
+        float waterMask = (1.0 - isLand) * (1.0 - seaIce) * (1.0 - cloudShadow * 0.85);
+        float specTight = pow(NdotH, 140.0) * 1.35;
+        float specWide  = pow(NdotH, 24.0) * 0.28;
+        vec3 sunSpecCol = mix(vec3(1.0, 0.58, 0.28), vec3(1.0, 0.95, 0.86), smoothstep(0.0, 0.35, sphereNdotL));
+        vec3 specular = sunSpecCol * (specTight + specWide) * waterMask * smoothstep(-0.04, 0.18, sphereNdotL);
+
+        vec3 dayColor = surfaceAlbedo * diffuse * (1.0 - cloudShadow) + twilightTint * surfaceAlbedo * 1.4 + specular;
+
+        // 4. 暗夜半球：深邃月光环境光 + 璀璨城市灯火网络
+        vec3 nightAmbient = surfaceAlbedo * vec3(0.025, 0.045, 0.095) * 0.42;
+
+        vec3 cityGlow = vec3(0.0);
+        if (uLightsEnabled > 0.5 && isLand > 0.45 && polarIce < 0.3) {
+          float nightFactor = smoothstep(0.12, -0.16, sphereNdotL);
+          if (nightFactor > 0.001 && cityMask > 0.01) {
+            // 高频城市街道网格与城际主干道纹理
+            float urbanGrid = max(0.0, snoise(dir * 75.0));
+            float subCenters = max(0.0, snoise(dir * 28.0));
+            float sparks = pow(max(0.0, snoise(dir * 190.0)), 3.0) * 2.4;
+            float flatTerrain = smoothstep(0.65, 0.12, elevation);
+
+            float lightIntensity = cityMask * flatTerrain * (
+              pow(urbanGrid, 1.8) * 1.4 +
+              pow(subCenters, 2.5) * 0.9 +
+              sparks * cityMask
+            );
+            // 海岸线与河口都市圈加密明亮
+            float coastalBoost = smoothstep(0.16, 0.01, landSigned) * 0.65 + 0.75;
+            lightIntensity *= coastalBoost * nightFactor * (1.0 - cloudShadow * 0.45);
+
+            vec3 warmGold = vec3(1.0, 0.68, 0.25);
+            vec3 brightCore = vec3(1.0, 0.94, 0.82);
+            cityGlow = mix(warmGold, brightCore, clamp(lightIntensity * 0.85, 0.0, 1.0)) * lightIntensity * 2.1;
+          }
+        }
+
+        // 5. 地表大气边缘瑞利散射雾感 (Fresnel Limb Aerial Perspective)
+        float fresnel = pow(1.0 - max(0.0, dot(N, V)), 3.4);
+        vec3 limbDayCol = vec3(0.22, 0.58, 1.0);
+        vec3 limbSunsetCol = vec3(0.98, 0.38, 0.14);
+        vec3 limbCol = mix(limbSunsetCol, limbDayCol, smoothstep(-0.1, 0.35, sphereNdotL));
+        float limbLight = smoothstep(-0.35, 0.4, sphereNdotL) * uAtmoIntensity;
+
+        vec3 finalColor = dayColor + nightAmbient * (1.0 - dayFactor * 0.8) + cityGlow;
+        finalColor = mix(finalColor, limbCol, fresnel * 0.48 * limbLight);
+
+        gl_FragColor = vec4(finalColor, 1.0);
+      }
+    `;
+
+    const earthGeom = new THREE.SphereGeometry(EARTH_RADIUS, 128, 128);
+    const earthMat = new THREE.ShaderMaterial({
+      uniforms: earthUniforms,
+      vertexShader: earthVertexShader,
+      fragmentShader: earthFragmentShader
+    });
+    const earthMesh = new THREE.Mesh(earthGeom, earthMat);
+    earthSpinGroup.add(earthMesh);
+
+    // ============================================================================
+    // 5. 动态多层体积感云层球体 (带信风旋涡与晨昏线暖光染色)
+    // ============================================================================
+    const cloudUniforms = {
+      uSunDir: earthUniforms.uSunDir,
+      uTime: earthUniforms.uTime,
+      uCloudDensity: earthUniforms.uCloudDensity
+    };
+
+    const cloudFragmentShader = /* glsl */ `
+      uniform vec3 uSunDir;
+      uniform float uTime;
+      uniform float uCloudDensity;
+
+      varying vec3 vLocalPos;
+      varying vec3 vWorldPos;
+      varying vec3 vWorldNormal;
+
+      ${GLSL_SIMPLEX_NOISE}
+
+      void main() {
+        vec3 dir = normalize(vLocalPos);
+        vec3 N = normalize(vWorldNormal);
+        vec3 V = normalize(cameraPosition - vWorldPos);
+        vec3 L = normalize(uSunDir);
+
+        vec3 windOffset = vec3(uTime * 0.012, -uTime * 0.003, uTime * 0.009);
+        vec3 p = dir * 3.1 + windOffset;
+
+        // 气流旋涡扭曲 (Domain Warping 模拟气旋与台风云系)
+        float warp1 = snoise(p * 1.4 + vec3(2.1, 4.3, -1.7));
+        float warp2 = snoise(p * 2.8 - vec3(1.5, -3.1, 2.4));
+        vec3 warpedPos = p + vec3(warp1, warp2, warp1 - warp2) * 0.34;
+
+        float baseCloud = fbm4(warpedPos);
+        float wispyDetail = fbm4(warpedPos * 3.4) * 0.32;
+        float latBand = cos(asin(dir.y) * 2.6) * 0.08;
+
+        float threshold = mix(0.65, -0.18, uCloudDensity);
+        float density = smoothstep(threshold, threshold + 0.45, baseCloud + wispyDetail * 0.5 + latBand);
+
+        if (density < 0.01) discard;
+
+        // 云层立体自阴影近似 (沿着太阳方向采样密度差)
+        float sunSample = fbm4(warpedPos + L * 0.08);
+        float selfShadow = clamp((sunSample - baseCloud) * 1.8, 0.0, 1.0);
+
+        float sphereNdotL = dot(N, L);
+        float dayLit = smoothstep(-0.16, 0.25, sphereNdotL);
+        float twilight = exp(-pow((sphereNdotL - 0.0) * 6.5, 2.0)) * smoothstep(-0.25, 0.15, sphereNdotL);
+
+        vec3 cloudBright = vec3(0.98, 0.99, 1.00);
+        vec3 cloudShade  = vec3(0.55, 0.64, 0.76);
+        vec3 sunsetCloud = vec3(1.00, 0.46, 0.22);
+        vec3 nightCloud  = vec3(0.03, 0.05, 0.10);
+
+        vec3 litCloud = mix(cloudBright, cloudShade, selfShadow * 0.65);
+        vec3 col = mix(nightCloud, litCloud, dayLit);
+        col = mix(col, sunsetCloud, twilight * 0.72);
+
+        // 视角边缘柔化
+        float edgeFade = smoothstep(0.0, 0.18, abs(dot(N, V)));
+        float alpha = clamp(density * 0.88 * edgeFade, 0.0, 0.92);
+
+        gl_FragColor = vec4(col, alpha);
+      }
+    `;
+
+    const cloudGeom = new THREE.SphereGeometry(EARTH_RADIUS * 1.012, 96, 96);
+    const cloudMat = new THREE.ShaderMaterial({
+      uniforms: cloudUniforms,
+      vertexShader: earthVertexShader,
+      fragmentShader: cloudFragmentShader,
+      transparent: true,
+      depthWrite: false
+    });
+    const cloudMesh = new THREE.Mesh(cloudGeom, cloudMat);
+    earthSpinGroup.add(cloudMesh);
+
+    // ============================================================================
+    // 6. 南北极动态极光层 (Aurora Borealis & Australis)
+    // ============================================================================
+    const auroraUniforms = {
+      uTime: earthUniforms.uTime,
+      uSunDir: earthUniforms.uSunDir,
+      uAtmoIntensity: earthUniforms.uAtmoIntensity
+    };
+
+    const auroraFragmentShader = /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uSunDir;
+      uniform float uAtmoIntensity;
+
+      varying vec3 vLocalPos;
+      varying vec3 vWorldPos;
+      varying vec3 vWorldNormal;
+
+      ${GLSL_SIMPLEX_NOISE}
+
+      void main() {
+        vec3 dir = normalize(vLocalPos);
+        float absLat = abs(dir.y);
+
+        // 极光环带集中在纬度 64° ~ 79° 之间
+        float ringMask = smoothstep(0.86, 0.93, absLat) * smoothstep(0.992, 0.955, absLat);
+        if (ringMask < 0.005) discard;
+
+        vec3 N = normalize(vWorldNormal);
+        vec3 V = normalize(cameraPosition - vWorldPos);
+
+        // 极光丝带与垂向射线波动
+        float angle = atan(dir.x, dir.z);
+        float wave1 = snoise(vec3(dir.x * 4.5 + uTime * 0.08, dir.z * 4.5 - uTime * 0.06, uTime * 0.12));
+        float curtain = sin(angle * 14.0 + wave1 * 5.5 + uTime * 0.45) * 0.5 + 0.5;
+        float rays = snoise(vec3(angle * 8.0, absLat * 24.0 - uTime * 0.3, uTime * 0.2)) * 0.5 + 0.5;
+
+        float ribbon = smoothstep(0.35, 0.88, curtain) * (0.45 + 0.55 * rays);
+
+        // 夜半球极光更璀璨，昼半球微弱
+        float nightBoost = smoothstep(0.35, -0.25, dot(N, normalize(uSunDir))) * 0.75 + 0.25;
+        float viewGrazing = smoothstep(0.0, 0.3, abs(dot(N, V)));
+
+        vec3 greenAurora = vec3(0.10, 0.98, 0.58);
+        vec3 violetAurora = vec3(0.62, 0.22, 0.98);
+        vec3 auroraCol = mix(greenAurora, violetAurora, smoothstep(0.92, 0.98, absLat + wave1 * 0.04));
+
+        float alpha = ringMask * ribbon * nightBoost * viewGrazing * 0.68 * uAtmoIntensity;
+        gl_FragColor = vec4(auroraCol * alpha * 1.4, alpha);
+      }
+    `;
+
+    const auroraGeom = new THREE.SphereGeometry(EARTH_RADIUS * 1.032, 96, 64);
+    const auroraMat = new THREE.ShaderMaterial({
+      uniforms: auroraUniforms,
+      vertexShader: earthVertexShader,
+      fragmentShader: auroraFragmentShader,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const auroraMesh = new THREE.Mesh(auroraGeom, auroraMat);
+    earthSpinGroup.add(auroraMesh);
+
+    // ============================================================================
+    // 7. 物理感瑞利/米氏散射外层大气光晕 (Rayleigh / Mie Atmosphere Halo)
+    // ============================================================================
+    const atmoUniforms = {
+      uSunDir: earthUniforms.uSunDir,
+      uAtmoIntensity: earthUniforms.uAtmoIntensity
+    };
+
+    const atmoFragmentShader = /* glsl */ `
+      uniform vec3 uSunDir;
+      uniform float uAtmoIntensity;
+
+      varying vec3 vWorldPos;
+      varying vec3 vWorldNormal;
+
+      void main() {
+        vec3 N = normalize(vWorldNormal);
+        vec3 V = normalize(cameraPosition - vWorldPos);
+        vec3 L = normalize(uSunDir);
+
+        // BackSide 渲染：边缘光学厚度
+        float viewDot = max(0.0, dot(-N, V));
+        float rim = pow(1.0 - viewDot, 2.2) * pow(viewDot, 0.65) * 3.6;
+
+        float sunDot = dot(-N, L);
+        float daySide = smoothstep(-0.45, 0.35, sunDot);
+
+        // 逆光日蚀方向米氏前向散射增强
+        float forwardScatter = pow(max(0.0, dot(-V, L)), 6.0) * smoothstep(-0.35, 0.25, sunDot);
+
+        vec3 rayleighBlue = vec3(0.18, 0.56, 1.00);
+        vec3 sunsetGold   = vec3(1.00, 0.42, 0.12);
+        float twilightMask = exp(-pow((sunDot + 0.05) * 4.2, 2.0));
+
+        vec3 scatterCol = mix(rayleighBlue, sunsetGold, clamp(twilightMask * 0.75 + forwardScatter * 0.5, 0.0, 1.0));
+        float intensity = rim * (daySide * 0.92 + 0.08 + forwardScatter * 0.85) * uAtmoIntensity;
+
+        gl_FragColor = vec4(scatterCol * intensity, clamp(intensity, 0.0, 1.0));
+      }
+    `;
+
+    const atmoGeom = new THREE.SphereGeometry(EARTH_RADIUS * 1.145, 96, 96);
+    const atmoMat = new THREE.ShaderMaterial({
+      uniforms: atmoUniforms,
+      vertexShader: earthVertexShader,
+      fragmentShader: atmoFragmentShader,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide,
+      depthWrite: false
+    });
+    const atmoMesh = new THREE.Mesh(atmoGeom, atmoMat);
+    earthSystemGroup.add(atmoMesh);
+
+    // ============================================================================
+    // 8. 全球著名城市地标信标与大圆洲际光弧 (Great-Circle Data Arcs & Beacons)
+    // ============================================================================
+    const landmarksGroup = new THREE.Group();
+    earthSpinGroup.add(landmarksGroup);
+
+    const CITIES = [
+      { name: '北京 · 中国', lat: 39.90, lon: 116.40, color: '#38bdf8' },
+      { name: '杭州 · 中国', lat: 30.27, lon: 120.15, color: '#22d3ee' },
+      { name: '东京 · 日本', lat: 35.68, lon: 139.69, color: '#60a5fa' },
+      { name: '新加坡', lat: 1.35, lon: 103.82, color: '#34d399' },
+      { name: '迪拜 · 阿联酋', lat: 25.20, lon: 55.27, color: '#fbbf24' },
+      { name: '开罗 · 埃及', lat: 30.04, lon: 31.24, color: '#f59e0b' },
+      { name: '伦敦 · 英国', lat: 51.51, lon: -0.13, color: '#818cf8' },
+      { name: '巴黎 · 法国', lat: 48.86, lon: 2.35, color: '#a78bfa' },
+      { name: '纽约 · 美国', lat: 40.71, lon: -74.01, color: '#38bdf8' },
+      { name: '旧金山 · 美国', lat: 37.77, lon: -122.42, color: '#2dd4bf' },
+      { name: '里约热内卢 · 巴西', lat: -22.91, lon: -43.17, color: '#4ade80' },
+      { name: '悉尼 · 澳大利亚', lat: -33.87, lon: 151.21, color: '#f472b6' }
+    ];
+
+    // 将经纬度转换为与球面 Shader 完全对齐的 3D 坐标
+    function latLonToVector3(latDeg, lonDeg, radius) {
+      const lat = THREE.MathUtils.degToRad(latDeg);
+      const lon = THREE.MathUtils.degToRad(lonDeg);
+      const rXZ = radius * Math.cos(lat);
+      return new THREE.Vector3(
+        rXZ * Math.sin(lon),
+        radius * Math.sin(lat),
+        rXZ * Math.cos(lon)
+      );
+    }
+
+    const cityMarkerMeshes = [];
+    const pulseRings = [];
+    const markerGeom = new THREE.SphereGeometry(0.068, 16, 16);
+    const ringGeom = new THREE.RingGeometry(0.085, 0.145, 32);
+
+    CITIES.forEach((city, idx) => {
+      const pos = latLonToVector3(city.lat, city.lon, EARTH_RADIUS * 1.004);
+      const col = new THREE.Color(city.color);
+
+      const dotMat = new THREE.MeshBasicMaterial({ color: col });
+      const dotMesh = new THREE.Mesh(markerGeom, dotMat);
+      dotMesh.position.copy(pos);
+      dotMesh.userData = { city };
+      landmarksGroup.add(dotMesh);
+      cityMarkerMeshes.push(dotMesh);
+
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: col,
+        transparent: true,
+        opacity: 0.75,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+      const ringMesh = new THREE.Mesh(ringGeom, ringMat);
+      ringMesh.position.copy(pos);
+      ringMesh.lookAt(pos.clone().multiplyScalar(2));
+      landmarksGroup.add(ringMesh);
+      pulseRings.push({ mesh: ringMesh, phase: idx * 0.55 });
+    });
+
+    // 构建洲际光弧与流动光脉冲
+    const ARC_ROUTES = [
+      [1, 0], [1, 2], [1, 3], [0, 6], [0, 9], [3, 4], [3, 11],
+      [4, 5], [4, 7], [6, 8], [7, 10], [8, 9], [2, 9], [2, 11]
+    ];
+
+    const arcUniforms = { uTime: earthUniforms.uTime };
+    const arcVertexShader = /* glsl */ `
+      attribute float aProgress;
+      varying float vProgress;
+      void main() {
+        vProgress = aProgress;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+    const arcFragmentShader = /* glsl */ `
+      uniform float uTime;
+      uniform vec3 uColorA;
+      uniform vec3 uColorB;
+      uniform float uPhase;
+      varying float vProgress;
+
+      void main() {
+        vec3 baseCol = mix(uColorA, uColorB, vProgress);
+        float head = fract(uTime * 0.38 + uPhase);
+        float dist = vProgress - head;
+        if (dist > 0.0) dist -= 1.0;
+        float pulse = exp(dist * 9.5) * step(-0.45, dist);
+        float endFade = smoothstep(0.0, 0.08, vProgress) * smoothstep(1.0, 0.92, vProgress);
+        vec3 finalCol = baseCol * 0.55 + vec3(0.85, 0.97, 1.0) * pulse * 1.6;
+        float alpha = (0.22 + pulse * 0.78) * endFade;
+        gl_FragColor = vec4(finalCol, alpha);
+      }
+    `;
+
+    ARC_ROUTES.forEach(([iA, iB], idx) => {
+      const cA = CITIES[iA];
+      const cB = CITIES[iB];
+      const pA = latLonToVector3(cA.lat, cA.lon, EARTH_RADIUS * 1.004);
+      const pB = latLonToVector3(cB.lat, cB.lon, EARTH_RADIUS * 1.004);
+
+      const dist = pA.distanceTo(pB);
+      const mid = pA.clone().add(pB).multiplyScalar(0.5).normalize().multiplyScalar(EARTH_RADIUS + dist * 0.28 + 0.35);
+      const ctrl1 = pA.clone().lerp(mid, 0.55).normalize().multiplyScalar(EARTH_RADIUS + dist * 0.22 + 0.25);
+      const ctrl2 = pB.clone().lerp(mid, 0.55).normalize().multiplyScalar(EARTH_RADIUS + dist * 0.22 + 0.25);
+
+      const curve = new THREE.CubicBezierCurve3(pA, ctrl1, ctrl2, pB);
+      const segments = 64;
+      const pts = curve.getPoints(segments);
+      const geom = new THREE.BufferGeometry().setFromPoints(pts);
+
+      const progressArr = new Float32Array(segments + 1);
+      for (let i = 0; i <= segments; i++) progressArr[i] = i / segments;
+      geom.setAttribute('aProgress', new THREE.BufferAttribute(progressArr, 1));
+
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: arcUniforms.uTime,
+          uColorA: { value: new THREE.Color(cA.color) },
+          uColorB: { value: new THREE.Color(cB.color) },
+          uPhase: { value: (idx * 0.19) % 1.0 }
+        },
+        vertexShader: arcVertexShader,
+        fragmentShader: arcFragmentShader,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      const line = new THREE.Line(geom, mat);
+      landmarksGroup.add(line);
+    });
+
+    // ============================================================================
+    // 9. 近地轨道卫星系统 (LEO / MEO Satellites & Orbital Rings)
+    // ============================================================================
+    const satelliteGroup = new THREE.Group();
+    earthSystemGroup.add(satelliteGroup);
+
+    const satellites = [];
+    const satConfigs = [
+      { radius: EARTH_RADIUS * 1.18, incX: 0.65, incZ: 0.32, speed: 0.52, color: 0x38bdf8 },
+      { radius: EARTH_RADIUS * 1.26, incX: -0.92, incZ: 0.45, speed: -0.38, color: 0xa78bfa },
+      { radius: EARTH_RADIUS * 1.35, incX: 0.22, incZ: -0.78, speed: 0.29, color: 0x34d399 }
+    ];
+
+    satConfigs.forEach((cfg, idx) => {
+      const orbitHolder = new THREE.Group();
+      orbitHolder.rotation.x = cfg.incX;
+      orbitHolder.rotation.z = cfg.incZ;
+      satelliteGroup.add(orbitHolder);
+
+      // 纤细轨道环
+      const orbitPts = [];
+      for (let i = 0; i <= 128; i++) {
+        const a = (i / 128) * Math.PI * 2;
+        orbitPts.push(new THREE.Vector3(Math.cos(a) * cfg.radius, 0, Math.sin(a) * cfg.radius));
+      }
+      const orbitGeom = new THREE.BufferGeometry().setFromPoints(orbitPts);
+      const orbitMat = new THREE.LineBasicMaterial({
+        color: cfg.color,
+        transparent: true,
+        opacity: 0.16,
+        blending: THREE.AdditiveBlending
+      });
+      orbitHolder.add(new THREE.Line(orbitGeom, orbitMat));
+
+      // 卫星本体（主体 + 太阳翼 + 信号光点）
+      const satMesh = new THREE.Group();
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(0.09, 0.09, 0.14),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      const panel = new THREE.Mesh(
+        new THREE.BoxGeometry(0.42, 0.015, 0.10),
+        new THREE.MeshBasicMaterial({ color: cfg.color })
+      );
+      satMesh.add(body, panel);
+      orbitHolder.add(satMesh);
+
+      satellites.push({
+        mesh: satMesh,
+        radius: cfg.radius,
+        speed: cfg.speed,
+        angle: idx * 2.1
+      });
+    });
+
+    // ============================================================================
+    // 10. 程序化月球、太阳日冕辉光与深空银河星空
+    // ============================================================================
+    // --- (A) 3D 程序化月球 ---
+    const moonUniforms = {
+      uSunDir: earthUniforms.uSunDir
+    };
+    const moonFragmentShader = /* glsl */ `
+      uniform vec3 uSunDir;
+      varying vec3 vLocalPos;
+      varying vec3 vWorldNormal;
+
+      ${GLSL_SIMPLEX_NOISE}
+
+      void main() {
+        vec3 dir = normalize(vLocalPos);
+        vec3 N = normalize(vWorldNormal);
+        vec3 L = normalize(uSunDir);
+
+        // 月海 (Maria) 与高地陨石坑分形纹理
+        float maria = smoothstep(-0.1, 0.35, fbm4(dir * 2.4));
+        float craters = ridged3(dir * 9.5) * 0.35 + snoise(dir * 28.0) * 0.08;
+        vec3 highlandCol = vec3(0.66, 0.65, 0.62);
+        vec3 mariaCol    = vec3(0.32, 0.33, 0.36);
+
+        vec3 albedo = mix(mariaCol, highlandCol, maria) * (0.82 + craters * 0.35);
+        float diff = max(0.03, dot(N, L));
+        gl_FragColor = vec4(albedo * diff * 1.25, 1.0);
+      }
+    `;
+
+    const moonMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(1.15, 48, 48),
+      new THREE.ShaderMaterial({
+        uniforms: moonUniforms,
+        vertexShader: earthVertexShader,
+        fragmentShader: moonFragmentShader
+      })
+    );
+    scene.add(moonMesh);
+
+    // --- (B) 太阳日冕与星芒 Sprite ---
+    function createSunFlareTexture() {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 512;
+      const ctx = c.getContext('2d');
+      const cx = 256, cy = 256;
+
+      const grad = ctx.createRadialGradient(cx, cy, 4, cx, cy, 250);
+      grad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+      grad.addColorStop(0.12, 'rgba(255, 244, 214, 0.92)');
+      grad.addColorStop(0.32, 'rgba(255, 190, 95, 0.42)');
+      grad.addColorStop(0.65, 'rgba(255, 120, 40, 0.10)');
+      grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 星芒射线
+      ctx.save();
+      ctx.translate(cx, cy);
+      for (let i = 0; i < 8; i++) {
+        ctx.rotate(Math.PI / 4);
+        const rayGrad = ctx.createLinearGradient(-240, 0, 240, 0);
+        rayGrad.addColorStop(0, 'rgba(255,220,160,0)');
+        rayGrad.addColorStop(0.5, i % 2 === 0 ? 'rgba(255,245,220,0.45)' : 'rgba(255,220,160,0.22)');
+        rayGrad.addColorStop(1, 'rgba(255,220,160,0)');
+        ctx.fillStyle = rayGrad;
+        ctx.fillRect(-240, -2.2, 480, 4.4);
+      }
+      ctx.restore();
+
+      const tex = new THREE.CanvasTexture(c);
+      return tex;
+    }
+
+    const sunSprite = new THREE.Sprite(
+      new THREE.SpriteMaterial({
+        map: createSunFlareTexture(),
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        transparent: true
+      })
+    );
+    sunSprite.scale.set(28, 28, 1);
+    scene.add(sunSprite);
+
+    // --- (C) 深空多色温闪烁星空 + 银河星云天球 ---
+    function createStarfield() {
+      const starCount = 5500;
+      const positions = new Float32Array(starCount * 3);
+      const colors = new Float32Array(starCount * 3);
+      const sizes = new Float32Array(starCount);
+      const phases = new Float32Array(starCount);
+
+      const palette = [
+        new THREE.Color('#9bbcff'), // O/B 蓝白星
+        new THREE.Color('#cad8ff'), // A 白星
+        new THREE.Color('#fff4ea'), // F/G 黄白恒星
+        new THREE.Color('#ffd2a1'), // K 橙色星
+        new THREE.Color('#ffcc6f')  // M 红巨星
+      ];
+
+      for (let i = 0; i < starCount; i++) {
+        const r = 180 + Math.random() * 240;
+        const theta = Math.random() * Math.PI * 2;
+        // 让部分恒星聚集在银河盘面附近
+        const isGalacticPlane = Math.random() < 0.42;
+        const u = isGalacticPlane
+          ? (Math.random() - 0.5) * 0.38
+          : (Math.random() * 2 - 1);
+        const phi = Math.acos(THREE.MathUtils.clamp(u, -1, 1));
+
+        let v = new THREE.Vector3(
+          r * Math.sin(phi) * Math.cos(theta),
+          r * Math.cos(phi),
+          r * Math.sin(phi) * Math.sin(theta)
+        );
+        // 旋转银道面倾角
+        v.applyAxisAngle(new THREE.Vector3(1, 0, 0.6).normalize(), 0.72);
+
+        positions[i * 3] = v.x;
+        positions[i * 3 + 1] = v.y;
+        positions[i * 3 + 2] = v.z;
+
+        const c = palette[Math.floor(Math.random() * palette.length)];
+        const brightness = 0.55 + Math.random() * 0.45;
+        colors[i * 3] = c.r * brightness;
+        colors[i * 3 + 1] = c.g * brightness;
+        colors[i * 3 + 2] = c.b * brightness;
+
+        sizes[i] = (Math.random() < 0.08 ? 2.6 + Math.random() * 1.8 : 0.9 + Math.random() * 1.4);
+        phases[i] = Math.random() * Math.PI * 2;
+      }
+
+      const geom = new THREE.BufferGeometry();
+      geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      geom.setAttribute('aSize', new THREE.BufferAttribute(sizes, 1));
+      geom.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+
+      const mat = new THREE.ShaderMaterial({
+        uniforms: {
+          uTime: earthUniforms.uTime,
+          uPixelRatio: { value: renderer.getPixelRatio() }
+        },
+        vertexShader: /* glsl */ `
+          attribute float aSize;
+          attribute float aPhase;
+          varying vec3 vColor;
+          varying float vTwinkle;
+          uniform float uTime;
+          uniform float uPixelRatio;
+
+          void main() {
+            vColor = color;
+            vTwinkle = 0.72 + 0.28 * sin(uTime * 2.2 + aPhase);
+            vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+            gl_PointSize = aSize * uPixelRatio * vTwinkle;
+            gl_Position = projectionMatrix * mvPos;
+          }
+        `,
+        fragmentShader: /* glsl */ `
+          varying vec3 vColor;
+          varying float vTwinkle;
+          void main() {
+            float d = length(gl_PointCoord - vec2(0.5));
+            if (d > 0.5) discard;
+            float glow = smoothstep(0.5, 0.05, d);
+            gl_FragColor = vec4(vColor * vTwinkle, glow);
+          }
+        `,
+        transparent: true,
+        vertexColors: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
+      });
+
+      return new THREE.Points(geom, mat);
+    }
+
+    scene.add(createStarfield());
+
+    // ============================================================================
+    // 11. 交互控制、预设切换与双击城市聚焦动画
+    // ============================================================================
+    const state = {
+      sunAngleDeg: 42,
+      rotSpeed: 1.0,
+      moonAngle: 0.85,
+      moonEnabled: true,
+      targetCamPos: null,
+      targetSpinY: null
+    };
+
+    function updateSunDirection(angleDeg) {
+      const rad = THREE.MathUtils.degToRad(angleDeg);
+      const sunDir = new THREE.Vector3(
+        Math.sin(rad),
+        Math.sin(rad * 0.5) * 0.24,
+        Math.cos(rad)
+      ).normalize();
+      earthUniforms.uSunDir.value.copy(sunDir);
+      sunSprite.position.copy(sunDir).multiplyScalar(145);
+
+      // 更新左下角遥测直射点经纬度显示
+      const subLat = THREE.MathUtils.radToDeg(Math.asin(sunDir.y)).toFixed(1);
+      const subLon = (((angleDeg % 360) + 540) % 360 - 180).toFixed(1);
+      const latSuffix = subLat >= 0 ? 'N' : 'S';
+      const lonSuffix = subLon >= 0 ? 'E' : 'W';
+      document.getElementById('hudSubsolar').textContent =
+        `${Math.abs(subLat)}°${latSuffix}, ${Math.abs(subLon)}°${lonSuffix}`;
+    }
+
+    updateSunDirection(state.sunAngleDeg);
+
+    // 面板折叠控制
+    const controlPanel = document.getElementById('controlPanel');
+    const panelToggleBtn = document.getElementById('panelToggleBtn');
+    document.getElementById('panelHeader').addEventListener('click', () => {
+      const collapsed = controlPanel.classList.toggle('collapsed');
+      panelToggleBtn.textContent = collapsed ? '展开' : '收起';
+    });
+
+    // 滑块事件绑定
+    const sunAngleSlider = document.getElementById('sunAngleSlider');
+    const sunAngleVal = document.getElementById('sunAngleVal');
+    sunAngleSlider.addEventListener('input', (e) => {
+      state.sunAngleDeg = parseFloat(e.target.value);
+      sunAngleVal.textContent = `${state.sunAngleDeg}°`;
+      updateSunDirection(state.sunAngleDeg);
+    });
+
+    const rotSpeedSlider = document.getElementById('rotSpeedSlider');
+    const rotSpeedVal = document.getElementById('rotSpeedVal');
+    rotSpeedSlider.addEventListener('input', (e) => {
+      state.rotSpeed = parseFloat(e.target.value);
+      rotSpeedVal.textContent = `${state.rotSpeed.toFixed(1)}x`;
+    });
+
+    const cloudSlider = document.getElementById('cloudSlider');
+    const cloudVal = document.getElementById('cloudVal');
+    cloudSlider.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      cloudVal.textContent = `${v}%`;
+      earthUniforms.uCloudDensity.value = v / 100;
+    });
+
+    const atmoSlider = document.getElementById('atmoSlider');
+    const atmoVal = document.getElementById('atmoVal');
+    atmoSlider.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      atmoVal.textContent = `${v}%`;
+      earthUniforms.uAtmoIntensity.value = v / 100;
+    });
+
+    const reliefSlider = document.getElementById('reliefSlider');
+    const reliefVal = document.getElementById('reliefVal');
+    reliefSlider.addEventListener('input', (e) => {
+      const v = parseInt(e.target.value, 10);
+      reliefVal.textContent = `${v}%`;
+      earthUniforms.uReliefScale.value = v / 100;
+    });
+
+    // 开关芯片切换
+    document.querySelectorAll('.chip-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const isOn = btn.classList.toggle('on');
+        const key = btn.dataset.toggle;
+        if (key === 'clouds') {
+          cloudMesh.visible = isOn;
+          earthUniforms.uCloudsEnabled.value = isOn ? 1.0 : 0.0;
+        } else if (key === 'lights') {
+          earthUniforms.uLightsEnabled.value = isOn ? 1.0 : 0.0;
+        } else if (key === 'aurora') {
+          auroraMesh.visible = isOn;
+        } else if (key === 'arcs') {
+          landmarksGroup.visible = isOn;
+        } else if (key === 'satellites') {
+          satelliteGroup.visible = isOn;
+        } else if (key === 'moon') {
+          state.moonEnabled = isOn;
+          moonMesh.visible = isOn;
+        }
+      });
+    });
+
+    // 预设模式切换
+    const presetButtons = document.querySelectorAll('.preset-btn');
+    presetButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        presetButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const mode = btn.dataset.preset;
+
+        if (mode === 'day') {
+          state.sunAngleDeg = 42;
+          earthUniforms.uCloudDensity.value = 0.72;
+          earthUniforms.uAtmoIntensity.value = 1.0;
+        } else if (mode === 'night') {
+          state.sunAngleDeg = 215;
+          earthUniforms.uCloudDensity.value = 0.42;
+          earthUniforms.uAtmoIntensity.value = 1.25;
+        } else if (mode === 'dawn') {
+          state.sunAngleDeg = 128;
+          earthUniforms.uCloudDensity.value = 0.65;
+          earthUniforms.uAtmoIntensity.value = 1.45;
+        } else if (mode === 'cyber') {
+          state.sunAngleDeg = 195;
+          earthUniforms.uCloudDensity.value = 0.28;
+          earthUniforms.uAtmoIntensity.value = 1.3;
+          landmarksGroup.visible = true;
+          document.querySelector('[data-toggle="arcs"]').classList.add('on');
+        }
+
+        sunAngleSlider.value = state.sunAngleDeg;
+        sunAngleVal.textContent = `${state.sunAngleDeg}°`;
+        cloudSlider.value = Math.round(earthUniforms.uCloudDensity.value * 100);
+        cloudVal.textContent = `${cloudSlider.value}%`;
+        atmoSlider.value = Math.round(earthUniforms.uAtmoIntensity.value * 100);
+        atmoVal.textContent = `${atmoSlider.value}%`;
+        updateSunDirection(state.sunAngleDeg);
+      });
+    });
+
+    // 鼠标悬停地标检测与双击丝滑聚焦
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2(-99, -99);
+    const cityTooltip = document.getElementById('cityTooltip');
+
+    window.addEventListener('pointermove', (e) => {
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      if (!landmarksGroup.visible) {
+        cityTooltip.classList.remove('visible');
+        return;
+      }
+
+      raycaster.setFromCamera(pointer, camera);
+      const hits = raycaster.intersectObjects(cityMarkerMeshes, false);
+      if (hits.length > 0) {
+        const city = hits[0].object.userData.city;
+        const latStr = `${Math.abs(city.lat).toFixed(1)}°${city.lat >= 0 ? 'N' : 'S'}`;
+        const lonStr = `${Math.abs(city.lon).toFixed(1)}°${city.lon >= 0 ? 'E' : 'W'}`;
+        cityTooltip.innerHTML = `${city.name}<span class="coords">${latStr}, ${lonStr}</span>`;
+        cityTooltip.style.left = `${e.clientX}px`;
+        cityTooltip.style.top = `${e.clientY}px`;
+        cityTooltip.classList.add('visible');
+        document.body.style.cursor = 'pointer';
+      } else {
+        cityTooltip.classList.remove('visible');
+        document.body.style.cursor = 'default';
+      }
+    });
+
+    // 双击地球任意位置或城市地标平滑聚焦镜头
+    window.addEventListener('dblclick', (e) => {
+      if (e.target.closest('#controlPanel') || e.target.closest('.back-btn')) return;
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const hits = raycaster.intersectObject(earthMesh, false);
+      if (hits.length > 0) {
+        const hitNormal = hits[0].point.clone().normalize();
+        state.targetCamPos = hitNormal.multiplyScalar(14.5);
+      }
+    });
+
+    // 取消相机自动聚焦当用户手动拖拽时
+    controls.addEventListener('start', () => {
+      state.targetCamPos = null;
+    });
+
+    // ============================================================================
+    // 12. 窗口自适应与主渲染循环 (稳定 60 FPS)
+    // ============================================================================
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    const hudAlt = document.getElementById('hudAlt');
+    const hudFps = document.getElementById('hudFps');
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let fpsAccum = 0;
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // FPS 统计与轨道高度遥测更新
+      frameCount++;
+      fpsAccum += dt;
+      if (fpsAccum >= 0.5) {
+        const fps = Math.min(60, Math.round(frameCount / fpsAccum));
+        hudFps.textContent = `${fps} FPS`;
+        const dist = camera.position.length();
+        const altKm = Math.max(400, Math.round((dist - EARTH_RADIUS) * 1250));
+        hudAlt.textContent = `${altKm.toLocaleString()} km`;
+        frameCount = 0;
+        fpsAccum = 0;
+      }
+
+      earthUniforms.uTime.value += dt;
+
+      // 地球自转与云层差速旋转
+      earthSpinGroup.rotation.y += dt * 0.055 * state.rotSpeed;
+      cloudMesh.rotation.y += dt * 0.012 * (0.4 + state.rotSpeed * 0.6);
+
+      // 城市地标脉冲光环动画
+      const t = earthUniforms.uTime.value;
+      for (let i = 0; i < pulseRings.length; i++) {
+        const item = pulseRings[i];
+        const cycle = (t * 0.9 + item.phase) % 1.0;
+        const scale = 0.8 + cycle * 2.2;
+        item.mesh.scale.set(scale, scale, 1);
+        item.mesh.material.opacity = (1.0 - cycle) * 0.85;
+      }
+
+      // 近地轨道卫星运行
+      for (let i = 0; i < satellites.length; i++) {
+        const sat = satellites[i];
+        sat.angle += dt * sat.speed;
+        sat.mesh.position.set(
+          Math.cos(sat.angle) * sat.radius,
+          0,
+          Math.sin(sat.angle) * sat.radius
+        );
+        sat.mesh.rotation.y = -sat.angle;
+      }
+
+      // 月球公转
+      if (state.moonEnabled) {
+        state.moonAngle += dt * 0.035;
+        const moonDist = 38.0;
+        moonMesh.position.set(
+          Math.cos(state.moonAngle) * moonDist,
+          Math.sin(state.moonAngle * 0.7) * 4.2,
+          Math.sin(state.moonAngle) * moonDist
+        );
+        moonMesh.rotation.y = -state.moonAngle + Math.PI * 0.5;
+      }
+
+      // 双击平滑相机过渡
+      if (state.targetCamPos) {
+        camera.position.lerp(state.targetCamPos, Math.min(1.0, dt * 4.5));
+        if (camera.position.distanceTo(state.targetCamPos) < 0.08) {
+          state.targetCamPos = null;
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    requestAnimationFrame(animate);
+  </script>
+  <script src="../prompt-panel.js" data-id="earth-web"></script>
+</body>
+</html>

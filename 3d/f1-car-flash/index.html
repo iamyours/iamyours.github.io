@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>梅赛德斯-AMG F1 赛车 - 体素艺术 (Voxel Art)</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0f14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    /* 返回按钮 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 100;
+      padding: 8px 16px;
+      background: rgba(254, 250, 240, 0.88);
+      color: #1a1a1a;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 9999px;
+      backdrop-filter: blur(10px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .back-btn:hover {
+      background: rgba(255, 255, 255, 0.98);
+      transform: translateY(-1px) scale(1.02);
+      box-shadow: 0 6px 18px rgba(0, 210, 190, 0.35);
+      color: #008778;
+    }
+
+    /* 右上角/底部控制控制面板 */
+    .hud-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      background: rgba(13, 20, 26, 0.82);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(0, 210, 190, 0.28);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #e2f1f1;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 210, 190, 0.05);
+      max-width: 340px;
+      width: calc(100% - 36px);
+      pointer-events: auto;
+    }
+    @media (min-width: 640px) {
+      .hud-panel {
+        width: 320px;
+      }
+    }
+    .hud-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 8px;
+    }
+    .hud-title {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      color: #00d2be;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      text-transform: uppercase;
+    }
+    .hud-title::before {
+      content: '';
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      background: #00d2be;
+      border-radius: 2px;
+      box-shadow: 0 0 8px #00d2be;
+    }
+    .hud-badge {
+      font-size: 11px;
+      background: rgba(224, 0, 36, 0.2);
+      color: #ff334b;
+      border: 1px solid rgba(224, 0, 36, 0.4);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    .btn-group {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+    .hud-btn {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #c0d5d5;
+      font-size: 12px;
+      padding: 7px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-align: center;
+      font-weight: 500;
+    }
+    .hud-btn:hover {
+      background: rgba(0, 210, 190, 0.15);
+      color: #ffffff;
+      border-color: rgba(0, 210, 190, 0.5);
+    }
+    .hud-btn.active {
+      background: #00d2be;
+      color: #051414;
+      font-weight: 700;
+      border-color: #00d2be;
+      box-shadow: 0 0 12px rgba(0, 210, 190, 0.45);
+    }
+    .hud-sublabel {
+      font-size: 11px;
+      color: #799a9a;
+      margin-bottom: -2px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .hud-tips {
+      font-size: 11px;
+      color: #5d7e82;
+      text-align: center;
+      line-height: 1.4;
+      margin-top: 4px;
+    }
+
+    /* 速度仪表与HUD状态 */
+    .speedo {
+      position: fixed;
+      bottom: 22px;
+      left: 22px;
+      z-index: 90;
+      background: rgba(11, 17, 23, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 10px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+      color: #fff;
+    }
+    .speedo-num {
+      font-size: 32px;
+      font-weight: 900;
+      font-family: monospace;
+      color: #00d2be;
+      text-shadow: 0 0 10px rgba(0, 210, 190, 0.6);
+      min-width: 55px;
+      text-align: right;
+    }
+    .speedo-unit {
+      font-size: 12px;
+      color: #7d9ba1;
+      font-weight: 600;
+    }
+    .drs-badge {
+      margin-left: 8px;
+      padding: 3px 6px;
+      background: #143530;
+      color: #00f0d8;
+      border: 1px solid #00d2be;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 返回按钮 -->
+  <a href="../" class="back-btn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 12H5M12 19l-7-7 7-7"/>
+    </svg>
+    返回 3D 作品
+  </a>
+
+  <!-- 仪表显示 -->
+  <div class="speedo" id="speedo-box">
+    <span class="speedo-num" id="speedo-val">312</span>
+    <span class="speedo-unit">KM/H</span>
+    <span class="drs-badge" id="drs-tag">DRS OPEN</span>
+  </div>
+
+  <!-- HUD控制面板 -->
+  <div class="hud-panel">
+    <div class="hud-header">
+      <div class="hud-title">W15 E PERFORMANCE</div>
+      <div class="hud-badge">#44 HAM</div>
+    </div>
+
+    <div class="hud-sublabel">展示模式 (Display Mode)</div>
+    <div class="btn-group">
+      <button class="hud-btn active" id="btn-mode-race">高速飞驰模式</button>
+      <button class="hud-btn" id="btn-mode-turntable">展台全景模式</button>
+    </div>
+
+    <div class="hud-sublabel">环境灯光 (Environment)</div>
+    <div class="btn-group">
+      <button class="hud-btn active" id="btn-env-day">赛道日光</button>
+      <button class="hud-btn" id="btn-env-night">夜赛霓虹 (滨海湾)</button>
+    </div>
+
+    <div class="hud-sublabel">预设镜头视角 (Camera Views)</div>
+    <div class="btn-group">
+      <button class="hud-btn" id="btn-cam-persp">前侧 45°</button>
+      <button class="hud-btn" id="btn-cam-cockpit">T-Cam座舱</button>
+      <button class="hud-btn" id="btn-cam-side">车侧水平</button>
+      <button class="hud-btn" id="btn-cam-top">赛道鸟瞰</button>
+    </div>
+
+    <div class="hud-tips">
+      鼠标拖拽旋转 · 滚轮缩放 · 右键平移
+    </div>
+  </div>
+
+  <div id="webgl-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // -------------------------------------------------------------
+    // 1. 全局配置与状态
+    // -------------------------------------------------------------
+    const VOXEL_SIZE = 0.12; // 体素单位基准尺寸
+    const state = {
+      mode: 'race', // 'race' | 'turntable'
+      env: 'day',   // 'day' | 'night'
+      speed: 318,
+      wheelSpeed: 28,
+      sparkIntensity: 1.0,
+      targetCamPos: null,
+      targetLookAt: null
+    };
+
+    const container = document.getElementById('webgl-container');
+    const width = window.innerWidth;
+    const height = window.innerHeight;
+
+    // 渲染器
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    container.appendChild(renderer.domElement);
+
+    // 场景与摄像机
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0e141b);
+    scene.fog = new THREE.FogExp2(0x0e141b, 0.015);
+
+    const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 150);
+    camera.position.set(-5.5, 3.2, 7.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI / 2 - 0.03; // 防止穿透地面
+    controls.minDistance = 2.5;
+    controls.maxDistance = 35;
+    controls.target.set(0, 0.7, 0);
+
+    // -------------------------------------------------------------
+    // 2. 光照系统
+    // -------------------------------------------------------------
+    const hemiLight = new THREE.HemisphereLight(0xdff0ff, 0x141f27, 0.85);
+    scene.add(hemiLight);
+
+    const dirLight = new THREE.DirectionalLight(0xfffaed, 2.2);
+    dirLight.position.set(12, 18, 10);
+    dirLight.castShadow = true;
+    dirLight.shadow.mapSize.width = 2048;
+    dirLight.shadow.mapSize.height = 2048;
+    dirLight.shadow.camera.near = 0.5;
+    dirLight.shadow.camera.far = 45;
+    const d = 9;
+    dirLight.shadow.camera.left = -d;
+    dirLight.shadow.camera.right = d;
+    dirLight.shadow.camera.top = d;
+    dirLight.shadow.camera.bottom = -d;
+    dirLight.shadow.bias = -0.0006;
+    scene.add(dirLight);
+
+    // 霓虹夜景补光灯组
+    const neonCyan = new THREE.PointLight(0x00ffd0, 0, 20);
+    neonCyan.position.set(0, 3, 4);
+    scene.add(neonCyan);
+
+    const neonMagenta = new THREE.PointLight(0xff0055, 0, 20);
+    neonMagenta.position.set(0, 2.5, -4);
+    scene.add(neonMagenta);
+
+    function updateLighting() {
+      if (state.env === 'day') {
+        scene.background.set(0x131a24);
+        scene.fog.color.set(0x131a24);
+        hemiLight.color.set(0xdff0ff);
+        hemiLight.groundColor.set(0x1a252f);
+        hemiLight.intensity = 0.9;
+        dirLight.intensity = 2.4;
+        dirLight.color.set(0xfffaee);
+        neonCyan.intensity = 0;
+        neonMagenta.intensity = 0;
+      } else {
+        scene.background.set(0x05070a);
+        scene.fog.color.set(0x05070a);
+        hemiLight.color.set(0x223547);
+        hemiLight.groundColor.set(0x080c10);
+        hemiLight.intensity = 0.4;
+        dirLight.intensity = 0.6;
+        dirLight.color.set(0x88bbff);
+        neonCyan.intensity = 3.5;
+        neonMagenta.intensity = 3.0;
+      }
+    }
+
+    // -------------------------------------------------------------
+    // 3. 体素材质调色板 (Mercedes-AMG F1 专属)
+    // -------------------------------------------------------------
+    // 经典配方：亚光黑色碳纤维底盘、银箭 Silver Arrow、Petronas 绿、INEOS 勃艮第红、软胎红带
+    const COLOR_DEF = {
+      BLACK: 0x111315,      // 极速暗夜黑 (Stealth Matte Black)
+      CARBON: 0x1c1e22,     // 碳纤维暗灰
+      SILVER: 0xd8dde2,     // 银箭银 (Mercedes Silver)
+      PETRONAS: 0x00d2be,   // 标志性蒂芙尼绿/马来西亚国家石油绿
+      PETRONAS_LIGHT: 0x5affec, // 高光荧光绿
+      INEOS_RED: 0xdf0024,  // 英力士红 (进气道/翼端板)
+      WHITE: 0xf5f8fa,      // 赞助商字样/白色号牌
+      YELLOW_ACCENT: 0xffd000, // 44号亮黄/荧光细节
+      TIRE_RUBBER: 0x1a1b1d, // 橡胶光头胎
+      WHEEL_RIM: 0x090a0b,   // 轮毂及气动轮罩
+      TIRE_LINE: 0xdf0024,  // 倍耐力软胎红标边线 (P Zero Red)
+      HALO_TITANIUM: 0x3a3f45,// Halo 钛合金保护环
+      COCKPIT_INSIDE: 0x08090a,
+      DRIVER_SUIT: 0xf0f0f0, // 汉密尔顿白色连体赛车服
+      HELMET_YELLOW: 0xffe600, // 汉密尔顿标志性黄头盔
+      VISOR_PURPLE: 0x5b2282,  // 护目镜幻彩紫
+      RED_TAILLIGHT: 0xff0022  // 雨战/能量回收尾灯
+    };
+
+    // 采用带圆角感与微弱倒角质感的 BoxGeometry 构建体素
+    const boxGeo = new THREE.BoxGeometry(VOXEL_SIZE * 0.96, VOXEL_SIZE * 0.96, VOXEL_SIZE * 0.96);
+    
+    // 使用统一的 MeshStandardMaterial 材质，按颜色实例化或者批处理
+    const voxelMatCache = new Map();
+    function getVoxelMaterial(colorHex, roughness = 0.55, metalness = 0.25, emissive = 0x000000, emissiveIntensity = 0) {
+      const key = `${colorHex}_${roughness}_${metalness}_${emissive}_${emissiveIntensity}`;
+      if (!voxelMatCache.has(key)) {
+        const mat = new THREE.MeshStandardMaterial({
+          color: colorHex,
+          roughness: roughness,
+          metalness: metalness,
+          emissive: emissive,
+          emissiveIntensity: emissiveIntensity,
+        });
+        voxelMatCache.set(key, mat);
+      }
+      return voxelMatCache.get(key);
+    }
+
+    // -------------------------------------------------------------
+    // 4. 构建体素赛车模型
+    // -------------------------------------------------------------
+    const carRoot = new THREE.Group();
+    scene.add(carRoot);
+
+    // 存储静态车身的所有体素坐标与颜色
+    const bodyVoxels = [];
+    function addV(x, y, z, color) {
+      bodyVoxels.push({ x, y, z, c: color });
+    }
+
+    // A. 鼻锥与前部碰撞结构 (Nose cone & Front Wing)
+    // 鼻锥向前端逐渐收窄下倾
+    for (let z = 6; z <= 24; z++) {
+      const taper = Math.max(1, Math.round(3.2 - (z - 6) * 0.12));
+      const y = Math.round(2.6 - (z - 6) * 0.04);
+      for (let x = -taper; x <= taper; x++) {
+        let color = COLOR_DEF.BLACK;
+        // 银黑渐变与 Petronas 绿线条
+        if (z > 14 && Math.abs(x) === taper) color = COLOR_DEF.PETRONAS;
+        else if (z > 12 && z < 18 && (x === 0)) color = COLOR_DEF.PETRONAS;
+        else if (z >= 22) color = COLOR_DEF.BLACK;
+        else if (z % 2 === 0 && Math.abs(x) === 1) color = COLOR_DEF.SILVER;
+        addV(x, y, z, color);
+      }
+    }
+    // 汉密尔顿 #44 号牌与鼻锥尖端三叉星徽标识点
+    addV(0, 3, 11, COLOR_DEF.YELLOW_ACCENT); // 44黄
+    addV(1, 3, 11, COLOR_DEF.YELLOW_ACCENT);
+    addV(0, 3, 12, COLOR_DEF.YELLOW_ACCENT);
+    addV(0, 2, 23, COLOR_DEF.SILVER); // 车标点
+
+    // 前翼组件 (Front Wing) - 具有丰富阶梯翼板、端板与外撇导流槽
+    for (let z = 23; z <= 26; z++) {
+      for (let x = -13; x <= 13; x++) {
+        if (Math.abs(x) <= 2 && z === 26) continue; // 避开尖端气流区
+        let color = COLOR_DEF.BLACK;
+        if (z === 25 && Math.abs(x) > 3) color = COLOR_DEF.PETRONAS; // 主翼绿线
+        if (z === 24 && Math.abs(x) > 4 && Math.abs(x) < 12) color = COLOR_DEF.SILVER;
+        addV(x, 1, z, color);
+      }
+    }
+    // 二层上扬前翼襟翼 (Flaps)
+    for (let z = 22; z <= 24; z++) {
+      for (let x = -12; x <= 12; x++) {
+        if (Math.abs(x) > 2) {
+          addV(x, 2, z, (Math.abs(x) % 3 === 0) ? COLOR_DEF.PETRONAS : COLOR_DEF.CARBON);
+        }
+      }
+    }
+    // 前翼端板 (Endplates)
+    for (let y = 1; y <= 4; y++) {
+      for (let z = 22; z <= 26; z++) {
+        addV(-13, y, z, (z === 25) ? COLOR_DEF.PETRONAS : COLOR_DEF.BLACK);
+        addV(13, y, z, (z === 25) ? COLOR_DEF.PETRONAS : COLOR_DEF.BLACK);
+      }
+    }
+
+    // B. 底板 (Floor) & 文丘里底切 (Underfloor Ground Effect)
+    for (let z = -17; z <= 8; z++) {
+      const widthAtZ = (z < -10) ? 9 : 10;
+      for (let x = -widthAtZ; x <= widthAtZ; x++) {
+        let color = COLOR_DEF.CARBON;
+        // 底板边缘经典的绿色流线边缘
+        if (Math.abs(x) === widthAtZ) {
+          color = COLOR_DEF.PETRONAS;
+        }
+        addV(x, 1, z, color);
+      }
+    }
+
+    // C. 侧箱 (Sidepods) - 梅赛德斯下倾下洗方案 (Downwash style sidepods)
+    for (let z = -11; z <= 6; z++) {
+      const podW = (z > 2) ? 8 : (z < -8 ? 6 : 9);
+      for (let x = -podW; x <= podW; x++) {
+        if (Math.abs(x) <= 2) continue; // 中间座舱留空
+        let hMax = (z > 1) ? 4 : (z < -6 ? 3 : 4);
+        for (let y = 2; y <= hMax; y++) {
+          let c = COLOR_DEF.BLACK;
+          // 侧箱优雅的 Petronas 绿拉花与银箭星徽点缀
+          if (y === 3 && (Math.abs(x) === podW || Math.abs(x) === podW - 1)) {
+            c = COLOR_DEF.PETRONAS;
+          } else if (y === hMax && z % 2 === 0) {
+            c = COLOR_DEF.SILVER;
+          }
+          addV(x, y, z, c);
+        }
+      }
+    }
+    // 侧箱百叶窗散热格栅 (Cooling Louvres)
+    for (let z = -5; z <= 0; z += 2) {
+      addV(-6, 4, z, COLOR_DEF.CARBON);
+      addV(6, 4, z, COLOR_DEF.CARBON);
+    }
+
+    // D. 座舱 (Cockpit), Halo 保护系统 & 车手小人 (Driver)
+    // 座舱内部
+    for (let z = -3; z <= 5; z++) {
+      for (let x = -2; x <= 2; x++) {
+        addV(x, 2, z, COLOR_DEF.COCKPIT_INSIDE);
+      }
+    }
+    // 方向盘 (Steering Wheel with display screen)
+    addV(0, 3, 4, COLOR_DEF.PETRONAS); // 屏幕亮光绿
+    addV(-1, 3, 4, COLOR_DEF.YELLOW_ACCENT);
+    addV(1, 3, 4, COLOR_DEF.YELLOW_ACCENT);
+
+    // 车手汉密尔顿体素人 (Lewis Hamilton)
+    // 身体
+    addV(0, 3, 0, COLOR_DEF.DRIVER_SUIT);
+    addV(-1, 3, 0, COLOR_DEF.DRIVER_SUIT);
+    addV(1, 3, 0, COLOR_DEF.DRIVER_SUIT);
+    addV(0, 3, 1, COLOR_DEF.DRIVER_SUIT);
+    // 头盔 (标志性亮黄色头盔 + 紫色面罩)
+    for (let hx = -1; hx <= 1; hx++) {
+      for (let hy = 4; hy <= 5; hy++) {
+        for (let hz = 0; hz <= 1; hz++) {
+          let col = COLOR_DEF.HELMET_YELLOW;
+          if (hy === 4 && hz === 1) col = COLOR_DEF.VISOR_PURPLE; // 护目镜
+          addV(hx, hy, hz, col);
+        }
+      }
+    }
+
+    // Halo 保护环结构 (前单柱 + 环状顶环)
+    addV(0, 4, 3, COLOR_DEF.HALO_TITANIUM); // 前中柱
+    addV(0, 5, 2, COLOR_DEF.HALO_TITANIUM);
+    for (let hz = -1; hz <= 1; hz++) {
+      addV(-2, 5, hz, COLOR_DEF.HALO_TITANIUM);
+      addV(2, 5, hz, COLOR_DEF.HALO_TITANIUM);
+    }
+    addV(-1, 5, -1, COLOR_DEF.HALO_TITANIUM);
+    addV(0, 5, -1, COLOR_DEF.HALO_TITANIUM);
+    addV(1, 5, -1, COLOR_DEF.HALO_TITANIUM);
+
+    // E. 顶置发动机进气道 (Engine Airbox) & INEOS 亮红顶盖
+    for (let z = -4; z <= -1; z++) {
+      for (let x = -2; x <= 2; x++) {
+        for (let y = 4; y <= 6; y++) {
+          let c = COLOR_DEF.BLACK;
+          if (y === 6) {
+            c = COLOR_DEF.INEOS_RED; // INEOS 勃艮第红色顶盖
+          }
+          if (z === -1 && y === 5 && Math.abs(x) <= 1) continue; // 进气孔留空
+          addV(x, y, z, c);
+        }
+      }
+    }
+    // 荧光黄车载 T-Cam (汉密尔顿的主黄标)
+    addV(0, 7, -2, COLOR_DEF.YELLOW_ACCENT);
+    addV(0, 7, -1, COLOR_DEF.YELLOW_ACCENT);
+
+    // F. 鲨鱼鳍与引擎盖 (Engine Cover & Shark Fin)
+    for (let z = -14; z <= -4; z++) {
+      // 引擎罩主体
+      for (let x = -2; x <= 2; x++) {
+        for (let y = 2; y <= 4; y++) {
+          let c = (z % 3 === 0) ? COLOR_DEF.SILVER : COLOR_DEF.BLACK;
+          addV(x, y, z, c);
+        }
+      }
+      // 竖立鲨鱼鳍脊
+      for (let y = 5; y <= 6; y++) {
+        if (z < -11 && y === 6) continue;
+        let c = COLOR_DEF.BLACK;
+        if (y === 6) c = COLOR_DEF.INEOS_RED;
+        else if (z % 2 === 0) c = COLOR_DEF.PETRONAS;
+        addV(0, y, z, c);
+      }
+    }
+
+    // G. 尾翼组 (Rear Wing), DRS 扰流板与后扩散器 (Diffuser)
+    // 扩散器与雨雾尾灯
+    for (let x = -6; x <= 6; x++) {
+      for (let z = -19; z <= -17; z++) {
+        addV(x, 1, z, COLOR_DEF.CARBON);
+        if (z === -19 && (x % 3 === 0)) addV(x, 2, z, COLOR_DEF.CARBON); // 扩散器垂直叶片
+      }
+    }
+    // F1 安全红尾灯 (FIA Rain Light)
+    addV(0, 2, -19, COLOR_DEF.RED_TAILLIGHT);
+
+    // 双鹅颈尾翼支架 (Swan-neck pylons)
+    for (let y = 2; y <= 7; y++) {
+      addV(-1, y, -16, COLOR_DEF.CARBON);
+      addV(1, y, -16, COLOR_DEF.CARBON);
+    }
+
+    // 尾翼主翼板 (Mainplane & DRS flap)
+    for (let z = -18; z <= -16; z++) {
+      for (let x = -9; x <= 9; x++) {
+        let c = COLOR_DEF.BLACK;
+        if (z === -16) c = COLOR_DEF.PETRONAS; // DRS绿边
+        if (z === -17 && Math.abs(x) <= 3) c = COLOR_DEF.SILVER; // AMG 星徽字样
+        addV(x, 6, z, c);
+        addV(x, 7, z - 1, c); // DRS 开启斜角
+      }
+    }
+    // 尾翼端板 (Rear Wing Endplates)
+    for (let y = 3; y <= 8; y++) {
+      for (let z = -19; z <= -15; z++) {
+        let c = COLOR_DEF.BLACK;
+        if (y >= 6 && z === -15) c = COLOR_DEF.INEOS_RED; // 端板上角 INEOS 红
+        if (z === -18) c = COLOR_DEF.PETRONAS;
+        addV(-9, y, z, c);
+        addV(9, y, z, c);
+      }
+    }
+
+    // H. 悬挂连杆 (Suspension Wishbones)
+    // 前推杆悬挂
+    for (let step = 0; step < 4; step++) {
+      addV(-3 - step, 2 + Math.floor(step * 0.4), 16 - step * 2, COLOR_DEF.CARBON);
+      addV(3 + step, 2 + Math.floor(step * 0.4), 16 - step * 2, COLOR_DEF.CARBON);
+      addV(-3 - step, 2, 12 + step * 2, COLOR_DEF.CARBON);
+      addV(3 + step, 2, 12 + step * 2, COLOR_DEF.CARBON);
+    }
+    // 后拉杆悬挂
+    for (let step = 0; step < 4; step++) {
+      addV(-3 - step, 2 + Math.floor(step * 0.3), -12 - step, COLOR_DEF.CARBON);
+      addV(3 + step, 2 + Math.floor(step * 0.3), -12 - step, COLOR_DEF.CARBON);
+    }
+
+    // -------------------------------------------------------------
+    // 5. 使用 InstancedMesh 批处理优化体素渲染性能
+    // -------------------------------------------------------------
+    // 按颜色归类体素
+    const colorGroups = {};
+    bodyVoxels.forEach(v => {
+      if (!colorGroups[v.c]) colorGroups[v.c] = [];
+      colorGroups[v.c].push(v);
+    });
+
+    const dummy = new THREE.Object3D();
+    const chassisMeshGroup = new THREE.Group();
+    carRoot.add(chassisMeshGroup);
+
+    Object.keys(colorGroups).forEach(colorHexStr => {
+      const hex = parseInt(colorHexStr, 10);
+      const voxList = colorGroups[colorHexStr];
+      const count = voxList.length;
+
+      let isEmissive = (hex === COLOR_DEF.RED_TAILLIGHT || hex === COLOR_DEF.PETRONAS_LIGHT);
+      let mat = getVoxelMaterial(
+        hex,
+        hex === COLOR_DEF.SILVER ? 0.3 : 0.65,
+        hex === COLOR_DEF.SILVER ? 0.7 : 0.2,
+        isEmissive ? hex : 0x000000,
+        isEmissive ? 1.5 : 0
+      );
+
+      const instMesh = new THREE.InstancedMesh(boxGeo, mat, count);
+      instMesh.castShadow = true;
+      instMesh.receiveShadow = true;
+
+      for (let i = 0; i < count; i++) {
+        const v = voxList[i];
+        dummy.position.set(v.x * VOXEL_SIZE, v.y * VOXEL_SIZE, v.z * VOXEL_SIZE);
+        dummy.updateMatrix();
+        instMesh.setMatrixAt(i, dummy.matrix);
+      }
+      instMesh.instanceMatrix.needsUpdate = true;
+      chassisMeshGroup.add(instMesh);
+    });
+
+    // -------------------------------------------------------------
+    // 6. 体素车轮系统 (4只倍耐力宽胎，可独立高速旋转)
+    // -------------------------------------------------------------
+    const wheels = [];
+
+    function createVoxelWheel(isFront, isLeft) {
+      const wheelGroup = new THREE.Group();
+      const radius = 4; // 体素半径
+      const thickness = isFront ? 4 : 5; // 后轮更宽 (F1规范后轮 405mm)
+      const wheelVoxels = [];
+
+      for (let rx = -radius; rx <= radius; rx++) {
+        for (let ry = -radius; ry <= radius; ry++) {
+          const dist = Math.sqrt(rx * rx + ry * ry);
+          if (dist > radius || dist < 1.0) continue;
+
+          for (let w = 0; w < thickness; w++) {
+            let color = COLOR_DEF.TIRE_RUBBER;
+            const outerFace = isLeft ? (w === thickness - 1) : (w === 0);
+
+            // 胎侧红线 (P Zero 软胎标示)
+            if (outerFace && Math.abs(dist - 3.1) < 0.6) {
+              color = COLOR_DEF.TIRE_LINE;
+            } else if (outerFace && dist <= 2.2) {
+              // 18寸低风阻轮毂盖 (Wheel Cover) 带 Petronas 绿环
+              color = (dist > 1.6 && Math.abs(rx * ry) % 2 === 0) ? COLOR_DEF.PETRONAS : COLOR_DEF.WHEEL_RIM;
+            } else if (dist > 3.6) {
+              // 胎面光头胎
+              color = COLOR_DEF.TIRE_RUBBER;
+            }
+
+            // 局部坐标，轮轴为 X 轴
+            const localX = isLeft ? (w * VOXEL_SIZE) : (-w * VOXEL_SIZE);
+            const localY = ry * VOXEL_SIZE;
+            const localZ = rx * VOXEL_SIZE;
+
+            wheelVoxels.push({ x: localX, y: localY, z: localZ, c: color });
+          }
+        }
+      }
+
+      // 将该轮体素归并
+      const groups = {};
+      wheelVoxels.forEach(wv => {
+        if (!groups[wv.c]) groups[wv.c] = [];
+        groups[wv.c].push(wv);
+      });
+
+      Object.keys(groups).forEach(cHex => {
+        const h = parseInt(cHex, 10);
+        const list = groups[cHex];
+        const mat = getVoxelMaterial(h, 0.7, 0.1);
+        const instMesh = new THREE.InstancedMesh(boxGeo, mat, list.length);
+        instMesh.castShadow = true;
+        instMesh.receiveShadow = true;
+
+        for (let i = 0; i < list.length; i++) {
+          dummy.position.set(list[i].x, list[i].y, list[i].z);
+          dummy.updateMatrix();
+          instMesh.setMatrixAt(i, dummy.matrix);
+        }
+        instMesh.instanceMatrix.needsUpdate = true;
+        wheelGroup.add(instMesh);
+      });
+
+      return wheelGroup;
+    }
+
+    // 车轮挂载点 (根据体素轴距与轮距)
+    const wheelPositions = [
+      { isFront: true,  isLeft: true,  x: 10 * VOXEL_SIZE,  y: 3.8 * VOXEL_SIZE, z: 14 * VOXEL_SIZE },
+      { isFront: true,  isLeft: false, x: -10 * VOXEL_SIZE, y: 3.8 * VOXEL_SIZE, z: 14 * VOXEL_SIZE },
+      { isFront: false, isLeft: true,  x: 10 * VOXEL_SIZE,  y: 3.8 * VOXEL_SIZE, z: -13 * VOXEL_SIZE },
+      { isFront: false, isLeft: false, x: -10 * VOXEL_SIZE, y: 3.8 * VOXEL_SIZE, z: -13 * VOXEL_SIZE },
+    ];
+
+    wheelPositions.forEach(cfg => {
+      const wMesh = createVoxelWheel(cfg.isFront, cfg.isLeft);
+      wMesh.position.set(cfg.x, cfg.y, cfg.z);
+      carRoot.add(wMesh);
+      wheels.push(wMesh);
+    });
+
+    // 整体车辆微调位置，使其平稳接触地面
+    carRoot.position.set(0, 0.05, 0);
+
+    // -------------------------------------------------------------
+    // 7. F1 赛道发车格地面 (Asphalt Track, Kerbs & Grid Lines)
+    // -------------------------------------------------------------
+    const trackGroup = new THREE.Group();
+    scene.add(trackGroup);
+
+    // 沥青地面网格纹理
+    const trackGeo = new THREE.PlaneGeometry(16, 75, 1, 1);
+    const trackCanvas = document.createElement('canvas');
+    trackCanvas.width = 512;
+    trackCanvas.height = 1024;
+    const ctx = trackCanvas.getContext('2d');
+    ctx.fillStyle = '#111417';
+    ctx.fillRect(0, 0, 512, 1024);
+    // 噪点沥青质感
+    for (let i = 0; i < 40000; i++) {
+      const nx = Math.random() * 512;
+      const ny = Math.random() * 1024;
+      ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.08)';
+      ctx.fillRect(nx, ny, 2, 2);
+    }
+    // 发车位白标线 (Grid slot markings)
+    ctx.strokeStyle = '#e0eaec';
+    ctx.lineWidth = 14;
+    ctx.beginPath();
+    ctx.strokeRect(130, 200, 252, 380); // 1号发车位
+    ctx.moveTo(130, 390);
+    ctx.lineTo(382, 390);
+    ctx.stroke();
+
+    const trackTexture = new THREE.CanvasTexture(trackCanvas);
+    trackTexture.wrapS = THREE.RepeatWrapping;
+    trackTexture.wrapT = THREE.RepeatWrapping;
+    trackTexture.repeat.set(1, 4);
+
+    const trackMat = new THREE.MeshStandardMaterial({
+      map: trackTexture,
+      roughness: 0.9,
+      metalness: 0.1,
+    });
+    const trackMesh = new THREE.Mesh(trackGeo, trackMat);
+    trackMesh.rotation.x = -Math.PI / 2;
+    trackMesh.receiveShadow = true;
+    trackGroup.add(trackMesh);
+
+    // 经典红白路肩体素块 (Kerbs)
+    const kerbGeo = new THREE.BoxGeometry(0.55, 0.12, 0.7);
+    const kerbRedMat = new THREE.MeshStandardMaterial({ color: 0xdd1122, roughness: 0.7 });
+    const kerbWhiteMat = new THREE.MeshStandardMaterial({ color: 0xeeeeee, roughness: 0.7 });
+
+    const kerbCount = 80;
+    const kerbGroup = new THREE.Group();
+    for (let i = -kerbCount / 2; i < kerbCount / 2; i++) {
+      const mat = (Math.abs(i) % 2 === 0) ? kerbRedMat : kerbWhiteMat;
+      const kLeft = new THREE.Mesh(kerbGeo, mat);
+      kLeft.position.set(-8.2, 0.06, i * 0.75);
+      kLeft.receiveShadow = true;
+      kerbGroup.add(kLeft);
+
+      const kRight = new THREE.Mesh(kerbGeo, mat);
+      kRight.position.set(8.2, 0.06, i * 0.75);
+      kRight.receiveShadow = true;
+      kerbGroup.add(kRight);
+    }
+    trackGroup.add(kerbGroup);
+
+    // -------------------------------------------------------------
+    // 8. 粒子特效系统：F1钛合金底板擦地火花 & 速度感尾流粒子
+    // -------------------------------------------------------------
+    // A. 擦地火花 (Sparks)
+    const SPARK_COUNT = 90;
+    const sparkGeo = new THREE.BufferGeometry();
+    const sparkPositions = new Float32Array(SPARK_COUNT * 3);
+    const sparkVelocities = [];
+
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      sparkPositions[i * 3 + 0] = (Math.random() - 0.5) * 0.5;
+      sparkPositions[i * 3 + 1] = 0.05 + Math.random() * 0.08;
+      sparkPositions[i * 3 + 2] = -1.6 - Math.random() * 0.3;
+      sparkVelocities.push(new THREE.Vector3(
+        (Math.random() - 0.5) * 2.2,
+        Math.random() * 1.8 + 0.5,
+        -(Math.random() * 12 + 8)
+      ));
+    }
+    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPositions, 3));
+    const sparkMat = new THREE.PointsMaterial({
+      color: 0xffaa22,
+      size: 0.12,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending
+    });
+    const sparkPoints = new THREE.Points(sparkGeo, sparkMat);
+    carRoot.add(sparkPoints);
+
+    // B. 速度风线/体素气流粒子 (Speed Streaks)
+    const STREAK_COUNT = 120;
+    const streakGeo = new THREE.BufferGeometry();
+    const streakPos = new Float32Array(STREAK_COUNT * 3);
+    for (let i = 0; i < STREAK_COUNT; i++) {
+      streakPos[i * 3 + 0] = (Math.random() - 0.5) * 14;
+      streakPos[i * 3 + 1] = Math.random() * 4.5 + 0.2;
+      streakPos[i * 3 + 2] = (Math.random() - 0.5) * 45;
+    }
+    streakGeo.setAttribute('position', new THREE.BufferAttribute(streakPos, 3));
+    const streakMat = new THREE.PointsMaterial({
+      color: 0x00d2be,
+      size: 0.08,
+      transparent: true,
+      opacity: 0.45,
+      blending: THREE.AdditiveBlending
+    });
+    const streakPoints = new THREE.Points(streakGeo, streakMat);
+    scene.add(streakPoints);
+
+    // -------------------------------------------------------------
+    // 9. 镜头控制与UI切换逻辑
+    // -------------------------------------------------------------
+    const speedoValEl = document.getElementById('speedo-val');
+    const drsTagEl = document.getElementById('drs-tag');
+
+    function lerpCamera(delta) {
+      if (!state.targetCamPos) return;
+      camera.position.lerp(state.targetCamPos, delta * 3.5);
+      controls.target.lerp(state.targetLookAt, delta * 3.5);
+      if (camera.position.distanceTo(state.targetCamPos) < 0.05) {
+        state.targetCamPos = null;
+        state.targetLookAt = null;
+      }
+    }
+
+    function setCameraPreset(camPos, lookTarget) {
+      state.targetCamPos = camPos.clone();
+      state.targetLookAt = lookTarget.clone();
+    }
+
+    // 按钮交互绑定
+    const btnRace = document.getElementById('btn-mode-race');
+    const btnTurntable = document.getElementById('btn-mode-turntable');
+    const btnDay = document.getElementById('btn-env-day');
+    const btnNight = document.getElementById('btn-env-night');
+
+    btnRace.addEventListener('click', () => {
+      state.mode = 'race';
+      btnRace.classList.add('active');
+      btnTurntable.classList.remove('active');
+      trackMesh.visible = true;
+      kerbGroup.visible = true;
+      streakPoints.visible = true;
+      sparkPoints.visible = true;
+      drsTagEl.textContent = 'DRS OPEN';
+      drsTagEl.style.background = '#143530';
+      drsTagEl.style.color = '#00f0d8';
+    });
+
+    btnTurntable.addEventListener('click', () => {
+      state.mode = 'turntable';
+      btnTurntable.classList.add('active');
+      btnRace.classList.remove('active');
+      sparkPoints.visible = false;
+      streakPoints.visible = false;
+      drsTagEl.textContent = 'PARC FERMÉ';
+      drsTagEl.style.background = '#282b30';
+      drsTagEl.style.color = '#a0afb5';
+    });
+
+    btnDay.addEventListener('click', () => {
+      state.env = 'day';
+      btnDay.classList.add('active');
+      btnNight.classList.remove('active');
+      updateLighting();
+    });
+
+    btnNight.addEventListener('click', () => {
+      state.env = 'night';
+      btnNight.classList.add('active');
+      btnDay.classList.remove('active');
+      updateLighting();
+    });
+
+    document.getElementById('btn-cam-persp').addEventListener('click', () => {
+      setCameraPreset(new THREE.Vector3(-4.8, 2.5, 5.8), new THREE.Vector3(0, 0.6, 0.5));
+    });
+    document.getElementById('btn-cam-cockpit').addEventListener('click', () => {
+      setCameraPreset(new THREE.Vector3(0, 1.35, -0.2), new THREE.Vector3(0, 0.6, 6.0));
+    });
+    document.getElementById('btn-cam-side').addEventListener('click', () => {
+      setCameraPreset(new THREE.Vector3(-6.5, 0.8, 0.2), new THREE.Vector3(0, 0.7, 0));
+    });
+    document.getElementById('btn-cam-top').addEventListener('click', () => {
+      setCameraPreset(new THREE.Vector3(0.01, 9.2, 0.01), new THREE.Vector3(0, 0, 0));
+    });
+
+    // -------------------------------------------------------------
+    // 10. 动画与渲染主循环 (稳定的60FPS设计)
+    // -------------------------------------------------------------
+    const clock = new THREE.Clock();
+    let sparkTimer = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const delta = Math.min(clock.getDelta(), 0.1);
+      const elapsedTime = clock.getElapsedTime();
+
+      // 相机平滑插值移动
+      lerpCamera(delta);
+
+      if (state.mode === 'race') {
+        // 车轮高速旋转
+        wheels.forEach(w => {
+          w.rotation.x += state.wheelSpeed * delta;
+        });
+
+        // 赛道地面向后位移营造前冲感
+        trackTexture.offset.y = (trackTexture.offset.y + delta * 3.8) % 1;
+        kerbGroup.position.z = (kerbGroup.position.z - delta * 45) % 0.75;
+
+        // 赛车微动 (悬挂颠簸与轻微下压力晃动)
+        carRoot.position.y = 0.05 + Math.sin(elapsedTime * 35) * 0.008;
+        carRoot.rotation.z = Math.sin(elapsedTime * 6) * 0.005;
+        carRoot.rotation.x = -Math.cos(elapsedTime * 12) * 0.003;
+
+        // 火花粒子喷射动画 (钛合金底板触地效果)
+        sparkTimer += delta;
+        const sparkPosAttr = sparkGeo.attributes.position;
+        const sArr = sparkPosAttr.array;
+        const isSparksActive = Math.sin(elapsedTime * 4) > -0.2; // 周期性擦地
+
+        for (let i = 0; i < SPARK_COUNT; i++) {
+          if (!isSparksActive) {
+            sArr[i * 3 + 1] = -1.0; // 沉入地下
+            continue;
+          }
+          sArr[i * 3 + 0] += sparkVelocities[i].x * delta;
+          sArr[i * 3 + 1] += sparkVelocities[i].y * delta;
+          sArr[i * 3 + 2] += sparkVelocities[i].z * delta;
+
+          // 重力
+          sparkVelocities[i].y -= 9.8 * delta;
+
+          // 粒子重生
+          if (sArr[i * 3 + 1] < 0.02 || sArr[i * 3 + 2] < -6.0) {
+            sArr[i * 3 + 0] = (Math.random() - 0.5) * 0.6;
+            sArr[i * 3 + 1] = 0.03 + Math.random() * 0.05;
+            sArr[i * 3 + 2] = -1.6 - Math.random() * 0.2;
+            sparkVelocities[i].set(
+              (Math.random() - 0.5) * 3.0,
+              Math.random() * 2.5 + 0.8,
+              -(Math.random() * 15 + 10)
+            );
+          }
+        }
+        sparkPosAttr.needsUpdate = true;
+
+        // 速度气流线条更新
+        const sPosArr = streakGeo.attributes.position.array;
+        for (let i = 0; i < STREAK_COUNT; i++) {
+          sPosArr[i * 3 + 2] -= delta * 38;
+          if (sPosArr[i * 3 + 2] < -25) {
+            sPosArr[i * 3 + 2] = 25;
+            sPosArr[i * 3 + 0] = (Math.random() - 0.5) * 14;
+            sPosArr[i * 3 + 1] = Math.random() * 4.2 + 0.2;
+          }
+        }
+        streakGeo.attributes.position.needsUpdate = true;
+
+        // 仪表盘数字微幅波动 (315 - 335 km/h)
+        if (Math.random() > 0.6) {
+          const simulatedSpeed = Math.floor(322 + Math.sin(elapsedTime * 5) * 8 + (Math.random() - 0.5) * 4);
+          speedoValEl.textContent = simulatedSpeed;
+        }
+
+      } else {
+        // 展台模式：车身平稳旋转
+        carRoot.position.set(0, 0.05, 0);
+        carRoot.rotation.set(0, 0, 0);
+        carRoot.rotation.y += delta * 0.45;
+        speedoValEl.textContent = '0';
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // -------------------------------------------------------------
+    // 11. 自适应屏幕缩放
+    // -------------------------------------------------------------
+    window.addEventListener('resize', () => {
+      const w = window.innerWidth;
+      const h = window.innerHeight;
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+      renderer.setSize(w, h);
+    });
+
+    // 启动初始灯光并开启渲染循环
+    updateLighting();
+    animate();
+  </script>
+
+  <!-- 提示词展示脚本 (原样保留) -->
+  <script src="../prompt-panel.js" data-id="f1-car-flash"></script>
+</body>
+</html>

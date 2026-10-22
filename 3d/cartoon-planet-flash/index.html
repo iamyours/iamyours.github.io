@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>卡通奇幻微缩星球 - 3D 动漫风微缩世界</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, #1e2640 0%, #0c101c 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      outline: none;
+    }
+
+    /* 左上角返回链接：半透明奶油色圆角按钮 */
+    .back-link {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #3f2f18;
+      background: rgba(255, 248, 235, 0.88);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1.5px solid rgba(255, 255, 255, 0.95);
+      border-radius: 999px;
+      text-decoration: none;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.1);
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .back-link:hover {
+      background: rgba(255, 253, 245, 1);
+      transform: translateY(-2px) scale(1.02);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+      color: #1e1305;
+    }
+
+    /* 悬浮控制卡片面板 */
+    .ui-panel {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(18, 24, 40, 0.78);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      padding: 8px 14px;
+      border-radius: 36px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      max-width: 94vw;
+      overflow-x: auto;
+    }
+
+    .btn-action {
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s ease;
+      white-space: nowrap;
+    }
+    .btn-action:hover {
+      background: rgba(255, 215, 64, 0.25);
+      border-color: #ffd240;
+      color: #ffe685;
+      transform: translateY(-1px);
+    }
+    .btn-action.active {
+      background: #ffb830;
+      color: #261600;
+      border-color: #ffe082;
+      font-weight: 700;
+      box-shadow: 0 0 16px rgba(255, 184, 48, 0.6);
+    }
+
+    /* 提示引导标签 */
+    .info-badge {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 90;
+      background: rgba(15, 22, 36, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #e2e8f0;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .info-dot {
+      width: 8px;
+      height: 8px;
+      background: #4ade80;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #4ade80;
+      animation: pulse 2s infinite ease-in-out;
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(1.3); opacity: 0.6; }
+    }
+
+    @media (max-width: 640px) {
+      .info-badge { display: none; }
+      .ui-panel {
+        bottom: 16px;
+        padding: 6px 10px;
+        gap: 6px;
+      }
+      .btn-action {
+        padding: 6px 12px;
+        font-size: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-link">
+    <span>←</span> 返回 3D 作品
+  </a>
+
+  <div class="info-badge">
+    <div class="info-dot"></div>
+    <span>拖拽旋转视角 • 滚轮/双指缩放探索细节</span>
+  </div>
+
+  <div class="ui-panel">
+    <button class="btn-action active" id="btn-cam-free">🪐 自由视点</button>
+    <button class="btn-action" id="btn-cam-plane">✈️ 跟随小飞机</button>
+    <button class="btn-action" id="btn-cam-car">🚗 跟随小巴士</button>
+    <button class="btn-action" id="btn-speed">⚡ 加速公转</button>
+    <button class="btn-action" id="btn-daynight">🌙 昼夜切换</button>
+  </div>
+
+  <canvas id="webgl-canvas"></canvas>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // --- 基础常量与场景配置 ---
+    const PLANET_RADIUS = 30;
+    const ATMOSPHERE_RADIUS = 32.5;
+
+    const canvas = document.getElementById('webgl-canvas');
+    const renderer = new THREE.WebGLRenderer({
+      canvas,
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0c1424);
+    scene.fog = new THREE.FogExp2(0x0c1424, 0.0035);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.5, 800);
+    camera.position.set(65, 38, 75);
+
+    const controls = new OrbitControls(camera, canvas);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.minDistance = 35;
+    controls.maxDistance = 160;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.8;
+    controls.target.set(0, 0, 0);
+
+    // --- 漫画着色调色板渐变纹理（Toon Ramp）---
+    function createToonGradient(steps = [0.0, 0.5, 0.85, 1.0], colors = ['#282c3f', '#7d8a9e', '#dae3ef', '#ffffff']) {
+      const w = 256;
+      const cvs = document.createElement('canvas');
+      cvs.width = w;
+      cvs.height = 1;
+      const ctx = cvs.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, w, 0);
+      steps.forEach((stop, i) => grad.addColorStop(stop, colors[i]));
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, w, 1);
+      const tex = new THREE.CanvasTexture(cvs);
+      tex.minFilter = THREE.NearestFilter;
+      tex.magFilter = THREE.NearestFilter;
+      return tex;
+    }
+    const toonRamp = createToonGradient([0.0, 0.45, 0.75, 1.0], ['#444b6e', '#8892b0', '#d8e2dc', '#ffffff']);
+
+    // 通用卡通卡通材质创建器
+    function createToonMat(colorHex, options = {}) {
+      return new THREE.MeshToonMaterial({
+        color: colorHex,
+        gradientMap: toonRamp,
+        ...options
+      });
+    }
+
+    // --- 灯光系统 ---
+    const hemiLight = new THREE.HemisphereLight(0xfff7e6, 0x1d2948, 1.2);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff3d1, 2.4);
+    sunLight.position.set(80, 90, 60);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.camera.near = 10;
+    sunLight.shadow.camera.far = 240;
+    const shadowD = 55;
+    sunLight.shadow.camera.left = -shadowD;
+    sunLight.shadow.camera.right = shadowD;
+    sunLight.shadow.camera.top = shadowD;
+    sunLight.shadow.camera.bottom = -shadowD;
+    scene.add(sunLight);
+
+    // 补光营造卡通高光
+    const rimLight = new THREE.DirectionalLight(0x4dc9ff, 0.75);
+    rimLight.position.set(-60, -20, -50);
+    scene.add(rimLight);
+
+    // --- 星空与卡通微粒氛围 ---
+    function createStarfield() {
+      const starGeo = new THREE.BufferGeometry();
+      const count = 1200;
+      const positions = new Float32Array(count * 3);
+      const colors = new Float32Array(count * 3);
+      const colorChoices = [new THREE.Color(0xfff5ea), new THREE.Color(0xa5f3fc), new THREE.Color(0xfef08a), new THREE.Color(0xfbcfe8)];
+
+      for (let i = 0; i < count; i++) {
+        const r = 200 + Math.random() * 220;
+        const theta = Math.random() * Math.PI * 2;
+        const phi = Math.acos(2 * Math.random() - 1);
+        positions[i * 3] = r * Math.sin(phi) * Math.cos(theta);
+        positions[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta);
+        positions[i * 3 + 2] = r * Math.cos(phi);
+
+        const col = colorChoices[Math.floor(Math.random() * colorChoices.length)];
+        colors[i * 3] = col.r;
+        colors[i * 3 + 1] = col.g;
+        colors[i * 3 + 2] = col.b;
+      }
+      starGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      starGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+      // 星星微粒贴图
+      const starCvs = document.createElement('canvas');
+      starCvs.width = 32;
+      starCvs.height = 32;
+      const sctx = starCvs.getContext('2d');
+      const grad = sctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(0.3, '#ffffff');
+      grad.addColorStop(1, 'rgba(255,255,255,0)');
+      sctx.fillStyle = grad;
+      sctx.beginPath();
+      sctx.arc(16, 16, 15, 0, Math.PI * 2);
+      sctx.fill();
+      const starTex = new THREE.CanvasTexture(starCvs);
+
+      const starMat = new THREE.PointsMaterial({
+        size: 2.2,
+        map: starTex,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.85,
+        depthWrite: false
+      });
+      return new THREE.Points(starGeo, starMat);
+    }
+    scene.add(createStarfield());
+
+    // --- 星球主体组 ---
+    const planetGroup = new THREE.Group();
+    scene.add(planetGroup);
+
+    // 1. 卡通海洋球体 (Ocean Base)
+    const oceanGeo = new THREE.SphereGeometry(PLANET_RADIUS - 0.2, 64, 48);
+    const oceanMat = createToonMat(0x1892e8, {
+      roughness: 0.2,
+      metalness: 0.1
+    });
+    const oceanMesh = new THREE.Mesh(oceanGeo, oceanMat);
+    oceanMesh.receiveShadow = true;
+    planetGroup.add(oceanMesh);
+
+    // 2. 陆地板块生成（基于多重低面片与球体投射，创造岛屿与大陆）
+    const landGroup = new THREE.Group();
+    planetGroup.add(landGroup);
+
+    // 工具函数：将局部对象依附于球体指定经纬度并朝外法线定向
+    function placeOnSphere(object, lat, lon, altitude = 0, scale = 1) {
+      const phi = (90 - lat) * (Math.PI / 180);
+      const theta = (lon + 180) * (Math.PI / 180);
+      const radius = PLANET_RADIUS + altitude;
+
+      const x = -radius * Math.sin(phi) * Math.cos(theta);
+      const z = radius * Math.sin(phi) * Math.sin(theta);
+      const y = radius * Math.cos(phi);
+
+      object.position.set(x, y, z);
+      const normal = new THREE.Vector3(x, y, z).normalize();
+      object.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
+      object.scale.setScalar(scale);
+    }
+
+    // 制造几块起伏的卡通绿色大陆板块
+    const continentsData = [
+      { lat: 15, lon: 20, size: 14, color: 0x55c345 },
+      { lat: -10, lon: 70, size: 12, color: 0x62cf50 },
+      { lat: 40, lon: -40, size: 13, color: 0x48b839 },
+      { lat: -35, lon: -60, size: 11, color: 0x58c946 },
+      { lat: 5, lon: 160, size: 15, color: 0x4ebf3d },
+      { lat: -25, lon: -150, size: 10, color: 0x65d554 }
+    ];
+
+    continentsData.forEach(cd => {
+      const patchGeo = new THREE.CylinderGeometry(cd.size, cd.size * 1.15, 2.5, 9, 1);
+      // 稍微扭曲顶点增强自然卡通石块/岛屿感
+      const pos = patchGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const py = pos.getY(i);
+        if (py > 0) {
+          pos.setX(i, pos.getX(i) * (0.85 + Math.random() * 0.3));
+          pos.setZ(i, pos.getZ(i) * (0.85 + Math.random() * 0.3));
+        }
+      }
+      patchGeo.computeVertexNormals();
+
+      const patchMat = createToonMat(cd.color);
+      const patch = new THREE.Mesh(patchGeo, patchMat);
+      patch.receiveShadow = true;
+      patch.castShadow = true;
+      placeOnSphere(patch, cd.lat, cd.lon, -0.6);
+      landGroup.add(patch);
+
+      // 沙滩金色镶边
+      const beachGeo = new THREE.CylinderGeometry(cd.size * 1.08, cd.size * 1.25, 1.2, 9);
+      const beachMat = createToonMat(0xf4d35e);
+      const beach = new THREE.Mesh(beachGeo, beachMat);
+      beach.receiveShadow = true;
+      placeOnSphere(beach, cd.lat, cd.lon, -0.85);
+      landGroup.add(beach);
+    });
+
+    // 3. 卡通雪山群 (Mountains with Snow Peaks)
+    const mountainColors = [0x78909c, 0x607d8b, 0x8d6e63, 0x795548];
+    const snowMat = createToonMat(0xffffff);
+
+    function createCartoonMountain(height, baseRadius, snowFrac = 0.35) {
+      const group = new THREE.Group();
+      const col = mountainColors[Math.floor(Math.random() * mountainColors.length)];
+      const bodyMat = createToonMat(col);
+
+      const segments = 6 + Math.floor(Math.random() * 3);
+      const bodyGeo = new THREE.ConeGeometry(baseRadius, height, segments);
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.position.y = height / 2;
+      body.castShadow = true;
+      body.receiveShadow = true;
+      group.add(body);
+
+      // 雪顶帽子
+      const snowH = height * snowFrac;
+      const snowR = baseRadius * snowFrac;
+      const snowGeo = new THREE.ConeGeometry(snowR, snowH, segments);
+      const snow = new THREE.Mesh(snowGeo, snowMat);
+      snow.position.y = height - (snowH / 2) + 0.05;
+      snow.castShadow = true;
+      group.add(snow);
+
+      return group;
+    }
+
+    const mountainCoords = [
+      { lat: 26, lon: 15, h: 5.5, r: 3.2 },
+      { lat: 20, lon: 28, h: 6.8, r: 3.8 },
+      { lat: 12, lon: 32, h: 4.8, r: 2.8 },
+      { lat: -16, lon: 62, h: 6.0, r: 3.5 },
+      { lat: -8, lon: 78, h: 5.2, r: 3.0 },
+      { lat: 48, lon: -46, h: 5.8, r: 3.4 },
+      { lat: 36, lon: -32, h: 4.5, r: 2.6 },
+      { lat: 8, lon: 172, h: 6.5, r: 3.6 },
+      { lat: -2, lon: 154, h: 5.0, r: 2.9 }
+    ];
+    mountainCoords.forEach(m => {
+      const mtn = createCartoonMountain(m.h, m.r);
+      placeOnSphere(mtn, m.lat, m.lon, 0.4);
+      planetGroup.add(mtn);
+    });
+
+    // 4. 卡通生机树木 (Low-poly Pine & Rounded Trees)
+    const trunkMat = createToonMat(0x6d4c41);
+    const foliageMats = [
+      createToonMat(0x2e7d32),
+      createToonMat(0x43a047),
+      createToonMat(0x7cb342),
+      createToonMat(0xff7043), // 漫画秋色点缀
+      createToonMat(0xffb300)
+    ];
+
+    function createCartoonTree(type = 0) {
+      const tree = new THREE.Group();
+      const trunkH = 1.2;
+      const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, trunkH, 5);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = trunkH / 2;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      const fMat = foliageMats[Math.floor(Math.random() * foliageMats.length)];
+      if (type === 0) {
+        // 圆嘟嘟泡泡树
+        const folGeo = new THREE.DodecahedronGeometry(0.9, 1);
+        const fol = new THREE.Mesh(folGeo, fMat);
+        fol.position.y = trunkH + 0.6;
+        fol.castShadow = true;
+        tree.add(fol);
+      } else {
+        // 三层松树
+        for (let l = 0; l < 3; l++) {
+          const coneGeo = new THREE.ConeGeometry(0.85 - l * 0.18, 0.9, 6);
+          const cone = new THREE.Mesh(coneGeo, fMat);
+          cone.position.y = trunkH + 0.35 + l * 0.55;
+          cone.castShadow = true;
+          tree.add(cone);
+        }
+      }
+      return tree;
+    }
+
+    // 随机散落在大陆上的茂密小树林
+    for (let i = 0; i < 90; i++) {
+      const cont = continentsData[Math.floor(Math.random() * continentsData.length)];
+      const lat = cont.lat + (Math.random() - 0.5) * (cont.size * 1.1);
+      const lon = cont.lon + (Math.random() - 0.5) * (cont.size * 1.1);
+      const tree = createCartoonTree(Math.random() > 0.45 ? 0 : 1);
+      placeOnSphere(tree, lat, lon, 0.4, 0.75 + Math.random() * 0.5);
+      planetGroup.add(tree);
+    }
+
+    // 5. 繁华微缩卡通都市群 (Vibrant City Buildings)
+    const buildingColors = [0xff5964, 0x35a7ff, 0xffc43d, 0x9b5de5, 0x00f5d4, 0xffffff, 0xf15bb5];
+    const windowMat = new THREE.MeshBasicMaterial({ color: 0xfff3a1 }); // 窗户发光亮色
+    const antennaMat = createToonMat(0x37474f);
+
+    function createBuilding(width, depth, height, colorHex) {
+      const bldg = new THREE.Group();
+      const bMat = createToonMat(colorHex);
+      const bGeo = new THREE.BoxGeometry(width, height, depth);
+      const bMesh = new THREE.Mesh(bGeo, bMat);
+      bMesh.position.y = height / 2;
+      bMesh.castShadow = true;
+      bMesh.receiveShadow = true;
+      bldg.add(bMesh);
+
+      // 漫画风立体窗户细节 (网格小凸起或亮条)
+      const floors = Math.floor(height / 1.1);
+      for (let f = 1; f < floors; f++) {
+        const winGeo = new THREE.BoxGeometry(width * 1.02, 0.28, depth * 0.75);
+        const win = new THREE.Mesh(winGeo, windowMat);
+        win.position.y = f * 1.05;
+        bldg.add(win);
+      }
+
+      // 楼顶细节：水塔或避雷针/停机坪天线
+      if (Math.random() > 0.4) {
+        const antGeo = new THREE.CylinderGeometry(0.06, 0.06, 1.4, 4);
+        const ant = new THREE.Mesh(antGeo, antennaMat);
+        ant.position.y = height + 0.7;
+        bldg.add(ant);
+
+        const tipGeo = new THREE.SphereGeometry(0.18, 6, 6);
+        const tip = new THREE.Mesh(tipGeo, new THREE.MeshBasicMaterial({ color: 0xff1744 }));
+        tip.position.y = height + 1.4;
+        bldg.add(tip);
+      } else if (Math.random() > 0.5) {
+        // 小屋顶水箱
+        const tankGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.6, 7);
+        const tank = new THREE.Mesh(tankGeo, createToonMat(0xb0bec5));
+        tank.position.y = height + 0.3;
+        bldg.add(tank);
+      }
+
+      return bldg;
+    }
+
+    // 在主要大陆（大都会都会区）建造摩天楼群
+    const cityCenterLat = 10;
+    const cityCenterLon = 15;
+    for (let r = 0; r < 24; r++) {
+      const w = 1.2 + Math.random() * 0.9;
+      const d = 1.2 + Math.random() * 0.9;
+      const h = 2.2 + Math.random() * 4.8;
+      const col = buildingColors[Math.floor(Math.random() * buildingColors.length)];
+      const bldg = createBuilding(w, d, h, col);
+
+      const dLat = (Math.random() - 0.5) * 8.5;
+      const dLon = (Math.random() - 0.5) * 8.5;
+      placeOnSphere(bldg, cityCenterLat + dLat, cityCenterLon + dLon, 0.4);
+      planetGroup.add(bldg);
+    }
+
+    // 沿海小风车港口 (Coastal Lighthouse & Windmills)
+    function createWindmill() {
+      const wm = new THREE.Group();
+      const towerGeo = new THREE.CylinderGeometry(0.5, 0.8, 3.2, 8);
+      const tower = new THREE.Mesh(towerGeo, createToonMat(0xffffff));
+      tower.position.y = 1.6;
+      tower.castShadow = true;
+      wm.add(tower);
+
+      const domeGeo = new THREE.SphereGeometry(0.52, 8, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+      const dome = new THREE.Mesh(domeGeo, createToonMat(0xef4444));
+      dome.position.y = 3.2;
+      wm.add(dome);
+
+      // 风车扇叶组
+      const rotor = new THREE.Group();
+      rotor.position.set(0, 3.0, 0.52);
+      for (let i = 0; i < 4; i++) {
+        const bladeGeo = new THREE.BoxGeometry(0.3, 1.8, 0.05);
+        const blade = new THREE.Mesh(bladeGeo, createToonMat(0xffffff));
+        blade.position.y = 0.9;
+        const bladeHolder = new THREE.Group();
+        bladeHolder.rotation.z = (Math.PI / 2) * i;
+        bladeHolder.add(blade);
+        rotor.add(bladeHolder);
+      }
+      wm.add(rotor);
+      wm.userData.rotor = rotor;
+      return wm;
+    }
+
+    const windmills = [];
+    const wm1 = createWindmill();
+    placeOnSphere(wm1, -22, 60, 0.4, 0.9);
+    planetGroup.add(wm1);
+    windmills.push(wm1);
+
+    const wm2 = createWindmill();
+    placeOnSphere(wm2, -18, 82, 0.4, 0.85);
+    planetGroup.add(wm2);
+    windmills.push(wm2);
+
+    // --- 6. 环球环形道路与奔跑的卡通车车 ---
+    // 创建一条贴在星球表面的环状公路跑道 (使用圆环切片)
+    const roadGroup = new THREE.Group();
+    planetGroup.add(roadGroup);
+
+    // 环球公路：倾斜一定角度绕过城市群
+    const roadAngleTilt = 0.28;
+    const roadRadius = PLANET_RADIUS + 0.35;
+    const roadTubeGeo = new THREE.TorusGeometry(roadRadius, 0.75, 8, 128);
+    const roadMat = createToonMat(0x2f3640);
+    const roadMesh = new THREE.Mesh(roadTubeGeo, roadMat);
+    roadMesh.rotation.x = Math.PI / 2 + roadAngleTilt;
+    roadMesh.rotation.y = 0.3;
+    roadGroup.add(roadMesh);
+
+    // 卡通汽车构造器
+    function createCartoonCar(bodyColorHex, isBus = false) {
+      const car = new THREE.Group();
+      const length = isBus ? 2.5 : 1.7;
+      const width = isBus ? 1.1 : 0.95;
+      const height = isBus ? 1.2 : 0.75;
+
+      // 车身
+      const bodyGeo = new THREE.BoxGeometry(width, height, length);
+      const bMat = createToonMat(bodyColorHex);
+      const body = new THREE.Mesh(bodyGeo, bMat);
+      body.position.y = height / 2 + 0.25;
+      body.castShadow = true;
+      car.add(body);
+
+      // 车顶 (小轿车有更流线的顶棚)
+      if (!isBus) {
+        const cabinGeo = new THREE.BoxGeometry(width * 0.88, height * 0.8, length * 0.58);
+        const cabin = new THREE.Mesh(cabinGeo, createToonMat(0xffffff));
+        cabin.position.set(0, height + 0.18, -0.1);
+        cabin.castShadow = true;
+        car.add(cabin);
+      }
+
+      // 车轮
+      const wheelGeo = new THREE.CylinderGeometry(0.28, 0.28, 0.25, 8);
+      const wheelMat = createToonMat(0x1e272e);
+      const wheelOffsets = [
+        [-width / 2, 0.28, length * 0.32],
+        [width / 2, 0.28, length * 0.32],
+        [-width / 2, 0.28, -length * 0.32],
+        [width / 2, 0.28, -length * 0.32]
+      ];
+      wheelOffsets.forEach(([wx, wy, wz]) => {
+        const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+        wheel.rotation.z = Math.PI / 2;
+        wheel.position.set(wx, wy, wz);
+        car.add(wheel);
+      });
+
+      // 前车灯
+      const lightGeo = new THREE.SphereGeometry(0.12, 6, 6);
+      const lightMat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+      const leftLight = new THREE.Mesh(lightGeo, lightMat);
+      leftLight.position.set(-width * 0.3, height * 0.45, length / 2 + 0.05);
+      const rightLight = leftLight.clone();
+      rightLight.position.x = width * 0.3;
+      car.add(leftLight);
+      car.add(rightLight);
+
+      return car;
+    }
+
+    // 创建几辆在公路上巡逻的车
+    const cars = [];
+    const carConfigs = [
+      { color: 0xff3838, speed: 0.7, offset: 0.0, isBus: false },
+      { color: 0xffb142, speed: 0.55, offset: 1.6, isBus: true }, // 黄色小巴士
+      { color: 0x34ace0, speed: 0.65, offset: 3.2, isBus: false },
+      { color: 0x33d9b2, speed: 0.58, offset: 4.8, isBus: false }
+    ];
+
+    carConfigs.forEach((cfg) => {
+      const carObj = createCartoonCar(cfg.color, cfg.isBus);
+      planetGroup.add(carObj);
+      cars.push({
+        mesh: carObj,
+        speed: cfg.speed,
+        angle: cfg.offset,
+        isBus: cfg.isBus
+      });
+    });
+
+    // --- 7. 环球飞行的小飞机 (Cartoon Airplane with Smoke Trail) ---
+    function createCartoonAirplane() {
+      const plane = new THREE.Group();
+
+      // 机身：圆润胖乎乎机身
+      const bodyGeo = new THREE.ConeGeometry(0.95, 3.4, 10);
+      bodyGeo.rotateX(Math.PI / 2);
+      const bodyMat = createToonMat(0xffffff);
+      const body = new THREE.Mesh(bodyGeo, bodyMat);
+      body.castShadow = true;
+      plane.add(body);
+
+      // 机头罩
+      const noseGeo = new THREE.SphereGeometry(0.72, 8, 8);
+      const noseMat = createToonMat(0xff3b30);
+      const nose = new THREE.Mesh(noseGeo, noseMat);
+      nose.position.z = 1.35;
+      plane.add(nose);
+
+      // 螺旋桨
+      const propGroup = new THREE.Group();
+      propGroup.position.z = 2.05;
+      const propCenter = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.25, 8), createToonMat(0x333333));
+      propCenter.rotation.x = Math.PI / 2;
+      propGroup.add(propCenter);
+      for (let i = 0; i < 2; i++) {
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.8, 0.04), createToonMat(0xfac02e));
+        blade.rotation.z = i * Math.PI / 2;
+        propGroup.add(blade);
+      }
+      plane.add(propGroup);
+      plane.userData.propeller = propGroup;
+
+      // 主机翼
+      const wingGeo = new THREE.BoxGeometry(5.2, 0.14, 1.1);
+      const wingMat = createToonMat(0x007aff);
+      const wings = new THREE.Mesh(wingGeo, wingMat);
+      wings.position.set(0, 0.1, 0.1);
+      wings.castShadow = true;
+      plane.add(wings);
+
+      // 尾翼
+      const tailFinGeo = new THREE.BoxGeometry(0.12, 1.2, 0.9);
+      const tailFin = new THREE.Mesh(tailFinGeo, createToonMat(0xff3b30));
+      tailFin.position.set(0, 0.7, -1.25);
+      tailFin.rotation.x = -0.3;
+      plane.add(tailFin);
+
+      const tailHGeo = new THREE.BoxGeometry(1.9, 0.1, 0.6);
+      const tailH = new THREE.Mesh(tailHGeo, wingMat);
+      tailH.position.set(0, 0.2, -1.35);
+      plane.add(tailH);
+
+      // 驾驶舱圆罩
+      const cockpitGeo = new THREE.SphereGeometry(0.55, 8, 8);
+      const glassMat = new THREE.MeshBasicMaterial({ color: 0x70d6ff });
+      const cockpit = new THREE.Mesh(cockpitGeo, glassMat);
+      cockpit.position.set(0, 0.48, 0.45);
+      cockpit.scale.set(0.7, 0.8, 1.3);
+      plane.add(cockpit);
+
+      plane.scale.setScalar(0.75);
+      return plane;
+    }
+
+    const airplane = createCartoonAirplane();
+    scene.add(airplane); // 放在世界坐标下，更便于自由航行与镜头追踪
+
+    // 飞机尾部卡通喷气小烟圈 (Smoke Puffs)
+    const smokeParticles = [];
+    const smokeGeo = new THREE.DodecahedronGeometry(0.35, 1);
+    const smokeMat = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.75
+    });
+
+    for (let s = 0; s < 25; s++) {
+      const puff = new THREE.Mesh(smokeGeo, smokeMat.clone());
+      puff.visible = false;
+      puff.userData = { life: 0, maxLife: 1.0, scale: 1 };
+      scene.add(puff);
+      smokeParticles.push(puff);
+    }
+    let smokeEmitTimer = 0;
+
+    // --- 8. 蓬松卡通云朵 (Puffy Fluffy Cartoon Clouds) ---
+    const cloudMat = createToonMat(0xffffff, { roughness: 0.15 });
+
+    function createPuffyCloud() {
+      const cloud = new THREE.Group();
+      const puffCount = 5 + Math.floor(Math.random() * 4);
+      const mainScale = 1.0 + Math.random() * 0.8;
+
+      for (let p = 0; p < puffCount; p++) {
+        const radius = 1.1 + Math.random() * 1.0;
+        const pGeo = new THREE.DodecahedronGeometry(radius, 1);
+        const pMesh = new THREE.Mesh(pGeo, cloudMat);
+        pMesh.position.set(
+          (Math.random() - 0.5) * 3.2,
+          (Math.random() - 0.5) * 0.8,
+          (Math.random() - 0.5) * 1.8
+        );
+        pMesh.castShadow = true;
+        cloud.add(pMesh);
+      }
+      cloud.scale.setScalar(mainScale);
+      return cloud;
+    }
+
+    const cloudsGroup = new THREE.Group();
+    planetGroup.add(cloudsGroup);
+
+    const clouds = [];
+    const cloudPositions = [
+      { lat: 35, lon: 40, alt: 7.5, rotSpeed: 0.15 },
+      { lat: 15, lon: -80, alt: 8.5, rotSpeed: -0.2 },
+      { lat: -25, lon: 110, alt: 8.0, rotSpeed: 0.18 },
+      { lat: -45, lon: -30, alt: 9.0, rotSpeed: -0.14 },
+      { lat: 55, lon: 160, alt: 8.2, rotSpeed: 0.22 },
+      { lat: 0, lon: -160, alt: 7.8, rotSpeed: -0.16 },
+      { lat: -10, lon: 10, alt: 9.5, rotSpeed: 0.12 },
+      { lat: 60, lon: -85, alt: 8.8, rotSpeed: 0.25 }
+    ];
+
+    cloudPositions.forEach(c => {
+      const cMesh = createPuffyCloud();
+      placeOnSphere(cMesh, c.lat, c.lon, c.alt);
+      cloudsGroup.add(cMesh);
+      clouds.push({
+        mesh: cMesh,
+        lat: c.lat,
+        lon: c.lon,
+        alt: c.alt,
+        speed: c.rotSpeed
+      });
+    });
+
+    // --- 9. 漫画大气辉光外壳 (Atmospheric Shell) ---
+    const atmoGeo = new THREE.SphereGeometry(ATMOSPHERE_RADIUS + 4.5, 48, 36);
+    const atmoMat = new THREE.ShaderMaterial({
+      transparent: true,
+      side: THREE.BackSide,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: {
+        glowColor: { value: new THREE.Color(0x38bdf8) }
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        uniform vec3 glowColor;
+        void main() {
+          float intensity = pow(0.68 + dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.2);
+          gl_FragColor = vec4(glowColor, intensity * 0.42);
+        }
+      `
+    });
+    const atmoMesh = new THREE.Mesh(atmoGeo, atmoMat);
+    scene.add(atmoMesh);
+
+    // --- 动画与交互控制逻辑 ---
+    let cameraMode = 'free'; // 'free' | 'plane' | 'car'
+    let isSpeedBoost = false;
+    let isDay = true;
+    let clock = new THREE.Clock();
+
+    // 交互按钮绑定
+    const btnFree = document.getElementById('btn-cam-free');
+    const btnPlane = document.getElementById('btn-cam-plane');
+    const btnCar = document.getElementById('btn-cam-car');
+    const btnSpeed = document.getElementById('btn-speed');
+    const btnDayNight = document.getElementById('btn-daynight');
+
+    function setActiveModeButton(activeBtn) {
+      [btnFree, btnPlane, btnCar].forEach(b => b.classList.remove('active'));
+      activeBtn.classList.add('active');
+    }
+
+    btnFree.addEventListener('click', () => {
+      cameraMode = 'free';
+      setActiveModeButton(btnFree);
+      controls.autoRotate = true;
+    });
+
+    btnPlane.addEventListener('click', () => {
+      cameraMode = 'plane';
+      setActiveModeButton(btnPlane);
+      controls.autoRotate = false;
+    });
+
+    btnCar.addEventListener('click', () => {
+      cameraMode = 'car';
+      setActiveModeButton(btnCar);
+      controls.autoRotate = false;
+    });
+
+    btnSpeed.addEventListener('click', () => {
+      isSpeedBoost = !isSpeedBoost;
+      btnSpeed.classList.toggle('active', isSpeedBoost);
+      btnSpeed.textContent = isSpeedBoost ? '🔥 极速飞驰' : '⚡ 加速公转';
+    });
+
+    btnDayNight.addEventListener('click', () => {
+      isDay = !isDay;
+      btnDayNight.textContent = isDay ? '🌙 昼夜切换' : '☀️ 晨曦切换';
+      if (isDay) {
+        scene.background.setHex(0x0c1424);
+        scene.fog.color.setHex(0x0c1424);
+        sunLight.color.setHex(0xfff3d1);
+        sunLight.intensity = 2.4;
+        hemiLight.intensity = 1.2;
+      } else {
+        scene.background.setHex(0x05070f);
+        scene.fog.color.setHex(0x05070f);
+        sunLight.color.setHex(0xff9966);
+        sunLight.intensity = 0.9;
+        hemiLight.intensity = 0.45;
+      }
+    });
+
+    // --- 飞机航行轨道计算与平滑更新 ---
+    const planeFlightRadius = PLANET_RADIUS + 9.5;
+    let planeOrbitAngle = 0;
+
+    function updateAirplane(delta, time) {
+      const flightSpeed = (isSpeedBoost ? 1.6 : 0.7) * delta;
+      planeOrbitAngle += flightSpeed;
+
+      // 倾斜与起伏的双轴航线
+      const inclination = 0.42;
+      const x = planeFlightRadius * Math.cos(planeOrbitAngle);
+      const z = planeFlightRadius * Math.sin(planeOrbitAngle) * Math.cos(inclination);
+      const y = planeFlightRadius * Math.sin(planeOrbitAngle) * Math.sin(inclination) + Math.sin(time * 3.5) * 1.2;
+
+      // 下一步位置用于算切线朝向
+      const nextAngle = planeOrbitAngle + 0.05;
+      const nx = planeFlightRadius * Math.cos(nextAngle);
+      const nz = planeFlightRadius * Math.sin(nextAngle) * Math.cos(inclination);
+      const ny = planeFlightRadius * Math.sin(nextAngle) * Math.sin(inclination);
+
+      const currentPos = new THREE.Vector3(x, y, z);
+      const targetPos = new THREE.Vector3(nx, ny, nz);
+
+      airplane.position.copy(currentPos);
+      airplane.lookAt(targetPos);
+
+      // 卡通式飞行横滚/倾斜晃荡
+      airplane.rotateZ(Math.sin(time * 4) * 0.15 - 0.15);
+
+      // 螺旋桨疾速旋转
+      if (airplane.userData.propeller) {
+        airplane.userData.propeller.rotation.z += 28 * delta;
+      }
+
+      // 生成尾气小烟圈
+      smokeEmitTimer += delta;
+      if (smokeEmitTimer > 0.08) {
+        smokeEmitTimer = 0;
+        const availablePuff = smokeParticles.find(p => !p.visible);
+        if (availablePuff) {
+          const tailWorldPos = new THREE.Vector3(0, 0, -1.8);
+          tailWorldPos.applyMatrix4(airplane.matrixWorld);
+          availablePuff.position.copy(tailWorldPos);
+          availablePuff.visible = true;
+          availablePuff.userData.life = 0;
+          availablePuff.scale.setScalar(0.4 + Math.random() * 0.3);
+          availablePuff.material.opacity = 0.75;
+        }
+      }
+
+      // 更新烟雾生命周期
+      smokeParticles.forEach(puff => {
+        if (puff.visible) {
+          puff.userData.life += delta * 1.5;
+          puff.scale.multiplyScalar(1.02);
+          puff.material.opacity = Math.max(0, 0.75 * (1 - puff.userData.life));
+          if (puff.userData.life >= 1.0) {
+            puff.visible = false;
+          }
+        }
+      });
+    }
+
+    // --- 环球小车更新 ---
+    function updateCars(delta) {
+      const speedMult = isSpeedBoost ? 2.5 : 1.0;
+      cars.forEach((carItem) => {
+        carItem.angle += carItem.speed * speedMult * delta * 0.35;
+
+        // 计算车辆在倾斜道路环上的世界坐标
+        const r = roadRadius + 0.3;
+        const localX = r * Math.cos(carItem.angle);
+        const localZ = r * Math.sin(carItem.angle);
+        const pos = new THREE.Vector3(localX, 0, localZ);
+
+        // 应用道路相同倾斜旋转
+        pos.applyAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 + roadAngleTilt);
+        pos.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.3);
+        carItem.mesh.position.copy(pos);
+
+        // 朝向切线
+        const nextAngle = carItem.angle + 0.04;
+        const nextLocalX = r * Math.cos(nextAngle);
+        const nextLocalZ = r * Math.sin(nextAngle);
+        const nextPos = new THREE.Vector3(nextLocalX, 0, nextLocalZ);
+        nextPos.applyAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2 + roadAngleTilt);
+        nextPos.applyAxisAngle(new THREE.Vector3(0, 1, 0), 0.3);
+
+        carItem.mesh.lookAt(nextPos);
+        // 让汽车顶部法线背向地心
+        const upVec = pos.clone().normalize();
+        carItem.mesh.up.copy(upVec);
+      });
+    }
+
+    // --- 镜头跟随动画 ---
+    const desiredCamPos = new THREE.Vector3();
+    const desiredLookTarget = new THREE.Vector3();
+
+    function updateCameraFollow(delta) {
+      if (cameraMode === 'plane') {
+        // 跟随在飞机后上方
+        const offset = new THREE.Vector3(0, 3.8, -9.5);
+        offset.applyMatrix4(airplane.matrixWorld);
+        desiredCamPos.copy(offset);
+        desiredLookTarget.copy(airplane.position);
+
+        camera.position.lerp(desiredCamPos, 0.08);
+        controls.target.lerp(desiredLookTarget, 0.1);
+      } else if (cameraMode === 'car') {
+        // 跟随小巴士 (cars[1])
+        const targetCar = cars[1].mesh;
+        const offset = new THREE.Vector3(0, 4.5, -7.0);
+        offset.applyMatrix4(targetCar.matrixWorld);
+        desiredCamPos.copy(offset);
+        desiredLookTarget.copy(targetCar.position);
+
+        camera.position.lerp(desiredCamPos, 0.08);
+        controls.target.lerp(desiredLookTarget, 0.1);
+      } else {
+        // 自由模式：平滑回拉目标到球心
+        desiredLookTarget.set(0, 0, 0);
+        controls.target.lerp(desiredLookTarget, 0.05);
+      }
+    }
+
+    // --- 主动画循环 ---
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = Math.min(clock.getDelta(), 0.1);
+      const time = clock.getElapsedTime();
+
+      // 星球慢速自转
+      const planetRotSpeed = (isSpeedBoost ? 0.35 : 0.08) * delta;
+      planetGroup.rotation.y += planetRotSpeed;
+
+      // 风车旋转
+      windmills.forEach(wm => {
+        if (wm.userData.rotor) {
+          wm.userData.rotor.rotation.z += 3.2 * delta;
+        }
+      });
+
+      // 云朵浮动公转与轻微上下律动
+      clouds.forEach((c, idx) => {
+        c.mesh.rotation.y += c.speed * delta * 0.4;
+        c.mesh.position.y += Math.sin(time * 2 + idx) * 0.008;
+      });
+
+      // 更新载具系统
+      updateAirplane(delta, time);
+      updateCars(delta);
+
+      // 控制器与摄像机视角更新
+      updateCameraFollow(delta);
+      controls.update();
+
+      renderer.render(scene, camera);
+    }
+
+    // --- 响应式窗口大小调整 ---
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // 启动动画循环
+    animate();
+  </script>
+
+  <script src="../prompt-panel.js" data-id="cartoon-planet-flash"></script>
+</body>
+</html>

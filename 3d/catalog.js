@@ -209,6 +209,8 @@ window.GALLERY_CATEGORIES = [
         "title": "体素 F1 赛车",
         "description": "体素风格的梅赛德斯 AMG F1 赛车。",
         "models": [
+          "web",
+          "flash",
           "deepseek"
         ],
         "source": "https://x.com/HarshithLucky3/status/2110048102321365205"
@@ -253,6 +255,8 @@ window.GALLERY_CATEGORIES = [
         "title": "直列四缸发动机",
         "description": "活塞、曲轴、凸轮联动，按点火顺序点火，可一键分解。",
         "models": [
+          "web",
+          "flash",
           "deepseek"
         ],
         "source": "https://x.com/afeiNick/status/2106923394490863794"
@@ -297,6 +301,8 @@ window.GALLERY_CATEGORIES = [
         "title": "精细地球",
         "description": "一颗尽量精细好看的 3D 地球。",
         "models": [
+          "web",
+          "flash",
           "deepseek"
         ],
         "source": "https://x.com/LongXiao4082/status/2079472589114834995"
@@ -306,15 +312,22 @@ window.GALLERY_CATEGORIES = [
         "title": "黑洞引力透镜",
         "description": "卡冈图雅式黑洞：引力透镜、吸积盘和环绕的等离子体。",
         "models": [
+          "web",
+          "flash",
           "deepseek"
         ],
-        "source": "https://x.com/ItsmeAjayKV/status/2064432956505255939"
+        "source": "https://x.com/ItsmeAjayKV/status/2064432956505255939",
+        "chats": {
+          "web": "https://share.gemini.google/Bz4TuXDoIcNy"
+        }
       },
       {
         "id": "floating-islands",
         "title": "浮空岛世界",
         "description": "黄金时刻的浮空岛、瀑布、遗迹与飞艇，WASD 自由飞行。",
         "models": [
+          "web",
+          "flash",
           "deepseek"
         ],
         "source": "https://x.com/antpalkin/status/2084302112662417656"
@@ -324,9 +337,14 @@ window.GALLERY_CATEGORIES = [
         "title": "卡通星球",
         "description": "漫画风小星球，云、山、城市，车和飞机在上面跑。",
         "models": [
+          "web",
+          "flash",
           "deepseek"
         ],
-        "source": "https://x.com/huxlab/status/2102684995571859707"
+        "source": "https://x.com/huxlab/status/2102684995571859707",
+        "chats": {
+          "web": "https://share.gemini.google/8KATtBYvsU92"
+        }
       }
     ]
   }

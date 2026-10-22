@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>卡冈图雅 - 黑洞与引力透镜可视化</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #000000;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      color: #e0e0e0;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+    }
+    /* 左上角返回按钮 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 100;
+      padding: 8px 16px;
+      font-size: 13px;
+      letter-spacing: 0.5px;
+      color: #2c2214;
+      background: rgba(247, 241, 227, 0.78);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.4);
+      border-radius: 20px;
+      text-decoration: none;
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+    }
+    .back-btn:hover {
+      background: rgba(255, 248, 235, 0.95);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 22px rgba(255, 180, 80, 0.25);
+    }
+    /* 右上角原生风格控制面板 */
+    #ui-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 100;
+      width: 250px;
+      background: rgba(12, 12, 16, 0.68);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(255, 200, 120, 0.2);
+      border-radius: 12px;
+      padding: 14px 16px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      font-size: 12px;
+    }
+    .panel-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #ffca85;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      letter-spacing: 0.5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 6px;
+    }
+    .control-row {
+      margin-bottom: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      color: #cfd3dc;
+    }
+    .control-label span:last-child {
+      color: #ffaa44;
+      font-family: monospace;
+    }
+    input[type="range"] {
+      -webkit-appearance: none;
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 2px;
+      outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffb86c;
+      cursor: pointer;
+      box-shadow: 0 0 6px rgba(255, 170, 68, 0.8);
+      transition: transform 0.1s;
+    }
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 6px;
+      padding-top: 6px;
+      border-top: 1px dashed rgba(255, 255, 255, 0.1);
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 36px;
+      height: 20px;
+    }
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background-color: rgba(255, 255, 255, 0.2);
+      transition: .3s;
+      border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 14px;
+      width: 14px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: .3s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #ff9d3b;
+    }
+    input:checked + .slider:before {
+      transform: translateX(16px);
+    }
+    /* 底部实时物理现象解析文字 */
+    #info-banner {
+      position: fixed;
+      bottom: 22px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      font-size: 13px;
+      letter-spacing: 0.8px;
+      color: rgba(240, 230, 220, 0.9);
+      background: rgba(8, 8, 12, 0.6);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      padding: 7px 22px;
+      border-radius: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      pointer-events: none;
+      white-space: nowrap;
+      text-align: center;
+      box-shadow: 0 4px 18px rgba(0,0,0,0.6);
+    }
+    @media (max-width: 600px) {
+      #ui-panel {
+        top: auto;
+        bottom: 64px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+      }
+      #info-banner {
+        bottom: 12px;
+        font-size: 11px;
+        padding: 5px 14px;
+      }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:600px){#info-banner{bottom:76px}}</style>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div id="ui-panel">
+    <div class="panel-title">
+      <span>卡冈图雅控制台</span>
+      <span style="font-size: 10px; color: #889;">GARGANTUA</span>
+    </div>
+    <div class="control-row">
+      <div class="control-label">
+        <span>黑洞质量 (引力透镜)</span>
+        <span id="val-mass">1.0</span>
+      </div>
+      <input type="range" id="param-mass" min="0.2" max="2.5" step="0.05" value="1.0">
+    </div>
+    <div class="control-row">
+      <div class="control-label">
+        <span>吸积盘亮度</span>
+        <span id="val-brightness">1.2</span>
+      </div>
+      <input type="range" id="param-brightness" min="0.2" max="2.5" step="0.05" value="1.2">
+    </div>
+    <div class="control-row">
+      <div class="control-label">
+        <span>流体旋转速度</span>
+        <span id="val-speed">1.0</span>
+      </div>
+      <input type="range" id="param-speed" min="0.1" max="3.0" step="0.1" value="1.0">
+    </div>
+    <div class="control-row">
+      <div class="control-label">
+        <span>等离子体粒子量</span>
+        <span id="val-particles">4000</span>
+      </div>
+      <input type="range" id="param-particles" min="1000" max="6000" step="500" value="4000">
+    </div>
+    <div class="toggle-row">
+      <span>引力透镜开关</span>
+      <label class="switch">
+        <input type="checkbox" id="toggle-lensing" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div id="info-banner">观测状态：光子环与爱因斯坦引力偏折稳定</div>
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+    import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+    import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+    import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+    // --- 全局参数状态 ---
+    const PARAMS = {
+      mass: 1.0,
+      brightness: 1.2,
+      speed: 1.0,
+      particleCount: 4000,
+      lensingEnabled: true
+    };
+
+    const container = document.getElementById('canvas-container');
+    const infoBanner = document.getElementById('info-banner');
+
+    // 1. 初始化 Scene, Camera, Renderer
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.1, 1500);
+    camera.position.set(0, 7.5, 30);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+    controls.minDistance = 6.2;
+    controls.maxDistance = 80;
+    controls.target.set(0, 0, 0);
+
+    // --- 2. 程序化生成深空背景星云与恒星 ---
+    const bgVertexShader = `
+      varying vec3 vWorldPosition;
+      void main() {
+        vWorldPosition = (modelMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `;
+
+    const bgFragmentShader = `
+      varying vec3 vWorldPosition;
+      uniform float uTime;
+
+      // 3D 简易噪声
+      float hash(vec3 p) {
+        p = fract(p * 0.3183099 + 0.1);
+        p *= 17.0;
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+      }
+
+      float noise(vec3 x) {
+        vec3 i = floor(x);
+        vec3 f = fract(x);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(mix(hash(i + vec3(0,0,0)), hash(i + vec3(1,0,0)), f.x),
+                       mix(hash(i + vec3(0,1,0)), hash(i + vec3(1,1,0)), f.x), f.y),
+                   mix(mix(hash(i + vec3(0,0,1)), hash(i + vec3(1,0,1)), f.x),
+                       mix(hash(i + vec3(0,1,1)), hash(i + vec3(1,1,1)), f.x), f.y), f.z);
+      }
+
+      float fbm(vec3 p) {
+        float v = 0.0;
+        float a = 0.5;
+        for (int i = 0; i < 4; i++) {
+          v += a * noise(p);
+          p *= 2.05;
+          a *= 0.5;
+        }
+        return v;
+      }
+
+      void main() {
+        vec3 dir = normalize(vWorldPosition);
+
+        // 银河带主体（靠近倾斜盘平面的银河光晕）
+        float milkyBand = exp(-abs(dir.y * 3.5 + dir.x * 0.8) * 1.8);
+        float n = fbm(dir * 12.0);
+        float gas = smoothstep(0.15, 0.9, milkyBand * (0.4 + 0.6 * n));
+
+        vec3 nebulaColor1 = vec3(0.04, 0.08, 0.18);
+        vec3 nebulaColor2 = vec3(0.24, 0.12, 0.28);
+        vec3 nebulaColor3 = vec3(0.45, 0.22, 0.12);
+        vec3 skyColor = mix(vec3(0.003, 0.004, 0.01), nebulaColor1, dir.y * 0.5 + 0.5);
+        skyColor += mix(nebulaColor2, nebulaColor3, n) * gas * 0.9;
+
+        // 程序化点阵恒星
+        float starDensity = noise(dir * 180.0);
+        float star = step(0.965, starDensity) * pow((starDensity - 0.965) / 0.035, 3.0);
+        skyColor += vec3(star * 1.4);
+
+        gl_FragColor = vec4(skyColor, 1.0);
+      }
+    `;
+
+    const bgSphere = new THREE.Mesh(
+      new THREE.SphereGeometry(900, 32, 32),
+      new THREE.ShaderMaterial({
+        vertexShader: bgVertexShader,
+        fragmentShader: bgFragmentShader,
+        side: THREE.BackSide,
+        depthWrite: false
+      })
+    );
+    scene.add(bgSphere);
+
+    // --- 3. 吸积盘构建 (含弯折双拱透镜投影与多普勒频移) ---
+    // 采用围绕黑洞的双层体积感圆盘几何体
+    const diskRadiusInner = 2.4;
+    const diskRadiusOuter = 11.2;
+
+    const accretionDiskShader = {
+      vertexShader: `
+        varying vec3 vWorldPos;
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * viewMatrix * vec4(vWorldPos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float uTime;
+        uniform float uBrightness;
+        uniform vec3 uCamPos;
+        varying vec3 vWorldPos;
+        varying vec2 vUv;
+
+        // 噪声函数生成湍流
+        float hash(vec2 p) {
+          return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+        }
+        float noise(vec2 p) {
+          vec2 i = floor(p);
+          vec2 f = fract(p);
+          f = f * f * (3.0 - 2.0 * f);
+          return mix(mix(hash(i + vec2(0.0,0.0)), hash(i + vec2(1.0,0.0)), f.x),
+                     mix(hash(i + vec2(0.0,1.0)), hash(i + vec2(1.0,1.0)), f.x), f.y);
+        }
+        float fbm(vec2 p) {
+          float v = 0.0;
+          float a = 0.55;
+          for(int i = 0; i < 4; i++) {
+            v += a * noise(p);
+            p = p * 2.2 + vec2(1.6, -1.2);
+            a *= 0.48;
+          }
+          return v;
+        }
+
+        void main() {
+          float dist = length(vWorldPos.xz);
+          if (dist < 2.3 || dist > 11.0) discard;
+
+          // 归一化盘内半径
+          float tRadius = (dist - 2.3) / (11.0 - 2.3);
+
+          // 极坐标展开计算旋转湍流
+          float angle = atan(vWorldPos.z, vWorldPos.x);
+          // 开普勒差动旋转：内圈快，外圈慢
+          float rotationSpeed = 1.8 / pow(dist * 0.4, 1.3);
+          float spiralAngle = angle + uTime * rotationSpeed;
+
+          vec2 uvFlow = vec2(spiralAngle * 3.8, dist * 1.4);
+          float gasTurbulence = fbm(uvFlow);
+
+          // 吸积盘辐射色谱梯度：内圈极致白热与金光，中段橘黄，外圈暗红消散
+          vec3 innerColor = vec3(1.3, 1.25, 1.1);   // 视界边缘白炽极端高温
+          vec3 midColor   = vec3(1.0, 0.48, 0.08);  // 强烈橙黄电离气体
+          vec3 outerColor = vec3(0.55, 0.05, 0.01); // 边缘逐渐暗红
+
+          vec3 diskColor;
+          if (tRadius < 0.25) {
+            diskColor = mix(innerColor, midColor, tRadius / 0.25);
+          } else {
+            diskColor = mix(midColor, outerColor, (tRadius - 0.25) / 0.75);
+          }
+
+          // 密度衰减（内圈陡升，外圈渐变透明）
+          float density = smoothstep(0.0, 0.12, tRadius) * pow(1.0 - tRadius, 1.35);
+          density *= 0.65 + 0.75 * gasTurbulence;
+
+          // 多普勒效应 (Doppler Beaming):
+          // 轨道线速度方向 v ~ (-sin(angle), 0, cos(angle))
+          vec3 tangentDir = normalize(vec3(-vWorldPos.z, 0.0, vWorldPos.x));
+          vec3 toCamDir = normalize(uCamPos - vWorldPos);
+          float dopplerDot = dot(tangentDir, toCamDir);
+          // 沿视线接近观察者侧增强并蓝移/增亮，背离观察者侧变暗红
+          float dopplerFactor = pow(1.0 + 0.6 * dopplerDot, 3.2);
+
+          vec3 finalColor = diskColor * density * dopplerFactor * uBrightness * 2.5;
+
+          // 视角边缘轻微菲涅尔消散
+          gl_FragColor = vec4(finalColor, clamp(density * 1.5, 0.0, 1.0));
+        }
+      `
+    };
+
+    const diskGeo = new THREE.RingGeometry(diskRadiusInner, diskRadiusOuter, 128, 32);
+    // 水平铺开
+    diskGeo.rotateX(-Math.PI / 2);
+    const diskMaterial = new THREE.ShaderMaterial({
+      vertexShader: accretionDiskShader.vertexShader,
+      fragmentShader: accretionDiskShader.fragmentShader,
+      uniforms: {
+        uTime: { value: 0.0 },
+        uBrightness: { value: PARAMS.brightness },
+        uCamPos: { value: new THREE.Vector3() }
+      },
+      side: THREE.DoubleSide,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+    const accretionDisk = new THREE.Mesh(diskGeo, diskMaterial);
+    // 给予吸积盘适度的特征倾角 (约 17度)
+    accretionDisk.rotation.z = 0.18;
+    accretionDisk.rotation.x = 0.22;
+    scene.add(accretionDisk);
+
+    // --- 4. 真实卡冈图雅透镜投影次级弯折盘 (Upper/Lower Gravitational Lensed Arcs) ---
+    // 在纯 3D 几何层面构造受黑洞强场偏折向上/向下拱起的弯曲光晕盘，
+    // 与后处理屏幕空间透镜结合，完美再现《星际穿越》标志性的垂直交叉环绕光环
+    const arcGeo = new THREE.RingGeometry(2.32, 10.8, 128, 32);
+    const arcMaterial = diskMaterial.clone();
+    const lensedArcUpper = new THREE.Mesh(arcGeo, arcMaterial);
+    lensedArcUpper.rotation.x = Math.PI / 2 + 0.22;
+    lensedArcUpper.rotation.z = 0.18;
+    lensedArcUpper.scale.set(0.96, 0.96, 0.96);
+    scene.add(lensedArcUpper);
+
+    // --- 5. 纯黑事件视界与极细锐光子环球体 ---
+    // 视界球 (完全不透光遮挡内部)
+    const horizonGeo = new THREE.SphereGeometry(2.0, 64, 64);
+    const horizonMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+    const eventHorizonMesh = new THREE.Mesh(horizonGeo, horizonMat);
+    scene.add(eventHorizonMesh);
+
+    // 光子环（临界不稳定轨道 r ~ 2.6）
+    const photonRingShader = {
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
+          vViewDir = normalize(-mvPos.xyz);
+          gl_Position = projectionMatrix * mvPos;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vNormal;
+        varying vec3 vViewDir;
+        uniform float uBrightness;
+        void main() {
+          // 边缘掠射极窄锐利光圈
+          float rim = 1.0 - abs(dot(vNormal, vViewDir));
+          float sharpRing = pow(rim, 18.0) * 8.0;
+          float innerMask = smoothstep(0.2, 0.9, rim);
+          vec3 ringColor = vec3(1.3, 0.95, 0.7) * sharpRing * uBrightness;
+          gl_FragColor = vec4(ringColor, sharpRing * innerMask);
+        }
+      `
+    };
+    const photonRingMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(2.15, 64, 64),
+      new THREE.ShaderMaterial({
+        vertexShader: photonRingShader.vertexShader,
+        fragmentShader: photonRingShader.fragmentShader,
+        uniforms: { uBrightness: { value: PARAMS.brightness } },
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending,
+        transparent: true
+      })
+    );
+    scene.add(photonRingMesh);
+
+    // --- 6. 螺旋坠落的等离子体粒子流 ---
+    const maxParticles = 6000;
+    const particlePositions = new Float32Array(maxParticles * 3);
+    const particleColors = new Float32Array(maxParticles * 3);
+    const particleSizes = new Float32Array(maxParticles);
+    const particleMeta = []; // 存储轨半径、角度、速度、寿命
+
+    const pColorHot = new THREE.Color(0xffeedd);
+    const pColorOrange = new THREE.Color(0xff7722);
+    const pColorRed = new THREE.Color(0xaa1105);
+
+    for (let i = 0; i < maxParticles; i++) {
+      const radius = 2.4 + Math.pow(Math.random(), 1.6) * 11.5;
+      const angle = Math.random() * Math.PI * 2;
+      const vY = (Math.random() - 0.5) * 0.45 * (radius / 12.0);
+      const speed = (0.7 + Math.random() * 0.5) / Math.sqrt(radius);
+
+      particleMeta.push({
+        radius: radius,
+        angle: angle,
+        speed: speed,
+        height: vY,
+        seed: Math.random() * 10.0
+      });
+
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const y = vY;
+
+      particlePositions[i * 3 + 0] = x;
+      particlePositions[i * 3 + 1] = y;
+      particlePositions[i * 3 + 2] = z;
+
+      const normDist = (radius - 2.4) / 11.5;
+      const col = new THREE.Color();
+      if (normDist < 0.25) col.lerpColors(pColorHot, pColorOrange, normDist / 0.25);
+      else col.lerpColors(pColorOrange, pColorRed, (normDist - 0.25) / 0.75);
+
+      particleColors[i * 3 + 0] = col.r;
+      particleColors[i * 3 + 1] = col.g;
+      particleColors[i * 3 + 2] = col.b;
+      particleSizes[i] = 1.0 + Math.random() * 2.4;
+    }
+
+    const particleGeometry = new THREE.BufferGeometry();
+    particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+    particleGeometry.setAttribute('color', new THREE.BufferAttribute(particleColors, 3));
+    particleGeometry.setAttribute('size', new THREE.BufferAttribute(particleSizes, 1));
+
+    // 程序化圆形发光粒子贴图
+    const createParticleTexture = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, 'rgba(255,255,255,1)');
+      grad.addColorStop(0.35, 'rgba(255,180,100,0.85)');
+      grad.addColorStop(0.7, 'rgba(255,60,10,0.3)');
+      grad.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 64, 64);
+      return new THREE.CanvasTexture(canvas);
+    };
+
+    const particleMaterial = new THREE.PointsMaterial({
+      size: 0.28,
+      vertexColors: true,
+      map: createParticleTexture(),
+      blending: THREE.AdditiveBlending,
+      transparent: true,
+      depthWrite: false
+    });
+
+    const plasmaPoints = new THREE.Points(particleGeometry, particleMaterial);
+    // 与吸积盘倾角统一
+    plasmaPoints.rotation.z = 0.18;
+    plasmaPoints.rotation.x = 0.22;
+    scene.add(plasmaPoints);
+
+    // --- 7. 后处理管线：引力透镜全屏 Shader + UnrealBloom ---
+    const composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+
+    // 强引力透镜 ShaderPass
+    const GravitationalLensingShader = {
+      uniforms: {
+        tDiffuse: { value: null },
+        uScreenCenter: { value: new THREE.Vector2(0.5, 0.5) },
+        uAspectRatio: { value: window.innerWidth / window.innerHeight },
+        uRadius: { value: 0.12 },       // 事件视界屏幕映射半径
+        uMass: { value: PARAMS.mass },  // 引力偏折系数
+        uEnabled: { value: 1.0 },
+        uCameraDist: { value: 30.0 }
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform vec2 uScreenCenter;
+        uniform float uAspectRatio;
+        uniform float uRadius;
+        uniform float uMass;
+        uniform float uEnabled;
+        uniform float uCameraDist;
+        varying vec2 vUv;
+
+        void main() {
+          if (uEnabled < 0.5 || uRadius <= 0.001) {
+            gl_FragColor = texture2D(tDiffuse, vUv);
+            return;
+          }
+
+          // 保持坐标纵横比矫正，使得重力透镜呈精确正圆
+          vec2 diff = vUv - uScreenCenter;
+          diff.x *= uAspectRatio;
+          float dist = length(diff);
+
+          // 视界绝对遮蔽半径
+          float rh = uRadius;
+
+          // 强引力爱因斯坦弯折角公式近似：alpha ~ 4GM / r
+          // 临界视界直接斩断，输出纯黑（#000000），坚决不发光不透色
+          if (dist < rh) {
+            gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
+            return;
+          }
+
+          // 视界外部光线反向追踪扭曲
+          float delta = dist - rh;
+          // 爱因斯坦环偏折强度计算
+          float deflection = (uMass * rh * 0.18) / (delta + 0.0035 * uMass);
+          vec2 distortion = normalize(diff) * deflection;
+          distortion.x /= uAspectRatio;
+
+          vec2 sampledUv = vUv - distortion;
+
+          // 采样并叠加光子环临界锐化
+          vec4 sceneColor = texture2D(tDiffuse, sampledUv);
+
+          // 爱因斯坦环微弱光能聚焦增强
+          float ringGlow = exp(-abs(dist - rh * 1.35) * 45.0) * 0.35 * uMass;
+          vec3 finalRgb = sceneColor.rgb + vec3(1.0, 0.82, 0.6) * ringGlow;
+
+          gl_FragColor = vec4(finalRgb, sceneColor.a);
+        }
+      `
+    };
+
+    const lensingPass = new ShaderPass(GravitationalLensingShader);
+    composer.addPass(lensingPass);
+
+    // UnrealBloomPass 辉光
+    const bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      1.4,   // 辉光强度
+      0.45,  // 半径
+      0.82   // 阈值：让纯黑视界彻底排斥在辉光之外
+    );
+    composer.addPass(bloomPass);
+
+    // --- 8. 辅助向量与透镜中心重投影 ---
+    const blackHoleWorldPos = new THREE.Vector3(0, 0, 0);
+    const screenCenter = new THREE.Vector3();
+
+    function updateLensingMetrics() {
+      // 计算黑洞在屏幕 NDC 空间的位置
+      screenCenter.copy(blackHoleWorldPos).project(camera);
+
+      // 判断黑洞是否位于相机视线前方
+      const inFront = screenCenter.z < 1.0;
+      const screenX = (screenCenter.x * 0.5) + 0.5;
+      const screenY = (screenCenter.y * 0.5) + 0.5;
+
+      lensingPass.uniforms.uScreenCenter.value.set(screenX, screenY);
+      lensingPass.uniforms.uAspectRatio.value = window.innerWidth / window.innerHeight;
+
+      const camDist = camera.position.distanceTo(blackHoleWorldPos);
+      lensingPass.uniforms.uCameraDist.value = camDist;
+
+      // 投影视界半径至屏幕尺寸 (2.0 为视界几何半径)
+      const vFOV = camera.fov * Math.PI / 180.0;
+      const projRadius = inFront ? (2.0 / (Math.tan(vFOV / 2.0) * camDist * 2.0)) : 0.0;
+      lensingPass.uniforms.uRadius.value = projRadius;
+      lensingPass.uniforms.uMass.value = PARAMS.mass;
+      lensingPass.uniforms.uEnabled.value = PARAMS.lensingEnabled ? 1.0 : 0.0;
+
+      // 动态更新底部现象解说
+      if (!PARAMS.lensingEnabled) {
+        infoBanner.innerText = "引力透镜已关闭：仅观测吸积盘原始发射谱";
+      } else if (camDist < 10.0) {
+        infoBanner.innerText = "极端潮汐引力区：时空曲率剧烈撕裂背景，爱因斯坦环极度扩张";
+      } else if (camDist < 20.0) {
+        infoBanner.innerText = "光子球临界轨道：光线环绕多圈，吸积盘背面折叠至上下两翼";
+      } else {
+        infoBanner.innerText = "远场观测模式：观测到相对论多普勒增亮与爱因斯坦引力透镜";
+      }
+    }
+
+    // --- 9. UI 事件绑定 ---
+    const massSlider = document.getElementById('param-mass');
+    const massVal = document.getElementById('val-mass');
+    massSlider.addEventListener('input', (e) => {
+      PARAMS.mass = parseFloat(e.target.value);
+      massVal.innerText = PARAMS.mass.toFixed(2);
+    });
+
+    const brightSlider = document.getElementById('param-brightness');
+    const brightVal = document.getElementById('val-brightness');
+    brightSlider.addEventListener('input', (e) => {
+      PARAMS.brightness = parseFloat(e.target.value);
+      brightVal.innerText = PARAMS.brightness.toFixed(2);
+      diskMaterial.uniforms.uBrightness.value = PARAMS.brightness;
+      arcMaterial.uniforms.uBrightness.value = PARAMS.brightness;
+      photonRingMesh.material.uniforms.uBrightness.value = PARAMS.brightness;
+      bloomPass.strength = 1.1 + PARAMS.brightness * 0.35;
+    });
+
+    const speedSlider = document.getElementById('param-speed');
+    const speedVal = document.getElementById('val-speed');
+    speedSlider.addEventListener('input', (e) => {
+      PARAMS.speed = parseFloat(e.target.value);
+      speedVal.innerText = PARAMS.speed.toFixed(1);
+    });
+
+    const partSlider = document.getElementById('param-particles');
+    const partVal = document.getElementById('val-particles');
+    partSlider.addEventListener('input', (e) => {
+      PARAMS.particleCount = parseInt(e.target.value);
+      partVal.innerText = PARAMS.particleCount;
+      plasmaPoints.geometry.setDrawRange(0, PARAMS.particleCount);
+    });
+
+    const lensToggle = document.getElementById('toggle-lensing');
+    lensToggle.addEventListener('change', (e) => {
+      PARAMS.lensingEnabled = e.target.checked;
+    });
+
+    // 初始化粒子展示范围
+    plasmaPoints.geometry.setDrawRange(0, PARAMS.particleCount);
+
+    // --- 10. 动画与渲染主循环 ---
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const elapsedTime = clock.getElapsedTime() * PARAMS.speed;
+
+      controls.update();
+
+      // 传递相机位置给吸积盘 Shader 做真实视线方向多普勒分析
+      diskMaterial.uniforms.uTime.value = elapsedTime;
+      diskMaterial.uniforms.uCamPos.value.copy(camera.position);
+
+      arcMaterial.uniforms.uTime.value = elapsedTime;
+      arcMaterial.uniforms.uCamPos.value.copy(camera.position);
+
+      // 吸积盘极其微小的轴向摆动进动感
+      accretionDisk.rotation.y = elapsedTime * 0.03;
+      lensedArcUpper.rotation.y = -elapsedTime * 0.02;
+
+      // 更新等离子体粒子旋进落入黑洞的动力学逻辑
+      const positions = particleGeometry.attributes.position.array;
+      const count = PARAMS.particleCount;
+
+      for (let i = 0; i < count; i++) {
+        const meta = particleMeta[i];
+
+        // 开普勒角速度旋转
+        meta.angle += meta.speed * delta * PARAMS.speed * 2.2;
+        // 粒子随引力向内螺旋跌落
+        meta.radius -= 0.18 * delta * (3.0 / Math.max(meta.radius, 1.5)) * PARAMS.speed;
+        // 临近视界时垂直扰动收缩
+        meta.height *= 0.998;
+
+        // 穿越视界后在外圈重新喷射再生
+        if (meta.radius < 2.35) {
+          meta.radius = 11.2 + Math.random() * 2.0;
+          meta.speed = (0.7 + Math.random() * 0.5) / Math.sqrt(meta.radius);
+          meta.height = (Math.random() - 0.5) * 0.5;
+        }
+
+        const idx = i * 3;
+        positions[idx + 0] = Math.cos(meta.angle) * meta.radius;
+        positions[idx + 1] = meta.height + Math.sin(elapsedTime * 2.0 + meta.seed) * 0.06;
+        positions[idx + 2] = Math.sin(meta.angle) * meta.radius;
+      }
+      particleGeometry.attributes.position.needsUpdate = true;
+
+      // 实时计算透镜投影
+      updateLensingMetrics();
+
+      // 执行后处理管线
+      composer.render();
+    }
+
+    animate();
+
+    // --- 11. 窗口响应式适配 ---
+    window.addEventListener('resize', () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+
+      renderer.setSize(width, height);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+      composer.setSize(width, height);
+      bloomPass.setSize(width, height);
+    });
+  </script>
+  <script src="../prompt-panel.js" data-id="black-hole-flash"></script>
+</body>
+</html>

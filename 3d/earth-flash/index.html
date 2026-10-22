@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>超精细 3D 数字地球</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #020208;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    }
+    #webgl-container {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      left: 0;
+      top: 0;
+      z-index: 1;
+    }
+    /* 返回按钮样式 */
+    .back-btn {
+      position: absolute;
+      top: 18px;
+      left: 18px;
+      z-index: 10;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #3d3428;
+      text-decoration: none;
+      background: rgba(255, 248, 235, 0.72);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 240, 215, 0.5);
+      border-radius: 999px;
+      box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+      transition: all 0.25s cubic-bezier(0.2, 0.8, 0.2, 1);
+    }
+    .back-btn:hover {
+      background: rgba(255, 250, 240, 0.92);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 24px rgba(0, 0, 0, 0.45);
+    }
+    /* 界面仪表与交互面板 */
+    .hud-card {
+      position: absolute;
+      bottom: 22px;
+      right: 22px;
+      z-index: 10;
+      background: rgba(8, 12, 22, 0.55);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid rgba(120, 180, 255, 0.2);
+      border-radius: 14px;
+      padding: 14px 18px;
+      color: #e2e8f0;
+      font-size: 12px;
+      line-height: 1.6;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+    }
+    .hud-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #64b5f6;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-title::before {
+      content: "";
+      width: 7px;
+      height: 7px;
+      background: #4fc3f7;
+      border-radius: 50%;
+      box-shadow: 0 0 8px #4fc3f7;
+      display: inline-block;
+    }
+    .hud-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 20px;
+      color: #94a3b8;
+    }
+    .hud-val {
+      color: #e2e8f0;
+      font-family: monospace;
+      font-weight: 500;
+    }
+    @media (max-width: 600px) {
+      .hud-card {
+        bottom: 14px;
+        right: 14px;
+        left: 14px;
+        font-size: 11px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+<style>/* 避开右下角「📜 提示词」按钮 */.hud-card{bottom:76px}</style>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div id="webgl-container"></div>
+
+  <div class="hud-card">
+    <div class="hud-title">TERRA-V PROCEDURAL PLANET</div>
+    <div class="hud-row"><span>地表多频分形算法</span><span class="hud-val">Simplex FBM</span></div>
+    <div class="hud-row"><span>大气散射模型</span><span class="hud-val">Rayleigh Rim Glow</span></div>
+    <div class="hud-row"><span>双层流体对流云系</span><span class="hud-val">Dual Dyn-Flow</span></div>
+    <div class="hud-row"><span>操作</span><span class="hud-val">单指/左键拖拽旋转 · 滚轮缩放</span></div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // -------------------------------------------------------------
+    // 1. 初始化场景、相机与渲染器
+    // -------------------------------------------------------------
+    const container = document.getElementById('webgl-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x02030a, 0.0004);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1500);
+    camera.position.set(0, 16, 38);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.045;
+    controls.minDistance = 14;
+    controls.maxDistance = 120;
+    controls.rotateSpeed = 0.65;
+    controls.zoomSpeed = 0.85;
+
+    // -------------------------------------------------------------
+    // 2. 高精度程序化纹理生成器 (Canvas 离屏生成 2048x1024 级全景纹理)
+    // -------------------------------------------------------------
+    function createProceduralEarthTextures() {
+      const W = 2048;
+      const H = 1024;
+
+      // 快速 Simplex-Like 2D 梯度噪声与 FBM
+      const perm = new Uint8Array(512);
+      const grad2 = [
+        [1,1],[-1,1],[1,-1],[-1,-1],
+        [1,0],[-1,0],[0,1],[0,-1]
+      ];
+      for (let i = 0; i < 256; i++) perm[i] = i;
+      for (let i = 255; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
+      }
+      for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
+
+      function noise2D(x, y) {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+        const xf = x - Math.floor(x);
+        const yf = y - Math.floor(y);
+        const u = xf * xf * (3 - 2 * xf);
+        const v = yf * yf * (3 - 2 * yf);
+
+        const g00 = grad2[perm[X + perm[Y]] % 8];
+        const g10 = grad2[perm[X + 1 + perm[Y]] % 8];
+        const g01 = grad2[perm[X + perm[Y + 1]] % 8];
+        const g11 = grad2[perm[X + 1 + perm[Y + 1]] % 8];
+
+        const d00 = g00[0] * xf + g00[1] * yf;
+        const d10 = g10[0] * (xf - 1) + g10[1] * yf;
+        const d01 = g01[0] * xf + g01[1] * (yf - 1);
+        const d11 = g11[0] * (xf - 1) + g11[1] * (yf - 1);
+
+        const x1 = d00 + u * (d10 - d00);
+        const x2 = d01 + u * (d11 - d01);
+        return (x1 + v * (x2 - x1)) * 1.414;
+      }
+
+      function fbm(x, y, octaves = 6) {
+        let val = 0;
+        let amp = 0.55;
+        let freq = 1.0;
+        for (let i = 0; i < octaves; i++) {
+          val += amp * noise2D(x * freq, y * freq);
+          freq *= 2.05;
+          amp *= 0.49;
+        }
+        return val;
+      }
+
+      // 创建三个离屏 Canvas
+      const diffCanvas = document.createElement('canvas');
+      diffCanvas.width = W; diffCanvas.height = H;
+      const diffCtx = diffCanvas.getContext('2d');
+      const diffImg = diffCtx.createImageData(W, H);
+      const diffData = diffImg.data;
+
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = W; bumpCanvas.height = H;
+      const bumpCtx = bumpCanvas.getContext('2d');
+      const bumpImg = bumpCtx.createImageData(W, H);
+      const bumpData = bumpImg.data;
+
+      const specCanvas = document.createElement('canvas');
+      specCanvas.width = W; specCanvas.height = H;
+      const specCtx = specCanvas.getContext('2d');
+      const specImg = specCtx.createImageData(W, H);
+      const specData = specImg.data;
+
+      const nightCanvas = document.createElement('canvas');
+      nightCanvas.width = W; nightCanvas.height = H;
+      const nightCtx = nightCanvas.getContext('2d');
+      const nightImg = nightCtx.createImageData(W, H);
+      const nightData = nightImg.data;
+
+      // 宏观大陆骨架采样 (基于球形投影的近似几何大洲掩码)
+      const landMasks = [
+        { lon: 0.22, lat: 0.26, rx: 0.32, ry: 0.24, shape: 1.1 },   // 欧亚大陆
+        { lon: 0.12, lat: 0.52, rx: 0.16, ry: 0.26, shape: 0.9 },   // 非洲大陆
+        { lon: 0.72, lat: 0.28, rx: 0.22, ry: 0.22, shape: 1.0 },   // 北美
+        { lon: 0.78, lat: 0.65, rx: 0.14, ry: 0.25, shape: 0.8 },   // 南美
+        { lon: 0.38, lat: 0.72, rx: 0.14, ry: 0.14, shape: 0.9 },   // 澳洲
+        { lon: 0.50, lat: 0.95, rx: 0.45, ry: 0.08, shape: 1.4 },   // 南极洲
+        { lon: 0.48, lat: 0.05, rx: 0.35, ry: 0.06, shape: 1.2 }    // 北极圈冰原
+      ];
+
+      for (let y = 0; y < H; y++) {
+        const v = y / H;
+        const latNorm = v; // 0 (北极) ~ 1 (南极)
+        const latRad = (v - 0.5) * Math.PI; // -PI/2 ~ PI/2
+        const cosLat = Math.cos(latRad);
+
+        for (let x = 0; x < W; x++) {
+          const u = x / W;
+          const idx = (y * W + x) * 4;
+
+          // 循环经度域采样，防止出现接缝裂纹
+          const nx = Math.cos(u * Math.PI * 2) * 2.2;
+          const ny = Math.sin(u * Math.PI * 2) * 2.2;
+          const nz = (v - 0.5) * 3.8;
+
+          // 基础大陆抬升值
+          let continentalHeight = -0.32;
+          for (let m = 0; m < landMasks.length; m++) {
+            const mask = landMasks[m];
+            let du = Math.abs(u - mask.lon);
+            if (du > 0.5) du = 1.0 - du;
+            const dv = Math.abs(v - mask.lat);
+            const dist = Math.sqrt((du / mask.rx) ** 2 + (dv / mask.ry) ** 2);
+            if (dist < 1.0) {
+              continentalHeight += Math.cos(dist * Math.PI * 0.5) * 0.78 * mask.shape;
+            }
+          }
+
+          // 多频噪声增强自然地貌海岸与山脉
+          const n1 = fbm(nx + 13.4, ny + 21.1, 5);
+          const n2 = fbm(nx * 2.5 + nz, ny * 2.5 + nz, 4) * 0.4;
+          const height = continentalHeight + (n1 + n2) * 0.7;
+
+          // 极地冰冠覆盖权重
+          const polarIce = Math.pow(Math.abs(v - 0.5) * 2, 5.2);
+
+          let r = 0, g = 0, b = 0;
+          let bump = 0;
+          let spec = 0;
+          let cityLight = 0;
+
+          if (height <= 0.0 && polarIce < 0.8) {
+            // ----- 海洋区域 -----
+            const depth = Math.min(1.0, Math.max(0.0, -height * 1.5));
+            // 深海暗海蓝到浅海碧绿湖蓝
+            const deepSea = [4, 18, 48];
+            const shelfSea = [12, 58, 96];
+            r = THREE.MathUtils.lerp(shelfSea[0], deepSea[0], depth);
+            g = THREE.MathUtils.lerp(shelfSea[1], deepSea[1], depth);
+            b = THREE.MathUtils.lerp(shelfSea[2], deepSea[2], depth);
+
+            bump = 18;
+            spec = 255; // 水体强镜面高光反射
+            cityLight = 0;
+          } else {
+            // ----- 陆地区域 / 极地冰盖 -----
+            if (polarIce > 0.65 || height > 0.68) {
+              // 冰川、雪峰
+              r = 230; g = 238; b = 248;
+              bump = 180 + Math.random() * 20;
+              spec = 160;
+            } else {
+              // 陆地根据纬度与海拔生成丰富地貌 (植被、温带平原、热带雨林、干旱荒漠、山脉)
+              const latAbs = Math.abs(v - 0.5) * 2.0; // 0赤道, 1极地
+              const isDesert = (latAbs > 0.22 && latAbs < 0.48 && n1 > -0.05);
+
+              if (isDesert) {
+                // 沙漠戈壁
+                r = 194; g = 158; b = 108;
+              } else if (height > 0.38) {
+                // 高海拔岩石与高山
+                r = 118; g = 102; b = 88;
+              } else if (latAbs < 0.25) {
+                // 赤道低纬度深绿雨林
+                r = 28; g = 68; b = 34;
+              } else {
+                // 温带平原与丘陵森林
+                r = 46; g = 92; b = 48;
+              }
+
+              // 微细噪波润色
+              r = Math.min(255, Math.max(0, r + (n2 * 45)));
+              g = Math.min(255, Math.max(0, g + (n2 * 40)));
+              b = Math.min(255, Math.max(0, b + (n2 * 35)));
+
+              bump = Math.floor(Math.min(255, 60 + height * 220));
+              spec = 18; // 陆地弱高光
+
+              // 城市夜景灯光 (集中在适宜人居平原陆地，避开极地和高山)
+              if (latAbs > 0.08 && latAbs < 0.62 && height < 0.38) {
+                const cityNoise = noise2D(nx * 14.0 + 8.1, ny * 14.0 + 9.2);
+                if (cityNoise > 0.32) {
+                  const intensity = Math.pow((cityNoise - 0.32) / 0.68, 2.2);
+                  cityLight = Math.floor(intensity * 255);
+                }
+              }
+            }
+          }
+
+          // 写入主颜色贴图
+          diffData[idx] = r;
+          diffData[idx + 1] = g;
+          diffData[idx + 2] = b;
+          diffData[idx + 3] = 255;
+
+          // 凹凸高度图
+          bumpData[idx] = bump;
+          bumpData[idx + 1] = bump;
+          bumpData[idx + 2] = bump;
+          bumpData[idx + 3] = 255;
+
+          // 高光掩码图
+          specData[idx] = spec;
+          specData[idx + 1] = spec;
+          specData[idx + 2] = spec;
+          specData[idx + 3] = 255;
+
+          // 夜光贴图 (暖金金色城市光芒群)
+          nightData[idx] = cityLight;
+          nightData[idx + 1] = Math.floor(cityLight * 0.78);
+          nightData[idx + 2] = Math.floor(cityLight * 0.42);
+          nightData[idx + 3] = 255;
+        }
+      }
+
+      diffCtx.putImageData(diffImg, 0, 0);
+      bumpCtx.putImageData(bumpImg, 0, 0);
+      specCtx.putImageData(specImg, 0, 0);
+      nightCtx.putImageData(nightImg, 0, 0);
+
+      // 云层纹理生成 (透光气旋与羽状大气流)
+      const cloudCanvas = document.createElement('canvas');
+      cloudCanvas.width = W; cloudCanvas.height = H;
+      const cloudCtx = cloudCanvas.getContext('2d');
+      const cloudImg = cloudCtx.createImageData(W, H);
+      const cloudData = cloudImg.data;
+
+      for (let y = 0; y < H; y++) {
+        const v = y / H;
+        for (let x = 0; x < W; x++) {
+          const u = x / W;
+          const idx = (y * W + x) * 4;
+
+          const cx = Math.cos(u * Math.PI * 2) * 3.0;
+          const cy = Math.sin(u * Math.PI * 2) * 3.0;
+          const cz = (v - 0.5) * 4.2;
+
+          // 双层涡旋涡动
+          const c1 = fbm(cx * 1.5 + 4.2, cy * 1.5 + 3.1, 5);
+          const c2 = fbm(cx * 3.2 - cz * 0.8, cy * 3.2 + cz * 0.8, 4);
+          let cloudDensity = (c1 * 0.65 + c2 * 0.35);
+
+          // 大气信风与热带低气压气旋带条纹调配
+          const latBand = Math.sin(v * Math.PI * 6.0) * 0.12;
+          cloudDensity += latBand;
+
+          // 阈值过渡
+          const alpha = Math.min(1.0, Math.max(0.0, (cloudDensity - 0.08) * 2.8));
+          const brightness = Math.floor(240 + Math.random() * 15);
+
+          cloudData[idx] = brightness;
+          cloudData[idx + 1] = brightness;
+          cloudData[idx + 2] = brightness;
+          cloudData[idx + 3] = Math.floor(alpha * 240);
+        }
+      }
+      cloudCtx.putImageData(cloudImg, 0, 0);
+
+      return {
+        diffuse: new THREE.CanvasTexture(diffCanvas),
+        bump: new THREE.CanvasTexture(bumpCanvas),
+        specular: new THREE.CanvasTexture(specCanvas),
+        night: new THREE.CanvasTexture(nightCanvas),
+        cloud: new THREE.CanvasTexture(cloudCanvas)
+      };
+    }
+
+    const tex = createProceduralEarthTextures();
+    // 开启各向异性过滤与过滤平滑
+    [tex.diffuse, tex.bump, tex.specular, tex.night, tex.cloud].forEach(t => {
+      t.anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 8);
+      t.wrapS = THREE.RepeatWrapping;
+      t.wrapT = THREE.ClampToEdgeWrapping;
+    });
+
+    // -------------------------------------------------------------
+    // 3. 构建多层次核心地球系统
+    // -------------------------------------------------------------
+    const earthRadius = 10;
+    const earthGroup = new THREE.Group();
+    // 模拟真实地球黄赤交角 23.44°
+    earthGroup.rotation.z = THREE.MathUtils.degToRad(23.44);
+    scene.add(earthGroup);
+
+    // [A] 地表主体 (使用 MeshStandardMaterial 承接昼夜动态着色)
+    const earthGeo = new THREE.SphereGeometry(earthRadius, 96, 96);
+    
+    // 自定义着色器钩子，注入夜晚城市灯光在背光面渐显逻辑
+    const earthMat = new THREE.MeshStandardMaterial({
+      map: tex.diffuse,
+      bumpMap: tex.bump,
+      bumpScale: 0.18,
+      roughness: 0.68,
+      metalness: 0.08,
+      roughnessMap: tex.specular
+    });
+
+    earthMat.onBeforeCompile = (shader) => {
+      shader.uniforms.tNight = { value: tex.night };
+      shader.uniforms.sunDirection = { value: new THREE.Vector3(1, 0, 0.4).normalize() };
+
+      shader.vertexShader = `
+        varying vec3 vWorldNormalVec;
+        varying vec3 vWorldPositionVec;
+        ${shader.vertexShader}
+      `;
+      shader.vertexShader = shader.vertexShader.replace(
+        '#include <worldpos_vertex>',
+        `
+        #include <worldpos_vertex>
+        vWorldNormalVec = normalize((modelMatrix * vec4(normal, 0.0)).xyz);
+        vWorldPositionVec = (modelMatrix * vec4(transformed, 1.0)).xyz;
+        `
+      );
+
+      shader.fragmentShader = `
+        uniform sampler2D tNight;
+        uniform vec3 sunDirection;
+        varying vec3 vWorldNormalVec;
+        varying vec3 vWorldPositionVec;
+        ${shader.fragmentShader}
+      `;
+
+      shader.fragmentShader = shader.fragmentShader.replace(
+        '#include <dithering_fragment>',
+        `
+        #include <dithering_fragment>
+        // 计算昼夜过渡因子
+        float sunDotNormal = dot(normalize(vWorldNormalVec), normalize(sunDirection));
+        // 夜晚城市灯光在太阳背光区平滑浮现
+        float nightFactor = smoothstep(0.12, -0.28, sunDotNormal);
+        vec4 nightColor = texture2D(tNight, vMapUv);
+        gl_FragColor.rgb += nightColor.rgb * nightFactor * 2.2;
+        `
+      );
+      earthMat.userData.shader = shader;
+    };
+
+    const earthMesh = new THREE.Mesh(earthGeo, earthMat);
+    earthMesh.receiveShadow = true;
+    earthMesh.castShadow = true;
+    earthGroup.add(earthMesh);
+
+    // [B] 双层流体动感云层 (内云层 + 外卷云层，增强纵深空间厚度)
+    const cloudsGeo = new THREE.SphereGeometry(earthRadius + 0.12, 84, 84);
+    const cloudsMat = new THREE.MeshStandardMaterial({
+      map: tex.cloud,
+      transparent: true,
+      opacity: 0.82,
+      blending: THREE.NormalBlending,
+      roughness: 1.0,
+      metalness: 0.0,
+      depthWrite: false
+    });
+    const cloudsMesh = new THREE.Mesh(cloudsGeo, cloudsMat);
+    earthGroup.add(cloudsMesh);
+
+    const cloudsOuterGeo = new THREE.SphereGeometry(earthRadius + 0.22, 64, 64);
+    const cloudsOuterMat = new THREE.MeshStandardMaterial({
+      map: tex.cloud,
+      transparent: true,
+      opacity: 0.38,
+      blending: THREE.AdditiveBlending,
+      roughness: 0.9,
+      depthWrite: false
+    });
+    const cloudsOuterMesh = new THREE.Mesh(cloudsOuterGeo, cloudsOuterMat);
+    earthGroup.add(cloudsOuterMesh);
+
+    // [C] 真实高精度大气瑞利边缘辉光 (Atmosphere Fresnel Rim Glow Shader)
+    const atmoGeo = new THREE.SphereGeometry(earthRadius + 1.25, 64, 64);
+    const atmoMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      uniforms: {
+        glowColor: { value: new THREE.Color(0x3892ff) },
+        sunPosition: { value: new THREE.Vector3(50, 8, 20) },
+        viewDistance: { value: 38.0 }
+      },
+      vertexShader: `
+        varying vec3 vNormalVec;
+        varying vec3 vWorldPosition;
+        void main() {
+          vNormalVec = normalize(normalMatrix * normal);
+          vec4 worldPos = modelMatrix * vec4(position, 1.0);
+          vWorldPosition = worldPos.xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform vec3 glowColor;
+        varying vec3 vNormalVec;
+        varying vec3 vWorldPosition;
+        void main() {
+          vec3 viewDirection = normalize(-vWorldPosition);
+          float rim = dot(viewDirection, vNormalVec);
+          // 瑞利散射边缘向外光晕渐褪
+          float intensity = pow(clamp(1.0 - abs(rim), 0.0, 1.0), 3.2);
+          gl_FragColor = vec4(glowColor, intensity * 0.95);
+        }
+      `
+    });
+    const atmosphereMesh = new THREE.Mesh(atmoGeo, atmoMat);
+    earthGroup.add(atmosphereMesh);
+
+    // -------------------------------------------------------------
+    // 4. 动态卫星与轨道环形流光粒子
+    // -------------------------------------------------------------
+    const orbitRingGroup = new THREE.Group();
+    earthGroup.add(orbitRingGroup);
+
+    // 卫星轨道1与微型探测站
+    const orbitRadius = 14.5;
+    const orbitSegments = 180;
+    const orbitPositions = new Float32Array(orbitSegments * 3);
+    for (let i = 0; i < orbitSegments; i++) {
+      const angle = (i / orbitSegments) * Math.PI * 2;
+      orbitPositions[i * 3] = Math.cos(angle) * orbitRadius;
+      orbitPositions[i * 3 + 1] = Math.sin(angle * 2.0) * 1.8;
+      orbitPositions[i * 3 + 2] = Math.sin(angle) * orbitRadius;
+    }
+    const orbitLineGeo = new THREE.BufferGeometry();
+    orbitLineGeo.setAttribute('position', new THREE.BufferAttribute(orbitPositions, 3));
+    const orbitLineMat = new THREE.LineBasicMaterial({
+      color: 0x48bb78,
+      transparent: true,
+      opacity: 0.28,
+      blending: THREE.AdditiveBlending
+    });
+    const orbitLine = new THREE.LineLoop(orbitLineGeo, orbitLineMat);
+    orbitLine.rotation.x = 0.45;
+    orbitLine.rotation.z = 0.25;
+    orbitRingGroup.add(orbitLine);
+
+    // 探测器模型
+    const satMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.35, 0.16, 0.2),
+      new THREE.MeshStandardMaterial({ color: 0xddddf0, metalness: 0.9, roughness: 0.2 })
+    );
+    const satPanelLeft = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.02, 0.35),
+      new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.3 })
+    );
+    satPanelLeft.position.x = 0.55;
+    const satPanelRight = satPanelLeft.clone();
+    satPanelRight.position.x = -0.55;
+    satMesh.add(satPanelLeft);
+    satMesh.add(satPanelRight);
+    orbitRingGroup.add(satMesh);
+
+    // -------------------------------------------------------------
+    // 5. 浩瀚宇宙星空背景 (深空星系渐变球 + 2000颗三维闪烁恒星粒子)
+    // -------------------------------------------------------------
+    const starCount = 2200;
+    const starGeometry = new THREE.BufferGeometry();
+    const starPositions = new Float32Array(starCount * 3);
+    const starColors = new Float32Array(starCount * 3);
+    const starSizes = new Float32Array(starCount);
+
+    const baseStarColors = [
+      new THREE.Color(0xffffff),
+      new THREE.Color(0x9bc5ff),
+      new THREE.Color(0xffd2a1),
+      new THREE.Color(0x73a5ff)
+    ];
+
+    for (let i = 0; i < starCount; i++) {
+      const radius = 250 + Math.random() * 550;
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.acos(Math.random() * 2 - 1);
+
+      starPositions[i * 3] = radius * Math.sin(phi) * Math.cos(theta);
+      starPositions[i * 3 + 1] = radius * Math.sin(phi) * Math.sin(theta);
+      starPositions[i * 3 + 2] = radius * Math.cos(phi);
+
+      const col = baseStarColors[Math.floor(Math.random() * baseStarColors.length)];
+      starColors[i * 3] = col.r;
+      starColors[i * 3 + 1] = col.g;
+      starColors[i * 3 + 2] = col.b;
+
+      starSizes[i] = 1.0 + Math.random() * 2.2;
+    }
+
+    starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+    starGeometry.setAttribute('color', new THREE.BufferAttribute(starColors, 3));
+
+    // 程序化星点纹理
+    const starTexCanvas = document.createElement('canvas');
+    starTexCanvas.width = 64; starTexCanvas.height = 64;
+    const starTexCtx = starTexCanvas.getContext('2d');
+    const grad = starTexCtx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, 'rgba(255,255,255,1)');
+    grad.addColorStop(0.25, 'rgba(210,235,255,0.7)');
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    starTexCtx.fillStyle = grad;
+    starTexCtx.fillRect(0, 0, 64, 64);
+    const starMap = new THREE.CanvasTexture(starTexCanvas);
+
+    const starMaterial = new THREE.PointsMaterial({
+      size: 2.2,
+      map: starMap,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    });
+
+    const starField = new THREE.Points(starGeometry, starMaterial);
+    scene.add(starField);
+
+    // -------------------------------------------------------------
+    // 6. 拟真恒星光照配置
+    // -------------------------------------------------------------
+    const sunLight = new THREE.DirectionalLight(0xfff6ea, 2.8);
+    sunLight.position.set(50, 10, 24);
+    scene.add(sunLight);
+
+    // 微弱的冷色银河漫反射背光，保持夜半球面层次感
+    const ambientLight = new THREE.AmbientLight(0x0a1426, 0.45);
+    scene.add(ambientLight);
+
+    // 补光模拟月球/深空反光
+    const subLight = new THREE.DirectionalLight(0x385d8a, 0.35);
+    subLight.position.set(-40, -15, -30);
+    scene.add(subLight);
+
+    // -------------------------------------------------------------
+    // 7. 动画驱动循环与视窗响应
+    // -------------------------------------------------------------
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const delta = clock.getDelta();
+      const elapsedTime = clock.getElapsedTime();
+
+      // 地球自西向东平稳自转
+      earthMesh.rotation.y += 0.045 * delta;
+
+      // 云层双层差速漂移 (营造真实高空气流层次感)
+      cloudsMesh.rotation.y += 0.062 * delta;
+      cloudsMesh.rotation.x = Math.sin(elapsedTime * 0.05) * 0.015;
+      cloudsOuterMesh.rotation.y += 0.078 * delta;
+
+      // 卫星环绕运行轨道计算
+      const satAngle = elapsedTime * 0.42;
+      const satX = Math.cos(satAngle) * orbitRadius;
+      const satY = Math.sin(satAngle * 2.0) * 1.8;
+      const satZ = Math.sin(satAngle) * orbitRadius;
+      satMesh.position.set(satX, satY, satZ);
+      satMesh.rotation.y = satAngle + Math.PI / 2;
+      satMesh.rotation.x = Math.sin(satAngle) * 0.4;
+
+      // 缓慢转动星空背景
+      starField.rotation.y = elapsedTime * 0.003;
+
+      // 动态向着色器更新太阳光方向向量
+      if (earthMat.userData.shader) {
+        const sunDir = new THREE.Vector3().copy(sunLight.position).normalize();
+        earthMat.userData.shader.uniforms.sunDirection.value.copy(sunDir);
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // 响应式画布缩放
+    window.addEventListener('resize', onWindowResize, false);
+    function onWindowResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    }
+  </script>
+
+  <script src="../prompt-panel.js" data-id="earth-flash"></script>
+</body>
+</html>

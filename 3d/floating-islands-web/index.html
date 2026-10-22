@@ -1,0 +1,1760 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>黄昏浮空岛 — 自由飞行探索</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #2a1829;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      touch-action: none;
+    }
+    #canvas-container {
+      width: 100%;
+      height: 100%;
+      position: fixed;
+      inset: 0;
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    canvas:active {
+      cursor: grabbing;
+    }
+    /* 左上角固定返回按钮：半透明奶油色圆角小按钮 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      padding: 8px 15px;
+      background: rgba(255, 248, 232, 0.78);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      color: #4a3525;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      box-shadow: 0 4px 14px rgba(35, 18, 8, 0.22);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+    .back-btn:hover {
+      background: rgba(255, 251, 240, 0.94);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(35, 18, 8, 0.3);
+    }
+    /* 左下角一行中文小字提示操作方法 */
+    .controls-hint {
+      position: fixed;
+      left: 18px;
+      bottom: 16px;
+      z-index: 20;
+      color: rgba(255, 244, 224, 0.88);
+      font-size: 12px;
+      line-height: 1.4;
+      letter-spacing: 0.5px;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, 0.65);
+      background: rgba(32, 18, 24, 0.38);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 222, 180, 0.2);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      pointer-events: none;
+      white-space: nowrap;
+      max-width: calc(100vw - 36px);
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* 移动端虚拟摇杆与升降按钮 */
+    .touch-ui {
+      display: none;
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+    body.is-touch .touch-ui {
+      display: block;
+    }
+    .joystick-zone {
+      position: absolute;
+      left: 22px;
+      bottom: 54px;
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      background: rgba(255, 240, 215, 0.16);
+      border: 1.5px solid rgba(255, 232, 198, 0.38);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      pointer-events: auto;
+      touch-action: none;
+    }
+    .joystick-knob {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 44px;
+      height: 44px;
+      margin-left: -22px;
+      margin-top: -22px;
+      border-radius: 50%;
+      background: rgba(255, 245, 225, 0.72);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+      pointer-events: none;
+      transition: transform 0.04s linear;
+    }
+    .vertical-btns {
+      position: absolute;
+      left: 148px;
+      bottom: 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    .v-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(255, 240, 215, 0.2);
+      border: 1.5px solid rgba(255, 232, 198, 0.4);
+      color: rgba(255, 246, 230, 0.92);
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      touch-action: none;
+    }
+    .v-btn:active, .v-btn.active {
+      background: rgba(255, 240, 215, 0.5);
+      color: #2d1a12;
+    }
+    @media (max-width: 768px) {
+      .controls-hint {
+        font-size: 11px;
+        left: 12px;
+        bottom: 12px;
+        padding: 5px 10px;
+      }
+      .back-btn {
+        top: 12px;
+        left: 12px;
+        padding: 7px 13px;
+        font-size: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div id="canvas-container"></div>
+
+  <div class="touch-ui" id="touch-ui">
+    <div class="joystick-zone" id="joystick-zone">
+      <div class="joystick-knob" id="joystick-knob"></div>
+    </div>
+    <div class="vertical-btns">
+      <div class="v-btn" id="btn-up">上升</div>
+      <div class="v-btn" id="btn-down">下降</div>
+    </div>
+  </div>
+
+  <div class="controls-hint">
+    操作提示：点击画面锁定鼠标或直接按住拖动转视角 · WASD 前后左右飞行 · 空格上升 · Shift 下降 · 手机左下角摇杆移动+右侧拖动看景
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+    // ==========================================
+    // 1. 数学与程序化噪声工具函数 (3D Value Noise + FBM)
+    // ==========================================
+    function hash3(x, y, z) {
+      let n = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453123;
+      return n - Math.floor(n);
+    }
+
+    function noise3D(x, y, z) {
+      const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+      const fx = x - ix, fy = y - iy, fz = z - iz;
+      const ux = fx * fx * (3.0 - 2.0 * fx);
+      const uy = fy * fy * (3.0 - 2.0 * fy);
+      const uz = fz * fz * (3.0 - 2.0 * fz);
+
+      const n000 = hash3(ix, iy, iz);
+      const n100 = hash3(ix + 1, iy, iz);
+      const n010 = hash3(ix, iy + 1, iz);
+      const n110 = hash3(ix + 1, iy + 1, iz);
+      const n001 = hash3(ix, iy, iz + 1);
+      const n101 = hash3(ix + 1, iy, iz + 1);
+      const n011 = hash3(ix, iy + 1, iz + 1);
+      const n111 = hash3(ix + 1, iy + 1, iz + 1);
+
+      const nx00 = n000 + (n100 - n000) * ux;
+      const nx10 = n010 + (n110 - n010) * ux;
+      const nx01 = n001 + (n101 - n001) * ux;
+      const nx11 = n011 + (n111 - n011) * ux;
+
+      const nxy0 = nx00 + (nx10 - nx00) * uy;
+      const nxy1 = nx01 + (nx11 - nx01) * uy;
+
+      return nxy0 + (nxy1 - nxy0) * uz;
+    }
+
+    function fbm(x, y, z, octaves = 4) {
+      let value = 0.0;
+      let amplitude = 0.5;
+      let frequency = 1.0;
+      for (let i = 0; i < octaves; i++) {
+        value += amplitude * noise3D(x * frequency, y * frequency, z * frequency);
+        frequency *= 2.03;
+        amplitude *= 0.5;
+      }
+      return value;
+    }
+
+    // 确定性伪随机生成器
+    let rngSeed = 1337;
+    function seededRandom() {
+      rngSeed = (rngSeed * 16807) % 2147483647;
+      return (rngSeed - 1) / 2147483646;
+    }
+
+    // ==========================================
+    // 2. 初始化场景、相机、渲染器与光照
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    // 黄金时刻暖色距离指数雾
+    scene.fog = new THREE.FogExp2(0xd98052, 0.0021);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.5, 1600);
+    camera.rotation.order = 'YXZ';
+    camera.position.set(0, 26, 115);
+    camera.lookAt(0, 12, 0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.12;
+    container.appendChild(renderer.domElement);
+
+    // 太阳方向：低角度日落暖光
+    const sunDirection = new THREE.Vector3(-0.62, 0.21, -0.75).normalize();
+
+    // 半球环境光：天空暖金、底部云海紫褐反射
+    const hemiLight = new THREE.HemisphereLight(0xffbe7b, 0x4b334f, 0.85);
+    scene.add(hemiLight);
+
+    // 主太阳平行光（投射长阴影）
+    const sunLight = new THREE.DirectionalLight(0xff9d47, 2.8);
+    sunLight.position.copy(sunDirection).multiplyScalar(320);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 40;
+    sunLight.shadow.camera.far = 680;
+    const shadowCamSize = 210;
+    sunLight.shadow.camera.left = -shadowCamSize;
+    sunLight.shadow.camera.right = shadowCamSize;
+    sunLight.shadow.camera.top = shadowCamSize;
+    sunLight.shadow.camera.bottom = -shadowCamSize;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.normalBias = 0.04;
+    scene.add(sunLight);
+
+    // 逆光轮廓柔光
+    const rimLight = new THREE.DirectionalLight(0x9a658c, 0.55);
+    rimLight.position.set(150, -60, 180);
+    scene.add(rimLight);
+
+    // ==========================================
+    // 3. 天空渐变 Shader 与日落太阳
+    // ==========================================
+    const skyGeo = new THREE.SphereGeometry(1350, 48, 32);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        uSunDir: { value: sunDirection }
+      },
+      vertexShader: `
+        varying vec3 vWorldPos;
+        void main() {
+          vec4 wp = modelMatrix * vec4(position, 1.0);
+          vWorldPos = wp.xyz;
+          gl_Position = projectionMatrix * viewMatrix * wp;
+        }
+      `,
+      fragmentShader: `
+        varying vec3 vWorldPos;
+        uniform vec3 uSunDir;
+
+        void main() {
+          vec3 dir = normalize(vWorldPos);
+          float y = dir.y;
+
+          // 天顶到地平线五段黄金时刻色彩渐变
+          vec3 cZenith   = vec3(0.14, 0.15, 0.34); // 深暮蓝紫
+          vec3 cUpper    = vec3(0.45, 0.25, 0.42); // 晚霞紫红
+          vec3 cMid      = vec3(0.84, 0.42, 0.28); // 暖橘红
+          vec3 cHorizon  = vec3(1.00, 0.72, 0.38); // 金黄地平线
+          vec3 cNadir    = vec3(0.32, 0.19, 0.28); // 云海下方暗紫
+
+          vec3 skyColor;
+          if (y >= 0.0) {
+            float t1 = smoothstep(0.0, 0.18, y);
+            float t2 = smoothstep(0.15, 0.48, y);
+            float t3 = smoothstep(0.42, 0.92, y);
+            skyColor = mix(cHorizon, cMid, t1);
+            skyColor = mix(skyColor, cUpper, t2);
+            skyColor = mix(skyColor, cZenith, t3);
+          } else {
+            skyColor = mix(cHorizon, cNadir, smoothstep(0.0, -0.38, y));
+          }
+
+          // 太阳散射光晕与日轮
+          float sunDot = max(dot(dir, uSunDir), 0.0);
+          vec3 mieGlow = vec3(1.0, 0.62, 0.25) * pow(sunDot, 5.0) * 0.52;
+          vec3 sunHalo = vec3(1.0, 0.85, 0.55) * pow(sunDot, 48.0) * 0.9;
+          float sunDisc = smoothstep(0.9982, 0.9994, sunDot);
+          vec3 sunCore = vec3(1.0, 0.97, 0.86) * sunDisc * 2.5;
+
+          // 远处高空微弱霞光条带
+          float floatwisps = sin(dir.x * 9.0 + dir.z * 7.0) * cos(dir.y * 22.0);
+          float cloudBand = smoothstep(0.02, 0.25, y) * (1.0 - smoothstep(0.25, 0.5, y));
+          skyColor += vec3(1.0, 0.68, 0.4) * max(0.0, floatwisps) * cloudBand * 0.07;
+
+          vec3 finalCol = skyColor + mieGlow + sunHalo + sunCore;
+          gl_FragColor = vec4(finalCol, 1.0);
+        }
+      `
+    });
+    const skyDome = new THREE.Mesh(skyGeo, skyMat);
+    scene.add(skyDome);
+
+    // ==========================================
+    // 4. 程序化贴图生成器 (瀑布水帘、水雾粒子、青苔古石)
+    // ==========================================
+    function createWaterfallTextures() {
+      // 1) 滚动水帘纹理
+      const c1 = document.createElement('canvas');
+      c1.width = 256;
+      c1.height = 512;
+      const ctx1 = c1.getContext('2d');
+      ctx1.fillStyle = '#5ca7b8';
+      ctx1.fillRect(0, 0, 256, 512);
+
+      for (let i = 0; i < 220; i++) {
+        const x = Math.random() * 256;
+        const y = Math.random() * 512;
+        const w = 1.5 + Math.random() * 5;
+        const h = 40 + Math.random() * 140;
+        const alpha = 0.15 + Math.random() * 0.55;
+        const grad = ctx1.createLinearGradient(x, y, x, y + h);
+        grad.addColorStop(0, `rgba(255, 245, 225, 0)`);
+        grad.addColorStop(0.5, `rgba(255, 248, 232, ${alpha})`);
+        grad.addColorStop(1, `rgba(255, 245, 225, 0)`);
+        ctx1.fillStyle = grad;
+        ctx1.fillRect(x, y, w, h);
+        // 纵向无缝平铺补偿
+        if (y + h > 512) {
+          ctx1.fillRect(x, y - 512, w, h);
+        }
+      }
+      const flowTex = new THREE.CanvasTexture(c1);
+      flowTex.wrapS = THREE.RepeatWrapping;
+      flowTex.wrapT = THREE.RepeatWrapping;
+      flowTex.repeat.set(2, 2.5);
+
+      // 2) 固定水帘透明度遮罩（顶部柔和过渡，底部落入云海渐渐消失）
+      const c2 = document.createElement('canvas');
+      c2.width = 64;
+      c2.height = 256;
+      const ctx2 = c2.getContext('2d');
+      const alphaGrad = ctx2.createLinearGradient(0, 0, 0, 256);
+      alphaGrad.addColorStop(0.0, 'rgba(255,255,255,0.95)');
+      alphaGrad.addColorStop(0.65, 'rgba(255,255,255,0.82)');
+      alphaGrad.addColorStop(0.88, 'rgba(120,120,120,0.35)');
+      alphaGrad.addColorStop(1.0, 'rgba(0,0,0,0.0)');
+      ctx2.fillStyle = alphaGrad;
+      ctx2.fillRect(0, 0, 64, 256);
+
+      // 两侧边缘羽化
+      ctx2.globalCompositeOperation = 'destination-in';
+      const sideGrad = ctx2.createLinearGradient(0, 0, 64, 0);
+      sideGrad.addColorStop(0.0, 'rgba(0,0,0,0)');
+      sideGrad.addColorStop(0.15, 'rgba(255,255,255,1)');
+      sideGrad.addColorStop(0.85, 'rgba(255,255,255,1)');
+      sideGrad.addColorStop(1.0, 'rgba(0,0,0,0)');
+      ctx2.fillStyle = sideGrad;
+      ctx2.fillRect(0, 0, 64, 256);
+
+      const alphaTex = new THREE.CanvasTexture(c2);
+      return { flowTex, alphaTex };
+    }
+
+    function createMistParticleTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
+      grad.addColorStop(0, 'rgba(255, 238, 215, 0.75)');
+      grad.addColorStop(0.45, 'rgba(255, 216, 182, 0.35)');
+      grad.addColorStop(1, 'rgba(255, 200, 165, 0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createMossyStoneTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(256, 256);
+      const data = imgData.data;
+
+      for (let y = 0; y < 256; y++) {
+        for (let x = 0; x < 256; x++) {
+          const idx = (y * 256 + x) * 4;
+          const n1 = fbm(x * 0.04, y * 0.04, 1.2, 3);
+          const n2 = fbm(x * 0.12, y * 0.12, 5.7, 2);
+          // 岩石暖灰底色
+          let r = 138 + (n1 - 0.5) * 55 + (n2 - 0.5) * 25;
+          let g = 126 + (n1 - 0.5) * 48 + (n2 - 0.5) * 22;
+          let b = 112 + (n1 - 0.5) * 42 + (n2 - 0.5) * 20;
+
+          // 青苔斑块（底部更浓密）
+          const mossMask = fbm(x * 0.035 + 10, y * 0.035 + 20, 3.4, 3) + (y / 256) * 0.32;
+          if (mossMask > 0.62) {
+            const blend = Math.min(1, (mossMask - 0.62) * 3.2);
+            r = r * (1 - blend) + 78 * blend;
+            g = g * (1 - blend) + 114 * blend;
+            b = b * (1 - blend) + 52 * blend;
+          }
+
+          // 石块横向层缝
+          if (y % 32 < 2) {
+            r *= 0.72; g *= 0.72; b *= 0.72;
+          }
+
+          data[idx] = Math.max(0, Math.min(255, r));
+          data[idx + 1] = Math.max(0, Math.min(255, g));
+          data[idx + 2] = Math.max(0, Math.min(255, b));
+          data[idx + 3] = 255;
+        }
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    const waterfallTextures = createWaterfallTextures();
+    const mistParticleTex = createMistParticleTexture();
+    const mossyStoneTex = createMossyStoneTexture();
+
+    const ruinMaterial = new THREE.MeshStandardMaterial({
+      map: mossyStoneTex,
+      roughness: 0.88,
+      metalness: 0.05,
+      flatShading: true
+    });
+
+    // ==========================================
+    // 5. 浮空岛程序化生成 (草地起伏顶部 + 层理凹凸倒锥岩底)
+    // ==========================================
+    // 轮廓半径扰动函数，保证顶部草地与底部岩石在边缘严丝合缝
+    function getIslandEdgeRadius(angle, baseRadius, seed) {
+      const nx = Math.cos(angle) * 1.4 + seed * 3.1;
+      const nz = Math.sin(angle) * 1.4 + seed * 5.7;
+      const n = fbm(nx, nz, seed, 3);
+      const lobe = Math.sin(angle * 3 + seed) * 0.08 + Math.cos(angle * 5 - seed * 2) * 0.04;
+      return baseRadius * (0.78 + n * 0.38 + lobe);
+    }
+
+    // 岛屿顶部草地高度函数
+    function getIslandTopHeight(x, z, baseRadius, seed) {
+      const r = Math.sqrt(x * x + z * z);
+      const angle = Math.atan2(z, x);
+      const maxR = getIslandEdgeRadius(angle, baseRadius, seed);
+      const normR = Math.min(1.0, r / Math.max(0.001, maxR));
+      // 中心起伏丘陵，边缘平滑收拢
+      const dome = Math.cos(normR * Math.PI * 0.5);
+      const hill = (fbm(x * 0.055 + seed * 7, z * 0.055 - seed * 4, seed, 3) - 0.35) * baseRadius * 0.28;
+      return Math.max(0.2, (hill + baseRadius * 0.14) * Math.pow(dome, 0.65));
+    }
+
+    // 构建顶部起伏草地网格
+    function buildIslandTopMesh(baseRadius, seed) {
+      const rings = 18;
+      const segs = 44;
+      const positions = [];
+      const colors = [];
+      const indices = [];
+
+      const cGrassHigh = new THREE.Color(0xc29e38); // 暖阳金绿草地
+      const cGrassMid  = new THREE.Color(0x6d8c34); // 翠绿草坡
+      const cGrassEdge = new THREE.Color(0x4c6628); // 边缘深苔绿
+      const tempCol = new THREE.Color();
+
+      // 中心顶点
+      const centerH = getIslandTopHeight(0, 0, baseRadius, seed);
+      positions.push(0, centerH, 0);
+      positions.push();
+      colors.push(cGrassHigh.r, cGrassHigh.g, cGrassHigh.b);
+
+      for (let ir = 1; ir <= rings; ir++) {
+        const t = ir / rings;
+        for (let is = 0; is < segs; is++) {
+          const angle = (is / segs) * Math.PI * 2;
+          const edgeR = getIslandEdgeRadius(angle, baseRadius, seed);
+          // 最后一圈向下微包形成草皮垂边
+          const rRatio = ir === rings ? 1.02 : t;
+          const r = edgeR * rRatio;
+          const x = Math.cos(angle) * r;
+          const z = Math.sin(angle) * r;
+          let y = getIslandTopHeight(x, z, baseRadius, seed);
+          if (ir === rings) {
+            y = -0.6 - noise3D(x * 0.2, z * 0.2, seed) * 0.8;
+          }
+          positions.push(x, y, z);
+
+          // 顶点颜色随高度与半径渐变
+          const nCol = fbm(x * 0.08, z * 0.08, seed + 2.0, 2);
+          if (t > 0.85) {
+            tempCol.copy(cGrassMid).lerp(cGrassEdge, (t - 0.85) / 0.15);
+          } else {
+            tempCol.copy(cGrassMid).lerp(cGrassHigh, Math.min(1, (y / (baseRadius * 0.25)) * 0.7 + nCol * 0.4));
+          }
+          colors.push(tempCol.r, tempCol.g, tempCol.b);
+        }
+      }
+
+      // 中心扇形三角形
+      for (let is = 0; is < segs; is++) {
+        const next = (is + 1) % segs;
+        indices.push(0, 1 + next, 1 + is);
+      }
+
+      // 环间四边形
+      for (let ir = 1; ir < rings; ir++) {
+        const row1 = 1 + (ir - 1) * segs;
+        const row2 = 1 + ir * segs;
+        for (let is = 0; is < segs; is++) {
+          const next = (is + 1) % segs;
+          indices.push(row1 + is, row1 + next, row2 + is);
+          indices.push(row1 + next, row2 + next, row2 + is);
+        }
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.86,
+        metalness: 0.02,
+        flatShading: true
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // 构建底部倒锥形层理岩石网格
+    function buildIslandRockMesh(baseRadius, coneDepth, seed) {
+      const vRings = 26;
+      const segs = 44;
+      const positions = [];
+      const colors = [];
+      const indices = [];
+
+      const cRockLight  = new THREE.Color(0xb87852); // 暖赭石受光层
+      const cRockMid    = new THREE.Color(0x855542); // 赤褐砂岩层
+      const cRockDark   = new THREE.Color(0x4c3638); // 深紫褐岩缝与底部尖锥
+      const cMossRim    = new THREE.Color(0x586b32); // 顶部交界苔藓
+      const tempCol     = new THREE.Color();
+
+      for (let iv = 0; iv <= vRings; iv++) {
+        const t = iv / vRings; // 0 = 顶部边缘, 1 = 底部锥尖
+        // 倒锥收束曲线 + 台阶状水平层理
+        const baseTaper = Math.pow(1.0 - t, 0.76);
+        const strataWave = Math.sin(t * 26.0 + seed) * 0.045 * (1.0 - t);
+
+        for (let is = 0; is < segs; is++) {
+          const angle = (is / segs) * Math.PI * 2;
+          const topEdgeR = getIslandEdgeRadius(angle, baseRadius, seed);
+
+          if (iv === vRings) {
+            // 底部尖点微偏，显得自然崎岖
+            const tipOffsetX = (noise3D(seed, 1, 2) - 0.5) * baseRadius * 0.15;
+            const tipOffsetZ = (noise3D(seed, 3, 4) - 0.5) * baseRadius * 0.15;
+            positions.push(tipOffsetX, -coneDepth, tipOffsetZ);
+            colors.push(cRockDark.r, cRockDark.g, cRockDark.b);
+          } else {
+            const nx = Math.cos(angle) * 2.2 + seed;
+            const ny = t * 5.0;
+            const nz = Math.sin(angle) * 2.2 - seed;
+            // 三维噪声制造岩石棱角凹凸与断层
+            const crag = (fbm(nx, ny, nz, 3) - 0.48) * 0.34 * (1.0 - t * 0.65);
+            const rFactor = Math.max(0.03, baseTaper + strataWave + crag * (t > 0 ? 1 : 0.12));
+            const r = topEdgeR * rFactor;
+
+            // 层理高度微扰
+            const yJitter = (noise3D(nx * 1.8, ny * 2.5, nz * 1.8) - 0.5) * (coneDepth / vRings) * 0.55;
+            const y = iv === 0 ? -0.3 : -t * coneDepth + yJitter * (1.0 - t);
+
+            positions.push(Math.cos(angle) * r, y, Math.sin(angle) * r);
+
+            // 岩石层理着色：水平条带交替暖赭色与暗褐色
+            const layerBand = Math.sin(t * 32.0 + fbm(nx, ny, nz, 2) * 3.0);
+            if (t < 0.08) {
+              tempCol.copy(cMossRim).lerp(cRockMid, t / 0.08);
+            } else if (layerBand > 0.25) {
+              tempCol.copy(cRockMid).lerp(cRockLight, (layerBand - 0.25) * 0.9);
+            } else {
+              tempCol.copy(cRockMid).lerp(cRockDark, Math.min(1, (-layerBand + 0.25) * 0.7 + t * 0.5));
+            }
+            colors.push(tempCol.r, tempCol.g, tempCol.b);
+          }
+        }
+      }
+
+      for (let iv = 0; iv < vRings; iv++) {
+        const row1 = iv * segs;
+        const row2 = (iv + 1) * segs;
+        for (let is = 0; is < segs; is++) {
+          const next = (is + 1) % segs;
+          indices.push(row1 + is, row2 + is, row1 + next);
+          indices.push(row1 + next, row2 + is, row2 + next);
+        }
+      }
+
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+
+      const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.92,
+        metalness: 0.04,
+        flatShading: true
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+    // ==========================================
+    // 6. 低多边形树木、岩石与古代遗迹生成
+    // ==========================================
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3c28, roughness: 0.9, flatShading: true });
+    const foliageMats = [
+      new THREE.MeshStandardMaterial({ color: 0x6f8c30, roughness: 0.8, flatShading: true }), // 暖草绿
+      new THREE.MeshStandardMaterial({ color: 0x9e9232, roughness: 0.8, flatShading: true }), // 金秋黄绿
+      new THREE.MeshStandardMaterial({ color: 0xd17c32, roughness: 0.8, flatShading: true }), // 夕阳琥珀叶
+      new THREE.MeshStandardMaterial({ color: 0x4e7029, roughness: 0.8, flatShading: true })  // 深林苍绿
+    ];
+
+    function createLowPolyTree(scale = 1.0, styleIdx = 0) {
+      const group = new THREE.Group();
+      const trunkGeo = new THREE.CylinderGeometry(0.18 * scale, 0.34 * scale, 1.8 * scale, 6);
+      trunkGeo.translate(0, 0.9 * scale, 0);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.castShadow = true;
+      trunk.receiveShadow = true;
+      group.add(trunk);
+
+      const leafMat = foliageMats[styleIdx % foliageMats.length];
+      const layers = 3;
+      for (let i = 0; i < layers; i++) {
+        const r = (1.45 - i * 0.34) * scale;
+        const h = (1.7 - i * 0.25) * scale;
+        const coneGeo = new THREE.ConeGeometry(r, h, 7);
+        // 轻微顶点扰动让低多边形树冠更有手作感
+        const pos = coneGeo.attributes.position;
+        for (let v = 0; v < pos.count; v++) {
+          pos.setX(v, pos.getX(v) + (seededRandom() - 0.5) * 0.18 * scale);
+          pos.setZ(v, pos.getZ(v) + (seededRandom() - 0.5) * 0.18 * scale);
+        }
+        coneGeo.computeVertexNormals();
+        const cone = new THREE.Mesh(coneGeo, leafMat);
+        cone.position.y = (1.8 + i * 0.95) * scale;
+        cone.rotation.y = seededRandom() * Math.PI;
+        cone.castShadow = true;
+        cone.receiveShadow = true;
+        group.add(cone);
+      }
+      return group;
+    }
+
+    // 古代遗迹1：断裂石柱（立柱 + 倾倒残段）
+    function createBrokenPillar(scale = 1.0, isFallen = false) {
+      const group = new THREE.Group();
+      // 柱础方形底座
+      const baseGeo = new THREE.BoxGeometry(1.5 * scale, 0.45 * scale, 1.5 * scale);
+      const baseMesh = new THREE.Mesh(baseGeo, ruinMaterial);
+      baseMesh.position.y = 0.225 * scale;
+      baseMesh.castShadow = true;
+      baseMesh.receiveShadow = true;
+      group.add(baseMesh);
+
+      // 棱柱体（顶部斜向残断）
+      const height = (2.2 + seededRandom() * 2.4) * scale;
+      const colGeo = new THREE.CylinderGeometry(0.52 * scale, 0.58 * scale, height, 8, 4);
+      const pos = colGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const py = pos.getY(i);
+        const px = pos.getX(i);
+        const pz = pos.getZ(i);
+        // 顶部参差断裂面
+        if (py > height * 0.35) {
+          const slant = (px * 0.45 + pz * 0.3) * 0.65 + (noise3D(px * 2, py, pz * 2) - 0.5) * 0.4 * scale;
+          pos.setY(i, py + slant);
+        }
+      }
+      colGeo.computeVertexNormals();
+      const colMesh = new THREE.Mesh(colGeo, ruinMaterial);
+      colMesh.position.y = 0.45 * scale + height * 0.5;
+      colMesh.castShadow = true;
+      colMesh.receiveShadow = true;
+      group.add(colMesh);
+
+      // 如果有倾倒在草地上的残段
+      if (isFallen) {
+        const segGeo = new THREE.CylinderGeometry(0.5 * scale, 0.52 * scale, 1.8 * scale, 8);
+        const segMesh = new THREE.Mesh(segGeo, ruinMaterial);
+        segMesh.position.set(1.6 * scale, 0.42 * scale, 0.5 * scale);
+        segMesh.rotation.z = Math.PI * 0.46;
+        segMesh.rotation.y = seededRandom() * 1.2;
+        segMesh.castShadow = true;
+        segMesh.receiveShadow = true;
+        group.add(segMesh);
+      }
+      return group;
+    }
+
+    // 古代遗迹2：青苔石拱门
+    function createAncientArch(scale = 1.0) {
+      const group = new THREE.Group();
+      const span = 2.4 * scale;
+      const pillarH = 3.6 * scale;
+
+      // 左右双石柱及底座
+      for (let side of [-1, 1]) {
+        const plinth = new THREE.Mesh(new THREE.BoxGeometry(1.4 * scale, 0.6 * scale, 1.4 * scale), ruinMaterial);
+        plinth.position.set(side * span, 0.3 * scale, 0);
+        plinth.castShadow = true;
+        plinth.receiveShadow = true;
+        group.add(plinth);
+
+        const col = new THREE.Mesh(new THREE.BoxGeometry(0.95 * scale, pillarH, 0.95 * scale), ruinMaterial);
+        col.position.set(side * span, 0.6 * scale + pillarH * 0.5, 0);
+        col.castShadow = true;
+        col.receiveShadow = true;
+        group.add(col);
+
+        const cap = new THREE.Mesh(new THREE.BoxGeometry(1.3 * scale, 0.4 * scale, 1.3 * scale), ruinMaterial);
+        cap.position.set(side * span, 0.6 * scale + pillarH + 0.2 * scale, 0);
+        cap.castShadow = true;
+        cap.receiveShadow = true;
+        group.add(cap);
+      }
+
+      // 楔形拱券石块拼接
+      const archBlocks = 7;
+      const archBaseY = 0.6 * scale + pillarH + 0.3 * scale;
+      for (let i = 0; i < archBlocks; i++) {
+        // 偶尔缺失一块营造残破感
+        if (scale < 1.15 && i === 4 && seededRandom() > 0.65) continue;
+        const t = (i + 0.5) / archBlocks;
+        const angle = t * Math.PI;
+        const bx = -Math.cos(angle) * span;
+        const by = archBaseY + Math.sin(angle) * span * 0.85;
+        const blockGeo = new THREE.BoxGeometry(1.05 * scale, 0.85 * scale, 1.05 * scale);
+        const block = new THREE.Mesh(blockGeo, ruinMaterial);
+        block.position.set(bx, by, 0);
+        block.rotation.z = angle - Math.PI * 0.5;
+        block.castShadow = true;
+        block.receiveShadow = true;
+        group.add(block);
+      }
+      return group;
+    }
+
+    // 古代遗迹3：阶梯式残墙
+    function createRuinedWall(scale = 1.0) {
+      const group = new THREE.Group();
+      const rows = 4;
+      const cols = 5;
+      const bw = 1.1 * scale;
+      const bh = 0.65 * scale;
+      const bd = 0.75 * scale;
+
+      for (let r = 0; r < rows; r++) {
+        // 越往上越残缺
+        const activeCols = cols - r - (seededRandom() > 0.5 ? 1 : 0);
+        for (let c = 0; c < activeCols; c++) {
+          const block = new THREE.Mesh(new THREE.BoxGeometry(bw * 0.96, bh * 0.95, bd), ruinMaterial);
+          const offsetX = (c - cols * 0.5 + (r % 2) * 0.45) * bw;
+          const offsetY = (r + 0.5) * bh;
+          block.position.set(offsetX, offsetY, (seededRandom() - 0.5) * 0.08 * scale);
+          block.rotation.y = (seededRandom() - 0.5) * 0.06;
+          block.castShadow = true;
+          block.receiveShadow = true;
+          group.add(block);
+        }
+      }
+      return group;
+    }
+
+    // ==========================================
+    // 7. 瀑布倾泻与底部水雾粒子生成
+    // ==========================================
+    const waterfallMistSystems = [];
+
+    function createWaterfallOnIsland(islandGroup, baseRadius, seed, waterfallAngle, worldY) {
+      const edgeR = getIslandEdgeRadius(waterfallAngle, baseRadius, seed);
+      const dirX = Math.cos(waterfallAngle);
+      const dirZ = Math.sin(waterfallAngle);
+
+      // 1) 岛面源头溪流浅池
+      const poolLength = edgeR * 0.68;
+      const poolWidth = Math.max(2.4, baseRadius * 0.22);
+      const poolGeo = new THREE.PlaneGeometry(poolWidth, poolLength, 8, 12);
+      poolGeo.rotateX(-Math.PI / 2);
+      const pPos = poolGeo.attributes.position;
+      for (let i = 0; i < pPos.count; i++) {
+        const lx = pPos.getX(i);
+        const lz = pPos.getZ(i) + poolLength * 0.48; // 从中心延伸至边缘
+        // 变换到岛屿局部坐标
+        const wx = dirX * lz - dirZ * lx;
+        const wz = dirZ * lz + dirX * lx;
+        const groundY = getIslandTopHeight(wx, wz, baseRadius, seed);
+        pPos.setXYZ(i, wx, groundY + 0.14, wz);
+      }
+      poolGeo.computeVertexNormals();
+      const poolMat = new THREE.MeshStandardMaterial({
+        color: 0x6ec5d4,
+        emissive: 0x2c6373,
+        emissiveIntensity: 0.45,
+        roughness: 0.15,
+        metalness: 0.3,
+        transparent: true,
+        opacity: 0.86
+      });
+      const poolMesh = new THREE.Mesh(poolGeo, poolMat);
+      islandGroup.add(poolMesh);
+
+      // 2) 倾泻而下的半透明滚动水帘（落入下方云海消失）
+      const cloudSeaWorldY = -44;
+      const fallHeight = Math.max(45, worldY - cloudSeaWorldY + 12);
+      const curtainGeo = new THREE.PlaneGeometry(poolWidth * 1.15, fallHeight, 12, 28);
+      const cPos = curtainGeo.attributes.position;
+
+      for (let i = 0; i < cPos.count; i++) {
+        const u = cPos.getX(i); // 宽度方向
+        const v = cPos.getY(i); // 高度方向 (+fallHeight/2 到 -fallHeight/2)
+        const normDrop = 0.5 - v / fallHeight; // 0(顶部悬崖口) -> 1(底部云海)
+
+        // 顶部向悬崖外抛物线跃出，底部微微散开
+        const widen = 1.0 + normDrop * 0.65;
+        const outward = Math.pow(normDrop, 0.55) * 4.2 + Math.sin(normDrop * 8.0) * 0.35;
+        const curveArch = Math.cos((u / (poolWidth * 0.6)) * 1.1) * 0.7;
+
+        const localForward = edgeR * 0.96 + outward + curveArch;
+        const localSide = u * widen;
+
+        const wx = dirX * localForward - dirZ * localSide;
+        const wz = dirZ * localForward + dirX * localSide;
+        const wy = -normDrop * fallHeight + 0.4;
+        cPos.setXYZ(i, wx, wy, wz);
+      }
+      curtainGeo.computeVertexNormals();
+
+      const curtainMat = new THREE.MeshStandardMaterial({
+        color: 0xffebd6,
+        emissive: 0xd98b5f,
+        emissiveIntensity: 0.4,
+        map: waterfallTextures.flowTex,
+        alphaMap: waterfallTextures.alphaTex,
+        transparent: true,
+        opacity: 0.92,
+        roughness: 0.25,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+
+      const curtainMesh = new THREE.Mesh(curtainGeo, curtainMat);
+      islandGroup.add(curtainMesh);
+
+      // 3) 瀑布底部与悬崖口水雾粒子系统
+      const mistCount = 46;
+      const mistPositions = new Float32Array(mistCount * 3);
+      const mistData = [];
+
+      const baseCenterX = dirX * (edgeR + 3.8);
+      const baseCenterZ = dirZ * (edgeR + 3.8);
+      const bottomLocalY = -(worldY - cloudSeaWorldY);
+
+      for (let i = 0; i < mistCount; i++) {
+        const isTopSplash = i < 10; // 少量在悬崖口，大量在底部云海交界处
+        const spread = isTopSplash ? poolWidth * 0.6 : poolWidth * 2.2;
+        const ox = baseCenterX + (Math.random() - 0.5) * spread;
+        const oz = baseCenterZ + (Math.random() - 0.5) * spread;
+        const oy = isTopSplash
+          ? (Math.random() - 0.5) * 2.5
+          : bottomLocalY + Math.random() * 14.0 - 3.0;
+
+        mistPositions[i * 3] = ox;
+        mistPositions[i * 3 + 1] = oy;
+        mistPositions[i * 3 + 2] = oz;
+
+        mistData.push({
+          baseX: baseCenterX,
+          baseZ: baseCenterZ,
+          baseY: isTopSplash ? 0 : bottomLocalY,
+          spread,
+          speedY: 2.2 + Math.random() * 3.5,
+          driftAngle: Math.random() * Math.PI * 2,
+          driftSpeed: 0.8 + Math.random() * 1.5,
+          maxLifeY: isTopSplash ? 3.5 : 16.0,
+          phase: Math.random() * 10
+        });
+      }
+
+      const mistGeo = new THREE.BufferGeometry();
+      mistGeo.setAttribute('position', new THREE.BufferAttribute(mistPositions, 3));
+      const mistMat = new THREE.PointsMaterial({
+        map: mistParticleTex,
+        size: Math.max(9, baseRadius * 0.65),
+        transparent: true,
+        opacity: 0.68,
+        depthWrite: false,
+        blending: THREE.NormalBlending,
+        color: 0xffdfc2
+      });
+
+      const mistPoints = new THREE.Points(mistGeo, mistMat);
+      islandGroup.add(mistPoints);
+
+      waterfallMistSystems.push({ points: mistPoints, data: mistData });
+    }
+
+    // ==========================================
+    // 8. 组装十几座大小不一的浮空岛世界
+    // ==========================================
+    const islandConfigs = [
+      // 主中央遗迹大岛（带双瀑布、拱门与残柱群）
+      { x: 0,    y: 8,   z: 0,    r: 28, depth: 52, seed: 1.1, waterfalls: [0.65, 2.45], ruins: 6, trees: 26 },
+      // 近景左侧瀑布岛
+      { x: -58,  y: 18,  z: 22,   r: 19, depth: 38, seed: 2.3, waterfalls: [0.15],       ruins: 3, trees: 16 },
+      // 近景右侧高空遗迹岛
+      { x: 64,   y: 26,  z: 16,   r: 21, depth: 44, seed: 3.7, waterfalls: [3.4],        ruins: 4, trees: 18 },
+      // 前方迎宾小岛
+      { x: -18,  y: 4,   z: 62,   r: 13, depth: 26, seed: 4.5, waterfalls: [],           ruins: 2, trees: 9  },
+      { x: 32,   y: 11,  z: 68,   r: 14, depth: 29, seed: 5.2, waterfalls: [4.7],        ruins: 2, trees: 11 },
+      // 中远景错落岛群
+      { x: -42,  y: 32,  z: -56,  r: 22, depth: 48, seed: 6.8, waterfalls: [1.2],        ruins: 4, trees: 19 },
+      { x: 45,   y: 15,  z: -64,  r: 18, depth: 36, seed: 7.4, waterfalls: [],           ruins: 3, trees: 14 },
+      { x: -98,  y: 6,   z: -28,  r: 16, depth: 34, seed: 8.9, waterfalls: [],           ruins: 2, trees: 12 },
+      { x: 108,  y: 12,  z: -35,  r: 17, depth: 37, seed: 9.6, waterfalls: [2.9],        ruins: 2, trees: 13 },
+      // 远景与高空悬浮小岛
+      { x: 8,    y: 42,  z: -112, r: 24, depth: 54, seed: 10.3,waterfalls: [1.5],        ruins: 4, trees: 20 },
+      { x: -82,  y: 38,  z: -105, r: 14, depth: 31, seed: 11.7,waterfalls: [],           ruins: 1, trees: 8  },
+      { x: 92,   y: 35,  z: -115, r: 15, depth: 33, seed: 12.4,waterfalls: [],           ruins: 2, trees: 10 },
+      { x: -75,  y: -5,  z: 78,   r: 12, depth: 24, seed: 13.8,waterfalls: [],           ruins: 1, trees: 7  },
+      { x: 86,   y: -2,  z: 74,   r: 11, depth: 22, seed: 14.2,waterfalls: [],           ruins: 1, trees: 6  },
+      { x: -12,  y: 48,  z: -24,  r: 9,  depth: 20, seed: 15.9,waterfalls: [],           ruins: 1, trees: 5  }
+    ];
+
+    const islandsRoot = new THREE.Group();
+    scene.add(islandsRoot);
+
+    islandConfigs.forEach((cfg, idx) => {
+      const islandGroup = new THREE.Group();
+      islandGroup.position.set(cfg.x, cfg.y, cfg.z);
+
+      // 1) 顶部草地与底部倒锥岩石
+      const topMesh = buildIslandTopMesh(cfg.r, cfg.seed);
+      const rockMesh = buildIslandRockMesh(cfg.r, cfg.depth, cfg.seed);
+      islandGroup.add(topMesh);
+      islandGroup.add(rockMesh);
+
+      // 2) 放置古代遗迹（拱门、断柱、残墙）
+      for (let rIdx = 0; rIdx < cfg.ruins; rIdx++) {
+        const angle = seededRandom() * Math.PI * 2;
+        const dist = seededRandom() * cfg.r * 0.58;
+        const rx = Math.cos(angle) * dist;
+        const rz = Math.sin(angle) * dist;
+        const ry = getIslandTopHeight(rx, rz, cfg.r, cfg.seed) - 0.15;
+
+        let ruinObj;
+        const typeRoll = (idx + rIdx) % 3;
+        const scale = 0.85 + seededRandom() * 0.45;
+        if (typeRoll === 0) {
+          ruinObj = createAncientArch(scale);
+        } else if (typeRoll === 1) {
+          ruinObj = createBrokenPillar(scale, seededRandom() > 0.35);
+        } else {
+          ruinObj = createRuinedWall(scale);
+        }
+        ruinObj.position.set(rx, ry, rz);
+        ruinObj.rotation.y = seededRandom() * Math.PI * 2;
+        islandGroup.add(ruinObj);
+      }
+
+      // 3) 放置程序化低多边形小树与青苔碎石
+      for (let tIdx = 0; tIdx < cfg.trees; tIdx++) {
+        const angle = seededRandom() * Math.PI * 2;
+        const maxEdge = getIslandEdgeRadius(angle, cfg.r, cfg.seed);
+        const dist = (0.18 + Math.sqrt(seededRandom()) * 0.68) * maxEdge;
+        // 避开瀑布水道附近
+        let nearWaterfall = false;
+        for (let wfAngle of cfg.waterfalls) {
+          let diff = Math.abs(Math.atan2(Math.sin(angle - wfAngle), Math.cos(angle - wfAngle)));
+          if (diff < 0.28) nearWaterfall = true;
+        }
+        if (nearWaterfall) continue;
+
+        const tx = Math.cos(angle) * dist;
+        const tz = Math.sin(angle) * dist;
+        const ty = getIslandTopHeight(tx, tz, cfg.r, cfg.seed) - 0.1;
+
+        const treeScale = 0.7 + seededRandom() * 0.75;
+        const tree = createLowPolyTree(treeScale, Math.floor(seededRandom() * 4));
+        tree.position.set(tx, ty, tz);
+        tree.rotation.y = seededRandom() * Math.PI * 2;
+        islandGroup.add(tree);
+      }
+
+      // 4) 创建边缘倾泻瀑布
+      cfg.waterfalls.forEach(wfAngle => {
+        createWaterfallOnIsland(islandGroup, cfg.r, cfg.seed, wfAngle, cfg.y);
+      });
+
+      islandsRoot.add(islandGroup);
+    });
+
+    // ==========================================
+    // 9. 飞艇生成与巡航动画（气囊+吊舱+旋转螺旋桨）
+    // ==========================================
+    const spinningPropellers = [];
+    const airshipAgents = [];
+
+    function createAirship(hullColorHex = 0xe8d0ae, stripeColorHex = 0x8f432b) {
+      const airship = new THREE.Group();
+
+      // 1) 飞艇流线型气囊
+      const envelopeGroup = new THREE.Group();
+      const bagGeo = new THREE.SphereGeometry(3.6, 24, 16);
+      bagGeo.scale(1.0, 1.08, 2.65);
+      const bagMat = new THREE.MeshStandardMaterial({
+        color: hullColorHex,
+        roughness: 0.68,
+        metalness: 0.08,
+        flatShading: true
+      });
+      const bagMesh = new THREE.Mesh(bagGeo, bagMat);
+      bagMesh.castShadow = true;
+      bagMesh.receiveShadow = true;
+      envelopeGroup.add(bagMesh);
+
+      // 气囊箍带环与金属鼻锥
+      const bandMat = new THREE.MeshStandardMaterial({
+        color: stripeColorHex,
+        roughness: 0.5,
+        metalness: 0.35,
+        flatShading: true
+      });
+      for (let zPos of [-4.2, -1.4, 1.4, 4.2]) {
+        const ratio = Math.sqrt(Math.max(0.1, 1 - Math.pow(zPos / (3.6 * 2.65), 2)));
+        const ringGeo = new THREE.TorusGeometry(3.62 * ratio, 0.12, 6, 24);
+        const ring = new THREE.Mesh(ringGeo, bandMat);
+        ring.scale.set(1.0, 1.08, 1.0);
+        ring.position.z = zPos;
+        envelopeGroup.add(ring);
+      }
+
+      // 尾部十字稳定翼
+      const finGeo = new THREE.BoxGeometry(0.18, 3.2, 3.4);
+      const posFin = finGeo.attributes.position;
+      for (let i = 0; i < posFin.count; i++) {
+        if (posFin.getZ(i) > 0 && posFin.getY(i) > 0) {
+          posFin.setY(i, posFin.getY(i) * 0.45);
+        }
+      }
+      finGeo.computeVertexNormals();
+      const topFin = new THREE.Mesh(finGeo, bandMat);
+      topFin.position.set(0, 2.2, -7.2);
+      envelopeGroup.add(topFin);
+
+      const sideFinL = topFin.clone();
+      sideFinL.rotation.z = Math.PI / 2;
+      sideFinL.position.set(-2.2, 0, -7.2);
+      envelopeGroup.add(sideFinL);
+
+      const sideFinR = topFin.clone();
+      sideFinR.rotation.z = -Math.PI / 2;
+      sideFinR.position.set(2.2, 0, -7.2);
+      envelopeGroup.add(sideFinR);
+
+      airship.add(envelopeGroup);
+
+      // 2) 底部悬挂吊舱與缆绳斜撑
+      const gondolaGroup = new THREE.Group();
+      gondolaGroup.position.set(0, -5.6, 0);
+
+      const cabinGeo = new THREE.BoxGeometry(2.1, 1.5, 6.2);
+      const cabinMat = new THREE.MeshStandardMaterial({
+        color: 0x5c3a24,
+        roughness: 0.75,
+        metalness: 0.15,
+        flatShading: true
+      });
+      const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+      cabin.castShadow = true;
+      cabin.receiveShadow = true;
+      gondolaGroup.add(cabin);
+
+      // 吊舱暖光舷窗
+      const winMat = new THREE.MeshStandardMaterial({
+        color: 0xffe49e,
+        emissive: 0xff9d2e,
+        emissiveIntensity: 1.8,
+        roughness: 0.2
+      });
+      for (let wz of [-1.8, 0, 1.8]) {
+        const winGeo = new THREE.BoxGeometry(2.18, 0.55, 0.75);
+        const win = new THREE.Mesh(winGeo, winMat);
+        win.position.set(0, 0.15, wz);
+        gondolaGroup.add(win);
+      }
+
+      // 吊索斜撑架
+      const strutMat = new THREE.MeshStandardMaterial({ color: 0x3b2c26, metalness: 0.6, roughness: 0.4 });
+      for (let sz of [-2.2, 2.2]) {
+        for (let sx of [-0.9, 0.9]) {
+          const strutGeo = new THREE.CylinderGeometry(0.05, 0.05, 3.2, 6);
+          const strut = new THREE.Mesh(strutGeo, strutMat);
+          strut.position.set(sx * 1.15, 2.1, sz);
+          strut.rotation.z = sx * 0.22;
+          gondolaGroup.add(strut);
+        }
+      }
+
+      // 3) 两侧与尾部螺旋桨组件
+      function buildPropellerUnit() {
+        const propGroup = new THREE.Group();
+        const hub = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.7, 8), bandMat);
+        hub.rotation.x = -Math.PI / 2;
+        propGroup.add(hub);
+
+        const bladeGeo = new THREE.BoxGeometry(0.22, 1.9, 0.06);
+        const bladeMat = new THREE.MeshStandardMaterial({ color: 0xd9a760, metalness: 0.45, roughness: 0.35 });
+        for (let b = 0; b < 3; b++) {
+          const bladePivot = new THREE.Group();
+          bladePivot.rotation.z = (b * Math.PI * 2) / 3;
+          const blade = new THREE.Mesh(bladeGeo, bladeMat);
+          blade.position.y = 0.95;
+          blade.rotation.y = 0.35; // 桨叶迎角
+          bladePivot.add(blade);
+          propGroup.add(bladePivot);
+        }
+        spinningPropellers.push(propGroup);
+        return propGroup;
+      }
+
+      // 左右舷发动机短舱与螺旋桨
+      for (let side of [-1, 1]) {
+        const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.8, 6), strutMat);
+        arm.rotation.z = Math.PI / 2;
+        arm.position.set(side * 1.8, 0.1, -0.5);
+        gondolaGroup.add(arm);
+
+        const prop = buildPropellerUnit();
+        prop.position.set(side * 2.65, 0.1, -1.1);
+        gondolaGroup.add(prop);
+      }
+
+      // 吊舱尾部主推进螺旋桨
+      const rearProp = buildPropellerUnit();
+      rearProp.scale.setScalar(1.25);
+      rearProp.position.set(0, 0, -3.35);
+      gondolaGroup.add(rearProp);
+
+      airship.add(gondolaGroup);
+      return airship;
+    }
+
+    // 生成 3 艘飞艇在薄雾中沿不同轨道缓慢巡航
+    const airshipRoutes = [
+      { cx: 10,  cy: 34, cz: -15, rx: 78, rz: 58, speed: 0.085, phase: 0.2,  scale: 1.0,  hull: 0xeed6b5, stripe: 0x99412a },
+      { cx: -35, cy: 16, cz: 10,  rx: 92, rz: 74, speed: -0.068,phase: 2.4,  scale: 0.88, hull: 0xe3c39d, stripe: 0x3b5866 },
+      { cx: 30,  cy: 50, cz: -55, rx: 85, rz: 62, speed: 0.072, phase: 4.5,  scale: 0.95, hull: 0xf2dfc4, stripe: 0x7a4259 }
+    ];
+
+    airshipRoutes.forEach(route => {
+      const ship = createAirship(route.hull, route.stripe);
+      ship.scale.setScalar(route.scale);
+      scene.add(ship);
+      airshipAgents.push({ mesh: ship, route });
+    });
+
+    // ==========================================
+    // 10. 层层体积感云海 (起伏云层 Shader + 漂浮立体云团)
+    // ==========================================
+    const cloudUniforms = {
+      uTime: { value: 0 },
+      uSunDir: { value: sunDirection }
+    };
+
+    // 第一层与第二层：广袤起伏的黄金时刻体积感云海平面
+    function createCloudSeaLayer(yLevel, opacityVal, speedScale) {
+      const geo = new THREE.PlaneGeometry(1800, 1800, 140, 140);
+      geo.rotateX(-Math.PI / 2);
+
+      const mat = new THREE.ShaderMaterial({
+        transparent: true,
+        depthWrite: false,
+        uniforms: {
+          uTime: cloudUniforms.uTime,
+          uSunDir: cloudUniforms.uSunDir,
+          uOpacity: { value: opacityVal },
+          uSpeed: { value: speedScale }
+        },
+        vertexShader: `
+          uniform float uTime;
+          uniform float uSpeed;
+          varying vec3 vWorldPos;
+          varying float vElevation;
+
+          float hash(vec2 p) {
+            return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+          }
+          float noise(vec2 p) {
+            vec2 i = floor(p);
+            vec2 f = fract(p);
+            vec2 u = f * f * (3.0 - 2.0 * f);
+            return mix(
+              mix(hash(i + vec2(0.0, 0.0)), hash(i + vec2(1.0, 0.0)), u.x),
+              mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
+              u.y
+            );
+          }
+          float fbmCloud(vec2 p) {
+            float v = 0.0;
+            float a = 0.5;
+            for (int i = 0; i < 4; i++) {
+              v += a * noise(p);
+              p *= 2.04;
+              a *= 0.5;
+            }
+            return v;
+          }
+
+          void main() {
+            vec3 pos = position;
+            vec2 flow = vec2(uTime * 0.45 * uSpeed, uTime * 0.22 * uSpeed);
+            float n = fbmCloud(pos.xz * 0.0085 + flow);
+            float billow = smoothstep(0.22, 0.85, n);
+            pos.y += billow * 24.0;
+            vElevation = billow;
+
+            vec4 wp = modelMatrix * vec4(pos, 1.0);
+            vWorldPos = wp.xyz;
+            gl_Position = projectionMatrix * viewMatrix * wp;
+          }
+        `,
+        fragmentShader: `
+          varying vec3 vWorldPos;
+          varying float vElevation;
+          uniform vec3 uSunDir;
+          uniform float uOpacity;
+
+          void main() {
+            float dist = length(vWorldPos.xz);
+            float edgeFade = 1.0 - smoothstep(420.0, 880.0, dist);
+
+            // 云海暗部暮紫与受光面鎏金暖橙过渡
+            vec3 shadowCol = vec3(0.36, 0.23, 0.36);
+            vec3 midCol    = vec3(0.82, 0.46, 0.34);
+            vec3 brightCol = vec3(1.00, 0.78, 0.46);
+
+            vec3 col = mix(shadowCol, midCol, smoothstep(0.15, 0.58, vElevation));
+            col = mix(col, brightCol, smoothstep(0.52, 0.92, vElevation));
+
+            // 太阳方向前向散射金边
+            vec3 viewDir = normalize(vWorldPos - cameraPosition);
+            float sunScatter = pow(max(dot(viewDir, uSunDir), 0.0), 4.0);
+            col += vec3(1.0, 0.65, 0.28) * sunScatter * 0.35;
+
+            // 远景大气雾混合
+            float fogFactor = 1.0 - exp(-0.0016 * dist);
+            vec3 fogColor = vec3(0.88, 0.52, 0.33);
+            col = mix(col, fogColor, fogFactor);
+
+            float alpha = uOpacity * edgeFade * smoothstep(0.08, 0.42, vElevation);
+            gl_FragColor = vec4(col, alpha);
+          }
+        `
+      });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.y = yLevel;
+      scene.add(mesh);
+      return mesh;
+    }
+
+    createCloudSeaLayer(-46, 0.95, 1.0);
+    createCloudSeaLayer(-58, 0.98, 0.65);
+
+    // 第三层：散落在岛屿之间与云海之上的 3D 立体体积云团 (InstancedMesh)
+    const puffGeo = new THREE.IcosahedronGeometry(1, 2);
+    const puffPos = puffGeo.attributes.position;
+    for (let i = 0; i < puffPos.count; i++) {
+      const vx = puffPos.getX(i), vy = puffPos.getY(i), vz = puffPos.getZ(i);
+      const n = noise3D(vx * 1.5, vy * 1.5, vz * 1.5);
+      const s = 0.85 + n * 0.3;
+      puffPos.setXYZ(i, vx * s, vy * s * 0.62, vz * s);
+    }
+    puffGeo.computeVertexNormals();
+
+    const cloudPuffMat = new THREE.MeshStandardMaterial({
+      color: 0xffd1a6,
+      emissive: 0x6b3a4b,
+      emissiveIntensity: 0.45,
+      roughness: 0.95,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.82,
+      flatShading: true
+    });
+
+    const puffCount = 260;
+    const cloudInstanced = new THREE.InstancedMesh(puffGeo, cloudPuffMat, puffCount);
+    const dummy = new THREE.Object3D();
+    const cloudPuffItems = [];
+
+    for (let i = 0; i < puffCount; i++) {
+      const isHighMist = i < 45; // 一部分在岛屿间薄雾漂移，大部分构成云海立体云峰
+      const angle = seededRandom() * Math.PI * 2;
+      const radius = isHighMist ? (35 + seededRandom() * 160) : (10 + seededRandom() * 340);
+      const x = Math.cos(angle) * radius;
+      const z = Math.sin(angle) * radius;
+      const y = isHighMist ? (-12 + seededRandom() * 48) : (-44 + seededRandom() * 12);
+      const sx = (isHighMist ? 8 : 16) + seededRandom() * 22;
+      const sy = (isHighMist ? 3.5 : 8) + seededRandom() * 9;
+      const sz = (isHighMist ? 8 : 16) + seededRandom() * 22;
+
+      cloudPuffItems.push({
+        x, y, z, sx, sy, sz,
+        rotY: seededRandom() * Math.PI * 2,
+        driftSpeed: (0.6 + seededRandom() * 1.4) * (isHighMist ? 1.3 : 0.7)
+      });
+
+      dummy.position.set(x, y, z);
+      dummy.rotation.y = cloudPuffItems[i].rotY;
+      dummy.scale.set(sx, sy, sz);
+      dummy.updateMatrix();
+      cloudInstanced.setMatrixAt(i, dummy.matrix);
+    }
+    scene.add(cloudInstanced);
+
+    // ==========================================
+    // 11. 自由飞行交互控制 (PointerLockControls + 鼠标拖拽 + WASD/空格/Shift + 手机摇杆)
+    // ==========================================
+    const pointerLockControls = new PointerLockControls(camera, renderer.domElement);
+
+    const moveState = {
+      forward: false,
+      backward: false,
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      joyX: 0,
+      joyY: 0
+    };
+
+    const euler = new THREE.Euler(0, 0, 0, 'YXZ');
+    euler.setFromQuaternion(camera.quaternion);
+
+    // 点击画面开启 PointerLockControls，同时兼容按住鼠标拖动转视角
+    let isMouseDragging = false;
+    let pointerDownPos = { x: 0, y: 0 };
+    let lastMousePos = { x: 0, y: 0 };
+
+    renderer.domElement.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      isMouseDragging = true;
+      pointerDownPos.x = e.clientX;
+      pointerDownPos.y = e.clientY;
+      lastMousePos.x = e.clientX;
+      lastMousePos.y = e.clientY;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!pointerLockControls.isLocked && isMouseDragging) {
+        const dx = e.clientX - lastMousePos.x;
+        const dy = e.clientY - lastMousePos.y;
+        lastMousePos.x = e.clientX;
+        lastMousePos.y = e.clientY;
+
+        euler.setFromQuaternion(camera.quaternion);
+        euler.y -= dx * 0.0032;
+        euler.x = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, euler.x - dy * 0.0032));
+        camera.quaternion.setFromEuler(euler);
+      }
+    });
+
+    window.addEventListener('mouseup', (e) => {
+      if (!isMouseDragging) return;
+      isMouseDragging = false;
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      // 轻点画面时激活 PointerLockControls
+      if (moveDist < 6 && !pointerLockControls.isLocked && !document.body.classList.contains('is-touch')) {
+        try {
+          pointerLockControls.lock();
+        } catch (_) {}
+      }
+    });
+
+    // 键盘按键监听
+    window.addEventListener('keydown', (e) => {
+      switch (e.code) {
+        case 'KeyW':
+        case 'ArrowUp':
+          moveState.forward = true;
+          break;
+        case 'KeyS':
+        case 'ArrowDown':
+          moveState.backward = true;
+          break;
+        case 'KeyA':
+        case 'ArrowLeft':
+          moveState.left = true;
+          break;
+        case 'KeyD':
+        case 'ArrowRight':
+          moveState.right = true;
+          break;
+        case 'Space':
+          moveState.up = true;
+          e.preventDefault();
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          moveState.down = true;
+          break;
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      switch (e.code) {
+        case 'KeyW':
+        case 'ArrowUp':
+          moveState.forward = false;
+          break;
+        case 'KeyS':
+        case 'ArrowDown':
+          moveState.backward = false;
+          break;
+        case 'KeyA':
+        case 'ArrowLeft':
+          moveState.left = false;
+          break;
+        case 'KeyD':
+        case 'ArrowRight':
+          moveState.right = false;
+          break;
+        case 'Space':
+          moveState.up = false;
+          break;
+        case 'ShiftLeft':
+        case 'ShiftRight':
+          moveState.down = false;
+          break;
+      }
+    });
+
+    // 移动端触控检测与虚拟摇杆 + 屏幕拖动转向
+    const isTouchCapable = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.innerWidth <= 820);
+    if (isTouchCapable) {
+      document.body.classList.add('is-touch');
+    }
+    window.addEventListener('touchstart', () => {
+      document.body.classList.add('is-touch');
+    }, { once: true, passive: true });
+
+    const joystickZone = document.getElementById('joystick-zone');
+    const joystickKnob = document.getElementById('joystick-knob');
+    let joyTouchId = null;
+    let joyCenter = { x: 0, y: 0 };
+    const maxJoyRadius = 38;
+
+    joystickZone.addEventListener('touchstart', (e) => {
+      e.preventDefault();
+      const touch = e.changedTouches[0];
+      joyTouchId = touch.identifier;
+      const rect = joystickZone.getBoundingClientRect();
+      joyCenter.x = rect.left + rect.width / 2;
+      joyCenter.y = rect.top + rect.height / 2;
+      updateJoystick(touch.clientX, touch.clientY);
+    }, { passive: false });
+
+    joystickZone.addEventListener('touchmove', (e) => {
+      e.preventDefault();
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === joyTouchId) {
+          updateJoystick(t.clientX, t.clientY);
+        }
+      }
+    }, { passive: false });
+
+    function resetJoystick(e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === joyTouchId) {
+          joyTouchId = null;
+          moveState.joyX = 0;
+          moveState.joyY = 0;
+          joystickKnob.style.transform = `translate(0px, 0px)`;
+        }
+      }
+    }
+    joystickZone.addEventListener('touchend', resetJoystick);
+    joystickZone.addEventListener('touchcancel', resetJoystick);
+
+    function updateJoystick(clientX, clientY) {
+      let dx = clientX - joyCenter.x;
+      let dy = clientY - joyCenter.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > maxJoyRadius) {
+        dx = (dx / dist) * maxJoyRadius;
+        dy = (dy / dist) * maxJoyRadius;
+      }
+      joystickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+      moveState.joyX = dx / maxJoyRadius;
+      moveState.joyY = -dy / maxJoyRadius; // 向上推为前进正值
+    }
+
+    // 移动端升降按钮
+    const btnUp = document.getElementById('btn-up');
+    const btnDown = document.getElementById('btn-down');
+    btnUp.addEventListener('touchstart', (e) => { e.preventDefault(); moveState.up = true; btnUp.classList.add('active'); }, { passive: false });
+    btnUp.addEventListener('touchend', () => { moveState.up = false; btnUp.classList.remove('active'); });
+    btnDown.addEventListener('touchstart', (e) => { e.preventDefault(); moveState.down = true; btnDown.classList.add('active'); }, { passive: false });
+    btnDown.addEventListener('touchend', () => { moveState.down = false; btnDown.classList.remove('active'); });
+
+    // 移动端画面拖动转视角
+    let lookTouchId = null;
+    let lastLookTouch = { x: 0, y: 0 };
+
+    renderer.domElement.addEventListener('touchstart', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (lookTouchId === null) {
+          lookTouchId = t.identifier;
+          lastLookTouch.x = t.clientX;
+          lastLookTouch.y = t.clientY;
+        }
+      }
+    }, { passive: true });
+
+    renderer.domElement.addEventListener('touchmove', (e) => {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        const t = e.changedTouches[i];
+        if (t.identifier === lookTouchId) {
+          const dx = t.clientX - lastLookTouch.x;
+          const dy = t.clientY - lastLookTouch.y;
+          lastLookTouch.x = t.clientX;
+          lastLookTouch.y = t.clientY;
+
+          euler.setFromQuaternion(camera.quaternion);
+          euler.y -= dx * 0.0042;
+          euler.x = Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, euler.x - dy * 0.0042));
+          camera.quaternion.setFromEuler(euler);
+        }
+      }
+    }, { passive: true });
+
+    function endLookTouch(e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier === lookTouchId) {
+          lookTouchId = null;
+        }
+      }
+    }
+    renderer.domElement.addEventListener('touchend', endLookTouch);
+    renderer.domElement.addEventListener('touchcancel', endLookTouch);
+
+    // ==========================================
+    // 12. 主渲染循环与动态更新
+    // ==========================================
+    const clock = new THREE.Clock();
+    const velocity = new THREE.Vector3();
+    const targetVelocity = new THREE.Vector3();
+    const forwardVec = new THREE.Vector3();
+    const rightVec = new THREE.Vector3();
+    const worldUp = new THREE.Vector3(0, 1, 0);
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.1);
+      const elapsed = clock.getElapsedTime();
+
+      // 1) 第一人称自由飞行物理平滑移动
+      const flySpeed = 32.0;
+      camera.getWorldDirection(forwardVec);
+      rightVec.crossVectors(forwardVec, worldUp).normalize();
+
+      const inputZ = (moveState.forward ? 1 : 0) - (moveState.backward ? 1 : 0) + moveState.joyY;
+      const inputX = (moveState.right ? 1 : 0) - (moveState.left ? 1 : 0) + moveState.joyX;
+      const inputY = (moveState.up ? 1 : 0) - (moveState.down ? 1 : 0);
+
+      targetVelocity.set(0, 0, 0);
+      targetVelocity.addScaledVector(forwardVec, inputZ * flySpeed);
+      targetVelocity.addScaledVector(rightVec, inputX * flySpeed);
+      targetVelocity.y += inputY * (flySpeed * 0.78);
+
+      velocity.lerp(targetVelocity, 1.0 - Math.exp(-8.5 * dt));
+      camera.position.addScaledVector(velocity, dt);
+      // 防止穿入云海过深
+      if (camera.position.y < -36) camera.position.y = -36;
+      if (camera.position.y > 240) camera.position.y = 240;
+
+      // 天空穹顶跟随相机中心
+      skyDome.position.copy(camera.position);
+
+      // 2) 瀑布纹理滚动与底部水雾粒子升腾
+      waterfallTextures.flowTex.offset.y += dt * 1.45;
+
+      for (let s = 0; s < waterfallMistSystems.length; s++) {
+        const sys = waterfallMistSystems[s];
+        const posAttr = sys.points.geometry.attributes.position;
+        const arr = posAttr.array;
+
+        for (let i = 0; i < sys.data.length; i++) {
+          const d = sys.data[i];
+          let y = arr[i * 3 + 1] + d.speedY * dt;
+          let x = arr[i * 3] + Math.cos(elapsed * 0.8 + d.driftAngle) * d.driftSpeed * dt;
+          let z = arr[i * 3 + 2] + Math.sin(elapsed * 0.8 + d.driftAngle) * d.driftSpeed * dt;
+
+          if (y > d.baseY + d.maxLifeY) {
+            y = d.baseY - 1.5;
+            x = d.baseX + (Math.random() - 0.5) * d.spread;
+            z = d.baseZ + (Math.random() - 0.5) * d.spread;
+          }
+          arr[i * 3] = x;
+          arr[i * 3 + 1] = y;
+          arr[i * 3 + 2] = z;
+        }
+        posAttr.needsUpdate = true;
+      }
+
+      // 3) 飞艇巡航轨迹与螺旋桨高速旋转
+      for (let p = 0; p < spinningPropellers.length; p++) {
+        spinningPropellers[p].rotation.z += dt * 22.0;
+      }
+
+      for (let a = 0; a < airshipAgents.length; a++) {
+        const { mesh, route } = airshipAgents[a];
+        const t = elapsed * route.speed + route.phase;
+        const nextT = t + (route.speed >= 0 ? 0.02 : -0.02);
+
+        const x = route.cx + Math.cos(t) * route.rx;
+        const z = route.cz + Math.sin(t) * route.rz + Math.sin(t * 2.0) * 14.0;
+        const y = route.cy + Math.sin(elapsed * 0.7 + route.phase) * 2.2;
+
+        const nx = route.cx + Math.cos(nextT) * route.rx;
+        const nz = route.cz + Math.sin(nextT) * route.rz + Math.sin(nextT * 2.0) * 14.0;
+
+        mesh.position.set(x, y, z);
+        mesh.lookAt(nx, y, nz);
+      }
+
+      // 4) 云海波浪时间推进与立体薄雾云团缓移
+      cloudUniforms.uTime.value = elapsed;
+
+      for (let i = 0; i < puffCount; i++) {
+        const item = cloudPuffItems[i];
+        item.x += item.driftSpeed * dt;
+        if (item.x > 360) item.x = -360;
+        dummy.position.set(item.x, item.y, item.z);
+        dummy.rotation.y = item.rotY;
+        dummy.scale.set(item.sx, item.sy, item.sz);
+        dummy.updateMatrix();
+        cloudInstanced.setMatrixAt(i, dummy.matrix);
+      }
+      cloudInstanced.instanceMatrix.needsUpdate = true;
+
+      renderer.render(scene, camera);
+    }
+
+    // 响应式窗口缩放
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    animate();
+  </script>
+
+  <script src="../prompt-panel.js" data-id="floating-islands-web"></script>
+</body>
+</html>

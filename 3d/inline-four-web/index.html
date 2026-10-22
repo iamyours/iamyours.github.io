@@ -1,0 +1,2119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>直列四缸发动机 (DOHC I4) 3D 交互式机械透视与爆炸图</title>
+  <style>
+    :root {
+      --bg-dark: #0b0e14;
+      --panel-bg: rgba(16, 21, 30, 0.82);
+      --panel-border: rgba(255, 255, 255, 0.14);
+      --accent: #f59e0b;
+      --accent-glow: rgba(245, 158, 11, 0.35);
+      --highlight: #38bdf8;
+      --text-main: #f3f4f6;
+      --text-muted: #9ca3af;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角固定返回按钮（半透明奶油色圆角小按钮样式） */
+    .back-link {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: rgba(253, 248, 235, 0.88);
+      color: #2b2620;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(255, 252, 244, 0.98);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    }
+
+    /* 顶部标题与点火状态栏 */
+    .top-header {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      pointer-events: none;
+      text-align: center;
+      width: max-content;
+      max-width: calc(100vw - 260px);
+    }
+
+    .title-badge {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 8px 20px;
+      border-radius: 999px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .title-badge h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #fff;
+    }
+
+    .firing-pills {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .cyl-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-weight: 700;
+      font-size: 11px;
+      color: #d1d5db;
+      transition: all 0.08s ease;
+    }
+
+    .cyl-pill.firing {
+      background: linear-gradient(135deg, #f59e0b, #ef4444);
+      color: #fff;
+      border-color: #fde68a;
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.85);
+      transform: scale(1.14);
+    }
+
+    /* 悬停部件说明条（底部上方） */
+    .hover-banner {
+      position: fixed;
+      bottom: 84px;
+      left: 50%;
+      transform: translateX(-50%) translateY(8px);
+      z-index: 25;
+      background: rgba(13, 18, 28, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.5);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6), 0 0 20px rgba(56, 189, 248, 0.2);
+      padding: 10px 20px;
+      border-radius: 14px;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.18s ease, transform 0.18s ease;
+      max-width: min(680px, 92vw);
+      text-align: center;
+    }
+
+    .hover-banner.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .hover-banner .part-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #38bdf8;
+      margin-bottom: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .hover-banner .part-title span.en {
+      font-size: 12px;
+      font-weight: 500;
+      color: #93c5fd;
+      opacity: 0.85;
+    }
+
+    .hover-banner .part-desc {
+      font-size: 13px;
+      color: #f3f4f6;
+      line-height: 1.45;
+    }
+
+    /* 底部主控面板 */
+    .control-bar {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 16px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+      flex-wrap: wrap;
+      justify-content: center;
+      max-width: 95vw;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      background: rgba(255, 255, 255, 0.08);
+      color: #f9fafb;
+      transition: all 0.18s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn-explode {
+      background: linear-gradient(135deg, #f59e0b, #ea580c);
+      border-color: rgba(253, 224, 71, 0.5);
+      color: #fff;
+      box-shadow: 0 4px 16px rgba(234, 88, 12, 0.4);
+    }
+
+    .btn-explode:hover {
+      background: linear-gradient(135deg, #fbbf24, #f97316);
+      box-shadow: 0 6px 20px rgba(234, 88, 12, 0.6);
+    }
+
+    .btn-explode.active {
+      background: linear-gradient(135deg, #0284c7, #2563eb);
+      border-color: rgba(125, 211, 252, 0.6);
+      box-shadow: 0 4px 16px rgba(37, 99, 235, 0.45);
+    }
+
+    .divider {
+      width: 1px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    .slider-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #d1d5db;
+    }
+
+    .slider-group input[type="range"] {
+      width: 100px;
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .rpm-readout {
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+      color: #fbbf24;
+      min-width: 66px;
+    }
+
+    /* 3D 爆炸视图悬浮部件标签 */
+    #labels-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+      overflow: hidden;
+    }
+
+    .part-label {
+      position: absolute;
+      left: 0;
+      top: 0;
+      transform: translate(-50%, -50%);
+      padding: 4px 10px;
+      border-radius: 7px;
+      background: rgba(12, 17, 26, 0.86);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: #f3f4f6;
+      font-size: 11.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      pointer-events: auto;
+      cursor: pointer;
+      opacity: 0;
+      transition: opacity 0.22s ease, border-color 0.18s ease, background 0.18s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .part-label::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #f59e0b;
+      display: inline-block;
+    }
+
+    .part-label.visible {
+      opacity: 1;
+    }
+
+    .part-label:hover,
+    .part-label.highlighted {
+      border-color: #38bdf8;
+      background: rgba(14, 36, 58, 0.95);
+      color: #fff;
+      z-index: 25;
+    }
+
+    .part-label:hover::before,
+    .part-label.highlighted::before {
+      background: #38bdf8;
+      box-shadow: 0 0 6px #38bdf8;
+    }
+
+    @media (max-width: 720px) {
+      .top-header {
+        top: 58px;
+        max-width: 94vw;
+      }
+      .title-badge h1 {
+        font-size: 13px;
+      }
+      .control-bar {
+        padding: 8px 12px;
+        gap: 8px;
+      }
+      .btn {
+        padding: 7px 12px;
+        font-size: 12px;
+      }
+      .part-label {
+        font-size: 10px;
+        padding: 3px 7px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:600px){.control-bar{bottom:76px}}</style>
+</head>
+<body>
+  <a href="../" class="back-link">← 返回 3D 作品</a>
+
+  <div class="top-header">
+    <div class="title-badge">
+      <h1>直列四缸 DOHC 16V 发动机</h1>
+      <div class="firing-pills" title="点火顺序 1-3-4-2">
+        <span>点火顺序:</span>
+        <span class="cyl-pill" id="pill-1">1</span>
+        <span>-</span>
+        <span class="cyl-pill" id="pill-3">3</span>
+        <span>-</span>
+        <span class="cyl-pill" id="pill-4">4</span>
+        <span>-</span>
+        <span class="cyl-pill" id="pill-2">2</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="labels-container"></div>
+
+  <div class="hover-banner" id="hover-banner">
+    <div class="part-title">
+      <span id="hover-name-zh">部件名称</span>
+      <span class="en" id="hover-name-en">Part Name</span>
+    </div>
+    <div class="part-desc" id="hover-desc">将鼠标悬停在发动机任意部件上即可高亮并查看其功能说明。</div>
+  </div>
+
+  <div class="control-bar">
+    <button class="btn btn-explode" id="btn-explode">💥 爆炸分解 (Explode)</button>
+    <button class="btn" id="btn-toggle-run">⏸️ 暂停运转</button>
+    <button class="btn" id="btn-cutaway">🔍 缸体透视: 开</button>
+    <div class="divider"></div>
+    <div class="slider-group">
+      <span>转速:</span>
+      <input type="range" id="rpm-slider" min="60" max="2400" value="650" step="10" />
+      <span class="rpm-readout" id="rpm-display">650 RPM</span>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============================================================================
+    // 1. 场景、相机与渲染器初始化
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const labelsContainer = document.getElementById('labels-container');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0b0e14);
+    scene.fog = new THREE.FogExp2(0x0b0e14, 0.018);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 150);
+    camera.position.set(-11.5, 6.2, -11.0);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 0.1, 0);
+    controls.minDistance = 4.5;
+    controls.maxDistance = 36;
+    controls.maxPolarAngle = Math.PI * 0.85;
+
+    // ============================================================================
+    // 2. 程序化生成 Studio 环境反射贴图 & 材质纹理（零外部图片依赖）
+    // ============================================================================
+    function createStudioEnvMap() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      // 背景渐变
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0, '#1e293b');
+      grad.addColorStop(0.45, '#334155');
+      grad.addColorStop(0.5, '#0f172a');
+      grad.addColorStop(1, '#090d16');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 256);
+
+      // 顶部工业柔光箱高光带
+      ctx.fillStyle = 'rgba(255, 250, 240, 0.85)';
+      ctx.fillRect(40, 18, 180, 32);
+      ctx.fillStyle = 'rgba(210, 235, 255, 0.75)';
+      ctx.fillRect(280, 24, 190, 28);
+
+      // 侧向暖色与冷色反光条
+      ctx.fillStyle = 'rgba(255, 190, 120, 0.45)';
+      ctx.fillRect(20, 95, 95, 45);
+      ctx.fillStyle = 'rgba(120, 200, 255, 0.45)';
+      ctx.fillRect(360, 90, 110, 50);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createCastMetalBumpTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      const imgData = ctx.createImageData(256, 256);
+      for (let i = 0; i < imgData.data.length; i += 4) {
+        const v = 110 + Math.floor(Math.random() * 45);
+        imgData.data[i] = v;
+        imgData.data[i + 1] = v;
+        imgData.data[i + 2] = v;
+        imgData.data[i + 3] = 255;
+      }
+      ctx.putImageData(imgData, 0, 0);
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(6, 6);
+      return tex;
+    }
+
+    function createTimingBeltTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#18181b';
+      ctx.fillRect(0, 0, 256, 64);
+
+      // 皮带横向齿槽与金色同步标记线
+      for (let x = 0; x < 256; x += 16) {
+        ctx.fillStyle = '#2e2e34';
+        ctx.fillRect(x, 0, 8, 64);
+        ctx.fillStyle = '#09090b';
+        ctx.fillRect(x + 8, 0, 3, 64);
+      }
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.65)';
+      ctx.fillRect(0, 10, 256, 3);
+      ctx.fillRect(0, 51, 256, 3);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(12, 1);
+      return tex;
+    }
+
+    function createAirFilterTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+
+      for (let x = 0; x < 256; x += 8) {
+        ctx.fillStyle = (x / 8) % 2 === 0 ? '#991b1b' : '#450a0a';
+        ctx.fillRect(x, 0, 4, 128);
+        ctx.fillStyle = '#dc2626';
+        ctx.fillRect(x + 4, 0, 4, 128);
+      }
+      // 金属丝网斜纹
+      ctx.strokeStyle = 'rgba(220, 225, 235, 0.35)';
+      ctx.lineWidth = 1;
+      for (let i = -128; i < 256; i += 12) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i + 128, 128);
+        ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(3, 1);
+      return tex;
+    }
+
+    scene.environment = createStudioEnvMap();
+    const castBumpTex = createCastMetalBumpTexture();
+    const beltTex = createTimingBeltTexture();
+    const airFilterTex = createAirFilterTexture();
+
+    // 灯光系统
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.55);
+    scene.add(ambientLight);
+
+    const keyLight = new THREE.DirectionalLight(0xfff7ed, 2.2);
+    keyLight.position.set(-10, 16, -8);
+    keyLight.castShadow = true;
+    keyLight.shadow.mapSize.set(2048, 2048);
+    keyLight.shadow.camera.near = 2;
+    keyLight.shadow.camera.far = 38;
+    const d = 8.5;
+    keyLight.shadow.camera.left = -d;
+    keyLight.shadow.camera.right = d;
+    keyLight.shadow.camera.top = d;
+    keyLight.shadow.camera.bottom = -d;
+    keyLight.shadow.bias = -0.0005;
+    scene.add(keyLight);
+
+    const fillLight = new THREE.DirectionalLight(0x93c5fd, 1.15);
+    fillLight.position.set(12, 6, 10);
+    scene.add(fillLight);
+
+    const rimLight = new THREE.DirectionalLight(0xfde68a, 0.9);
+    rimLight.position.set(0, -10, -10);
+    scene.add(rimLight);
+
+    // 底部工业展示台网格
+    const gridHelper = new THREE.GridHelper(36, 36, 0x334155, 0x1e293b);
+    gridHelper.position.y = -4.9;
+    scene.add(gridHelper);
+
+    // ============================================================================
+    // 3. 通用金属与工业材质库
+    // ============================================================================
+    const mats = {
+      castAluminum: new THREE.MeshStandardMaterial({
+        color: 0xcbd5e1,
+        metalness: 0.82,
+        roughness: 0.36,
+        bumpMap: castBumpTex,
+        bumpScale: 0.015
+      }),
+      machinedSteel: new THREE.MeshStandardMaterial({
+        color: 0xe2e8f0,
+        metalness: 0.94,
+        roughness: 0.16
+      }),
+      chrome: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        metalness: 0.98,
+        roughness: 0.08
+      }),
+      castIronBlock: new THREE.MeshStandardMaterial({
+        color: 0x475569,
+        metalness: 0.78,
+        roughness: 0.45,
+        bumpMap: castBumpTex,
+        bumpScale: 0.025,
+        transparent: true,
+        opacity: 0.88
+      }),
+      cylinderLiner: new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.9,
+        roughness: 0.2,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.42
+      }),
+      forgedPiston: new THREE.MeshStandardMaterial({
+        color: 0xdbeafe,
+        metalness: 0.9,
+        roughness: 0.22
+      }),
+      conRodSteel: new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.86,
+        roughness: 0.28
+      }),
+      crankSteel: new THREE.MeshStandardMaterial({
+        color: 0x64748b,
+        metalness: 0.88,
+        roughness: 0.25
+      }),
+      intakePlenum: new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        metalness: 0.8,
+        roughness: 0.32,
+        bumpMap: castBumpTex,
+        bumpScale: 0.012
+      }),
+      exhaustBronze: new THREE.MeshStandardMaterial({
+        color: 0xb48a64,
+        metalness: 0.88,
+        roughness: 0.26
+      }),
+      oilPanDark: new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        metalness: 0.72,
+        roughness: 0.38
+      }),
+      anodizedRed: new THREE.MeshStandardMaterial({
+        color: 0xdc2626,
+        metalness: 0.75,
+        roughness: 0.25
+      }),
+      anodizedBlue: new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        metalness: 0.78,
+        roughness: 0.24
+      }),
+      brass: new THREE.MeshStandardMaterial({
+        color: 0xfbbf24,
+        metalness: 0.9,
+        roughness: 0.2
+      }),
+      ceramicWhite: new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        metalness: 0.1,
+        roughness: 0.2
+      }),
+      timingBeltMat: new THREE.MeshStandardMaterial({
+        map: beltTex,
+        roughness: 0.7,
+        metalness: 0.15,
+        side: THREE.DoubleSide
+      }),
+      airFilterMat: new THREE.MeshStandardMaterial({
+        map: airFilterTex,
+        roughness: 0.65,
+        metalness: 0.25
+      }),
+      flywheelMat: new THREE.MeshStandardMaterial({
+        color: 0x475569,
+        metalness: 0.88,
+        roughness: 0.28
+      })
+    };
+
+    // ============================================================================
+    // 4. 发动机核心几何参数与部件注册表
+    // ============================================================================
+    const CYL_Z = [-2.7, -0.9, 0.9, 2.7]; // 1, 2, 3, 4 缸 Z 坐标
+    const CRANK_Y = -1.95;
+    const CRANK_R = 0.68;  // 曲柄半径 (冲程 = 1.36)
+    const ROD_LEN = 2.15;  // 连杆长度
+    const BORE_R = 0.68;   // 缸径半径
+    const HEAD_Y = 1.65;   // 气缸盖底面高度
+
+    // 平面曲轴各缸曲柄相位角: 1缸(0), 2缸(π), 3缸(π), 4缸(0)
+    const CRANK_PIN_OFFSET = [0, Math.PI, Math.PI, 0];
+    // 点火顺序 1 - 3 - 4 - 2 对应的 720°(4π) 循环点火角度
+    // 1缸在 0 点火, 3缸在 π 点火, 4缸在 2π 点火, 2缸在 3π 点火
+    const FIRE_PHASE = [0, 3 * Math.PI, Math.PI, 2 * Math.PI];
+
+    const engineRoot = new THREE.Group();
+    scene.add(engineRoot);
+
+    // 13 个可爆炸、可悬停高亮的核心总成定义
+    const PARTS_SPEC = [
+      {
+        id: 'airFilter',
+        nameZh: '空气滤清器与节气门',
+        nameEn: 'Air Filter & Throttle Body',
+        desc: '过滤吸入空气中的粉尘杂质，并通过节气门翻板精确调控进入发动机的空气流量。',
+        explodeOffset: new THREE.Vector3(-4.5, 2.0, -2.0),
+        labelAnchor: new THREE.Vector3(-2.6, 1.85, -2.2)
+      },
+      {
+        id: 'intakeManifold',
+        nameZh: '进气歧管与喷油轨',
+        nameEn: 'Intake Manifold & Fuel Rail',
+        desc: '将经节气门计量后的洁净空气均匀分配至四个气缸进气道，并配合喷油嘴雾化燃油。',
+        explodeOffset: new THREE.Vector3(-3.2, 0.6, 0),
+        labelAnchor: new THREE.Vector3(-1.75, 1.5, 0)
+      },
+      {
+        id: 'camshafts',
+        nameZh: '双顶置凸轮轴与火花塞组',
+        nameEn: 'DOHC Camshafts & Spark Plugs',
+        desc: '以曲轴一半转速同步旋转，通过桃形凸轮推开气门；中央四支火花塞按 1-3-4-2 顺序高压点火。',
+        explodeOffset: new THREE.Vector3(0, 4.9, 0),
+        labelAnchor: new THREE.Vector3(0, 2.65, 0)
+      },
+      {
+        id: 'valves',
+        nameZh: '16气门与气门弹簧组件',
+        nameEn: '16 Valves & Coil Springs',
+        desc: '每缸两进两排共16支气门，按四冲程相位精准开启吸气与排废气，并借弹簧回位密封燃烧室。',
+        explodeOffset: new THREE.Vector3(0, 3.55, 0),
+        labelAnchor: new THREE.Vector3(0.5, 2.0, 0)
+      },
+      {
+        id: 'cylinderHead',
+        nameZh: '铝合金气缸盖',
+        nameEn: 'DOHC Cylinder Head',
+        desc: '封闭气缸顶部构成燃烧室，内含进排气通道、气门导管、火花塞座与冷却水道。',
+        explodeOffset: new THREE.Vector3(0, 2.25, 0),
+        labelAnchor: new THREE.Vector3(0, 1.9, 1.8)
+      },
+      {
+        id: 'exhaustManifold',
+        nameZh: '4-2-1 排气芭蕉歧管',
+        nameEn: 'Exhaust Header Manifold',
+        desc: '耐受近千度高温，汇集四缸燃烧做功后的废气并利用排气脉冲效应顺畅导出。',
+        explodeOffset: new THREE.Vector3(3.5, 0.7, 0),
+        labelAnchor: new THREE.Vector3(1.9, 1.2, 0)
+      },
+      {
+        id: 'timingBelt',
+        nameZh: '正时皮带与同步轮系',
+        nameEn: 'Timing Belt & Pulleys',
+        desc: '通过齿形皮带连接曲轴与双顶置凸轮轴，严格维持 2:1 传动比，保证配气相位分毫不差。',
+        explodeOffset: new THREE.Vector3(0, 0.3, -3.5),
+        labelAnchor: new THREE.Vector3(0, 0.6, -3.95)
+      },
+      {
+        id: 'engineBlock',
+        nameZh: '直列四缸透视缸体',
+        nameEn: 'Inline-4 Cylinder Block',
+        desc: '发动机的主体骨架，集成四个精密珩磨气缸套、冷却水套与曲轴主轴承座。',
+        explodeOffset: new THREE.Vector3(0, 0, 0),
+        labelAnchor: new THREE.Vector3(-1.2, 0.1, 2.8)
+      },
+      {
+        id: 'pistons',
+        nameZh: '锻造活塞与活塞环 (×4)',
+        nameEn: '4 Pistons & Piston Rings',
+        desc: '直接承受气缸内混合气爆燃的高温高压推力，通过三道活塞环密封燃气并在缸内高速往复。',
+        explodeOffset: new THREE.Vector3(-2.3, 1.35, 0),
+        labelAnchor: new THREE.Vector3(0, 0.5, -0.9)
+      },
+      {
+        id: 'conRods',
+        nameZh: 'H型高强度连杆 (×4)',
+        nameEn: '4 Forged Connecting Rods',
+        desc: '连接活塞销与曲轴连杆颈，将活塞的往复直线推力转化为驱动曲轴旋转的切向力矩。',
+        explodeOffset: new THREE.Vector3(2.3, -0.35, 0),
+        labelAnchor: new THREE.Vector3(0, -0.75, 0.9)
+      },
+      {
+        id: 'crankshaft',
+        nameZh: '平面四缸平衡曲轴',
+        nameEn: 'Flat-Plane Crankshaft',
+        desc: '动力输出中轴，以 180° 错位布置四个连杆轴颈与八块平衡配重，将往复运动合成为旋转动力。',
+        explodeOffset: new THREE.Vector3(0, -1.55, 0),
+        labelAnchor: new THREE.Vector3(0, -1.95, -0.9)
+      },
+      {
+        id: 'flywheel',
+        nameZh: '储能飞轮与起动齿圈',
+        nameEn: 'Flywheel & Starter Ring Gear',
+        desc: '安装于曲轴输出端，利用巨大转动惯量平顺四冲程扭矩波动，外圈齿环供起动机啮合点火。',
+        explodeOffset: new THREE.Vector3(0, -0.6, 3.4),
+        labelAnchor: new THREE.Vector3(0, -1.95, 3.85)
+      },
+      {
+        id: 'oilPan',
+        nameZh: '铝合金散热油底壳',
+        nameEn: 'Finned Oil Pan Sump',
+        desc: '封闭曲轴箱下部，储存并利用底部散热鳍片冷却润滑机油，保障全车摩擦副长效润滑。',
+        explodeOffset: new THREE.Vector3(0, -3.3, 0),
+        labelAnchor: new THREE.Vector3(0, -3.25, 0)
+      }
+    ];
+
+    const partGroups = {};
+    const partMeshesMap = new Map(); // mesh -> partSpec
+    const partLabelEls = {};
+
+    PARTS_SPEC.forEach((spec) => {
+      const group = new THREE.Group();
+      group.name = spec.id;
+      engineRoot.add(group);
+      partGroups[spec.id] = group;
+
+      // 创建 3D 悬浮 DOM 标签
+      const el = document.createElement('div');
+      el.className = 'part-label';
+      el.textContent = spec.nameZh;
+      el.addEventListener('pointerenter', () => setHoveredPart(spec));
+      el.addEventListener('pointerleave', () => setHoveredPart(null));
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setHoveredPart(spec);
+      });
+      labelsContainer.appendChild(el);
+      partLabelEls[spec.id] = el;
+    });
+
+    function registerGroupMeshes(group, spec) {
+      group.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = true;
+          child.receiveShadow = true;
+          partMeshesMap.set(child, spec);
+        }
+      });
+    }
+
+    // ============================================================================
+    // 5. 构建各个精细 3D 机械总成
+    // ============================================================================
+
+    // --- 5.1 发动机缸体 (engineBlock) + 燃烧室火焰与火花 ---
+    const combustionVisuals = [];
+    {
+      const g = partGroups.engineBlock;
+
+      // 缸体上平台面板 (Deck plate)
+      const deckGeo = new THREE.BoxGeometry(2.15, 0.16, 7.4);
+      const deckMesh = new THREE.Mesh(deckGeo, mats.castAluminum);
+      deckMesh.position.set(0, HEAD_Y - 0.08, 0);
+      g.add(deckMesh);
+
+      // 缸体中部底座平台
+      const midPlateGeo = new THREE.BoxGeometry(2.25, 0.18, 7.4);
+      const midPlate = new THREE.Mesh(midPlateGeo, mats.castAluminum);
+      midPlate.position.set(0, -0.7, 0);
+      g.add(midPlate);
+
+      // 前后封板与五道主轴承隔墙 (Main Bearing Bulkheads)
+      const wallZ = [-3.6, -1.8, 0, 1.8, 3.6];
+      wallZ.forEach((z, idx) => {
+        const thickness = (idx === 0 || idx === 4) ? 0.22 : 0.16;
+        // 上部缸体隔墙
+        const upperWall = new THREE.Mesh(
+          new THREE.BoxGeometry(2.1, 2.35, thickness),
+          mats.castIronBlock
+        );
+        upperWall.position.set(0, 0.45, z);
+        g.add(upperWall);
+
+        // 下部曲轴箱轴承座拱门
+        const saddle = new THREE.Mesh(
+          new THREE.BoxGeometry(2.55, 1.9, thickness),
+          mats.castIronBlock
+        );
+        saddle.position.set(0, -1.65, z);
+        g.add(saddle);
+
+        // 主轴承盖加强螺栓
+        for (let sx of [-0.65, 0.65]) {
+          const bolt = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.06, 0.06, 0.45, 8),
+            mats.machinedSteel
+          );
+          bolt.position.set(sx, -2.55, z);
+          g.add(bolt);
+        }
+      });
+
+      // 左右两侧半透明缸体侧壁与加强筋（带透视观察窗）
+      for (let side of [-1, 1]) {
+        // 上下边框梁
+        const topRail = new THREE.Mesh(
+          new THREE.BoxGeometry(0.14, 0.32, 7.4),
+          mats.castIronBlock
+        );
+        topRail.position.set(side * 1.02, 1.38, 0);
+        g.add(topRail);
+
+        const skirtRail = new THREE.Mesh(
+          new THREE.BoxGeometry(0.16, 1.15, 7.4),
+          mats.castIronBlock
+        );
+        skirtRail.position.set(side * 1.22, -2.15, 0);
+        g.add(skirtRail);
+      }
+
+      // 侧置机油滤清器罐 (Oil Filter Canister)
+      const filterMount = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.24, 0.24, 0.4, 16),
+        mats.castAluminum
+      );
+      filterMount.rotation.z = Math.PI / 2;
+      filterMount.position.set(-1.35, -1.5, -2.4);
+      g.add(filterMount);
+
+      const oilFilterCan = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.34, 0.34, 0.85, 24),
+        mats.anodizedBlue
+      );
+      oilFilterCan.rotation.z = Math.PI / 3;
+      oilFilterCan.position.set(-1.68, -1.72, -2.4);
+      g.add(oilFilterCan);
+
+      // 四个半透明精密气缸套 + 缸内火花与爆燃光效
+      const linerGeo = new THREE.CylinderGeometry(BORE_R, BORE_R, 2.38, 32, 1, true);
+      CYL_Z.forEach((z) => {
+        const liner = new THREE.Mesh(linerGeo, mats.cylinderLiner);
+        liner.position.set(0, 0.45, z);
+        g.add(liner);
+
+        // 燃烧室电火花核 + 爆燃火焰柱
+        const sparkMat = new THREE.MeshBasicMaterial({
+          color: 0x7dd3fc,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false
+        });
+        const sparkCore = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 16), sparkMat);
+        sparkCore.position.set(0, HEAD_Y - 0.12, z);
+        g.add(sparkCore);
+
+        const flameMat = new THREE.MeshBasicMaterial({
+          color: 0xff6b00,
+          transparent: true,
+          opacity: 0,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        });
+        const flameMesh = new THREE.Mesh(
+          new THREE.CylinderGeometry(BORE_R * 0.86, BORE_R * 0.92, 0.65, 24),
+          flameMat
+        );
+        flameMesh.position.set(0, HEAD_Y - 0.35, z);
+        g.add(flameMesh);
+
+        const light = new THREE.PointLight(0xff7b00, 0, 3.2);
+        light.position.set(0, HEAD_Y - 0.25, z);
+        g.add(light);
+
+        combustionVisuals.push({ sparkCore, sparkMat, flameMesh, flameMat, light });
+      });
+    }
+
+    // --- 5.2 平面四缸曲轴 (crankshaft) ---
+    const crankshaftSpinner = new THREE.Group();
+    crankshaftSpinner.position.set(0, CRANK_Y, 0);
+    partGroups.crankshaft.add(crankshaftSpinner);
+    {
+      // 主轴颈轴线 (5个主轴承颈 + 前端正时轴鼻 + 后端飞轮法兰)
+      const mainJournalZ = [-3.6, -1.8, 0, 1.8, 3.6];
+      mainJournalZ.forEach((z) => {
+        const journal = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.28, 0.28, 0.42, 24),
+          mats.chrome
+        );
+        journal.rotation.x = Math.PI / 2;
+        journal.position.set(0, 0, z);
+        crankshaftSpinner.add(journal);
+      });
+
+      // 前端延伸轴鼻
+      const snout = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.2, 0.22, 0.65, 20),
+        mats.machinedSteel
+      );
+      snout.rotation.x = Math.PI / 2;
+      snout.position.set(0, 0, -3.95);
+      crankshaftSpinner.add(snout);
+
+      // 后端飞轮安装法兰
+      const rearFlange = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.32, 0.25, 24),
+        mats.machinedSteel
+      );
+      rearFlange.rotation.x = Math.PI / 2;
+      rearFlange.position.set(0, 0, 3.75);
+      crankshaftSpinner.add(rearFlange);
+
+      // 四个曲柄销 (Crankpins) 与八块水滴形平衡配重块 (Counterweights)
+      const webShape = new THREE.Shape();
+      webShape.moveTo(-0.48, -0.35);
+      webShape.quadraticCurveTo(-0.72, 0.15, -0.32, 0.85);
+      webShape.quadraticCurveTo(0, 1.02, 0.32, 0.85);
+      webShape.quadraticCurveTo(0.72, 0.15, 0.48, -0.35);
+      webShape.absarc(0, -0.35, 0.48, 0, Math.PI, true);
+
+      const webGeo = new THREE.ExtrudeGeometry(webShape, {
+        depth: 0.2,
+        bevelEnabled: true,
+        bevelThickness: 0.03,
+        bevelSize: 0.03,
+        bevelSegments: 2
+      });
+      webGeo.center();
+
+      CYL_Z.forEach((z, i) => {
+        const angle = CRANK_PIN_OFFSET[i];
+        const pinY = Math.cos(angle) * CRANK_R;
+        const pinX = Math.sin(angle) * CRANK_R;
+
+        // 连杆轴颈 (Crankpin)
+        const pin = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.23, 0.23, 0.66, 24),
+          mats.chrome
+        );
+        pin.rotation.x = Math.PI / 2;
+        pin.position.set(pinX, pinY, z);
+        crankshaftSpinner.add(pin);
+
+        // 前后两片曲柄臂与反向平衡块
+        for (let dz of [-0.45, 0.45]) {
+          const web = new THREE.Mesh(webGeo, mats.crankSteel);
+          web.position.set(pinX * 0.28, pinY * 0.28, z + dz);
+          web.rotation.z = -angle;
+          crankshaftSpinner.add(web);
+        }
+      });
+    }
+
+    // --- 5.3 四个锻造活塞组 (pistons) ---
+    const pistonAssemblyList = [];
+    {
+      const g = partGroups.pistons;
+      CYL_Z.forEach((z) => {
+        const pGroup = new THREE.Group();
+        pGroup.position.set(0, 0, z);
+
+        // 活塞主体顶部与裙部
+        const crown = new THREE.Mesh(
+          new THREE.CylinderGeometry(BORE_R * 0.96, BORE_R * 0.96, 0.72, 32),
+          mats.forgedPiston
+        );
+        crown.position.y = 0.22;
+        pGroup.add(crown);
+
+        // 活塞顶面四个气门避让坑 (Valve Relief Pockets)
+        for (let vx of [-0.26, 0.26]) {
+          for (let vz of [-0.22, 0.22]) {
+            const pocket = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.15, 0.15, 0.05, 16),
+              mats.crankSteel
+            );
+            pocket.position.set(vx, 0.57, vz);
+            pGroup.add(pocket);
+          }
+        }
+
+        // 三道活塞环 (气环、刮油环、油环)
+        const ringColors = [mats.chrome, mats.brass, mats.anodizedRed];
+        [0.44, 0.34, 0.24].forEach((ry, idx) => {
+          const ring = new THREE.Mesh(
+            new THREE.TorusGeometry(BORE_R * 0.965, 0.024, 10, 32),
+            ringColors[idx]
+          );
+          ring.rotation.x = Math.PI / 2;
+          ring.position.y = ry;
+          pGroup.add(ring);
+        });
+
+        // 活塞销 (Wrist Pin / Gudgeon Pin)
+        const wristPin = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.16, 0.16, 1.12, 20),
+          mats.chrome
+        );
+        wristPin.rotation.x = Math.PI / 2;
+        wristPin.position.y = 0;
+        pGroup.add(wristPin);
+
+        g.add(pGroup);
+        pistonAssemblyList.push(pGroup);
+      });
+    }
+
+    // --- 5.4 四根锻造连杆 (conRods) ---
+    const conRodAssemblyList = [];
+    {
+      const g = partGroups.conRods;
+      CYL_Z.forEach((z) => {
+        // 连杆原点设在活塞销中心 (小头中心)，向下延伸 ROD_LEN 到达大头中心
+        const rodGroup = new THREE.Group();
+        rodGroup.position.set(0, 0, z);
+
+        // 小头衬套环
+        const smallEnd = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.24, 0.24, 0.36, 20),
+          mats.conRodSteel
+        );
+        smallEnd.rotation.x = Math.PI / 2;
+        rodGroup.add(smallEnd);
+
+        // H型断面杆身
+        const beam = new THREE.Mesh(
+          new THREE.BoxGeometry(0.22, ROD_LEN - 0.35, 0.24),
+          mats.conRodSteel
+        );
+        beam.position.y = -ROD_LEN / 2;
+        rodGroup.add(beam);
+
+        // H型槽内凹细节
+        for (let side of [-1, 1]) {
+          const flute = new THREE.Mesh(
+            new THREE.BoxGeometry(0.1, ROD_LEN - 0.65, 0.06),
+            mats.crankSteel
+          );
+          flute.position.set(0, -ROD_LEN / 2, side * 0.11);
+          rodGroup.add(flute);
+        }
+
+        // 大头轴承盖 (Big End Cap)
+        const bigEnd = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.38, 0.38, 0.42, 24),
+          mats.conRodSteel
+        );
+        bigEnd.rotation.x = Math.PI / 2;
+        bigEnd.position.y = -ROD_LEN;
+        rodGroup.add(bigEnd);
+
+        // 连杆螺栓
+        for (let sx of [-0.32, 0.32]) {
+          const bolt = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.045, 0.045, 0.55, 8),
+            mats.brass
+          );
+          bolt.position.set(sx, -ROD_LEN, 0);
+          rodGroup.add(bolt);
+        }
+
+        g.add(rodGroup);
+        conRodAssemblyList.push(rodGroup);
+      });
+    }
+
+    // --- 5.5 铝合金气缸盖 (cylinderHead) ---
+    {
+      const g = partGroups.cylinderHead;
+
+      // 气缸盖下层实体座
+      const headBase = new THREE.Mesh(
+        new THREE.BoxGeometry(2.35, 0.55, 7.45),
+        mats.castAluminum
+      );
+      headBase.position.set(0, HEAD_Y + 0.28, 0);
+      g.add(headBase);
+
+      // 两侧凸轮轴箱护壁（镂空顶盖方便观察凸轮与气门）
+      for (let side of [-1, 1]) {
+        const wall = new THREE.Mesh(
+          new THREE.BoxGeometry(0.18, 0.72, 7.45),
+          mats.castAluminum
+        );
+        wall.position.set(side * 1.1, HEAD_Y + 0.85, 0);
+        g.add(wall);
+
+        // 气缸盖散热翼片
+        for (let f = 0; f < 3; f++) {
+          const fin = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, 0.04, 7.3),
+            mats.machinedSteel
+          );
+          fin.position.set(side * 1.21, HEAD_Y + 0.65 + f * 0.18, 0);
+          g.add(fin);
+        }
+      }
+
+      // 5道凸轮轴轴承座桥架 (Cam Bearing Caps / Bridges)
+      [-3.55, -1.8, 0, 1.8, 3.55].forEach((z) => {
+        const bridge = new THREE.Mesh(
+          new THREE.BoxGeometry(2.25, 0.68, 0.2),
+          mats.castAluminum
+        );
+        bridge.position.set(0, HEAD_Y + 0.85, z);
+        g.add(bridge);
+      });
+
+      // 红黑双色半开放式气门室盖装饰框 (Valve Cover Frame)
+      for (let side of [-0.95, 0.95]) {
+        const trim = new THREE.Mesh(
+          new THREE.BoxGeometry(0.28, 0.12, 7.5),
+          mats.anodizedRed
+        );
+        trim.position.set(side, HEAD_Y + 1.24, 0);
+        g.add(trim);
+      }
+      for (let endZ of [-3.65, 3.65]) {
+        const endCap = new THREE.Mesh(
+          new THREE.BoxGeometry(2.18, 0.14, 0.22),
+          mats.anodizedRed
+        );
+        endCap.position.set(0, HEAD_Y + 1.24, endZ);
+        g.add(endCap);
+      }
+    }
+
+    // --- 5.6 16气门与气门弹簧组件 (valves) ---
+    // 每缸 2 进气门(左侧 x < 0) + 2 排气门(右侧 x > 0)
+    const valveItems = [];
+    {
+      const g = partGroups.valves;
+      const VALVE_TILT = 0.26; // 气门夹角弧度 (~15°)
+
+      CYL_Z.forEach((z, cylIdx) => {
+        for (let dz of [-0.26, 0.26]) {
+          // 进气门 (左: isIntake = true) 与 排气门 (右: isIntake = false)
+          [true, false].forEach((isIntake) => {
+            const side = isIntake ? -1 : 1;
+            const pivot = new THREE.Group();
+            // 气门座基准位置位于燃烧室顶面
+            pivot.position.set(side * 0.34, HEAD_Y + 0.06, z + dz);
+            pivot.rotation.z = -side * VALVE_TILT;
+            g.add(pivot);
+
+            const movingStemGroup = new THREE.Group();
+            pivot.add(movingStemGroup);
+
+            // 气门盘部 (Tulip Valve Head)
+            const headRadius = isIntake ? 0.19 : 0.165;
+            const valveHead = new THREE.Mesh(
+              new THREE.ConeGeometry(headRadius, 0.09, 20),
+              mats.chrome
+            );
+            valveHead.position.y = 0.02;
+            movingStemGroup.add(valveHead);
+
+            // 气门杆身 (Valve Stem)
+            const stem = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.032, 0.032, 0.88, 12),
+              mats.chrome
+            );
+            stem.position.y = 0.46;
+            movingStemGroup.add(stem);
+
+            // 气门顶杯挺柱 (Tappet Bucket)
+            const bucket = new THREE.Mesh(
+              new THREE.CylinderGeometry(0.11, 0.11, 0.14, 16),
+              mats.machinedSteel
+            );
+            bucket.position.y = 0.88;
+            movingStemGroup.add(bucket);
+
+            // 螺旋气门弹簧 (4圈圆环组成可压缩弹簧组)
+            const springGroup = new THREE.Group();
+            springGroup.position.y = 0.18;
+            pivot.add(springGroup);
+            for (let c = 0; c < 4; c++) {
+              const coil = new THREE.Mesh(
+                new THREE.TorusGeometry(0.095, 0.018, 8, 18),
+                mats. brass
+              );
+              coil.rotation.x = Math.PI / 2;
+              coil.position.y = c * 0.14 + 0.06;
+              springGroup.add(coil);
+            }
+
+            valveItems.push({
+              cylIdx,
+              isIntake,
+              movingStemGroup,
+              springGroup
+            });
+          });
+        }
+      });
+    }
+
+    // --- 5.7 双顶置凸轮轴与中央火花塞组 (camshafts) ---
+    const intakeCamSpinner = new THREE.Group();
+    const exhaustCamSpinner = new THREE.Group();
+    {
+      const g = partGroups.camshafts;
+      const CAM_Y = HEAD_Y + 1.05;
+      const CAM_X = 0.56;
+
+      intakeCamSpinner.position.set(-CAM_X, CAM_Y, 0);
+      exhaustCamSpinner.position.set(CAM_X, CAM_Y, 0);
+      g.add(intakeCamSpinner, exhaustCamSpinner);
+
+      // 构建桃形凸轮轮廓 (Egg-shaped Cam Lobe)
+      const lobeShape = new THREE.Shape();
+      lobeShape.absarc(0, 0, 0.19, 0, Math.PI, false);
+      lobeShape.quadraticCurveTo(-0.19, -0.22, 0, -0.38); // 向下尖端凸起以匹配气门推程
+      lobeShape.quadraticCurveTo(0.19, -0.22, 0.19, 0);
+
+      const lobeGeo = new THREE.ExtrudeGeometry(lobeShape, {
+        depth: 0.12,
+        bevelEnabled: true,
+        bevelThickness: 0.015,
+        bevelSize: 0.015,
+        bevelSegments: 2
+      });
+      lobeGeo.center();
+
+      [
+        { spinner: intakeCamSpinner, isIntake: true },
+        { spinner: exhaustCamSpinner, isIntake: false }
+      ].forEach(({ spinner, isIntake }) => {
+        // 凸轮轴通长主轴
+        const shaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.11, 0.11, 7.8, 20),
+          mats.machinedSteel
+        );
+        shaft.rotation.x = Math.PI / 2;
+        spinner.add(shaft);
+
+        // 每个气缸两个凸轮桃尖，相位与四冲程进排气严格对应
+        CYL_Z.forEach((z, cylIdx) => {
+          // 凸轮轴转速为曲轴一半 (camAngle = crankPhase * 0.5)
+          // 排气门在 Δφ = 1.5π 达到最大升程；进气门在 Δφ = 2.5π 达到最大升程
+          const peakCrankAngle = FIRE_PHASE[cylIdx] + (isIntake ? 2.5 * Math.PI : 1.5 * Math.PI);
+          const lobeAngle = -(peakCrankAngle * 0.5);
+
+          for (let dz of [-0.26, 0.26]) {
+            const lobe = new THREE.Mesh(lobeGeo, mats.chrome);
+            lobe.position.set(0, 0, z + dz);
+            lobe.rotation.z = lobeAngle;
+            spinner.add(lobe);
+          }
+        });
+      });
+
+      // 中央谷区四支火花塞与独立点火线圈 (Spark Plugs & Ignition Coils)
+      CYL_Z.forEach((z) => {
+        const plugGroup = new THREE.Group();
+        plugGroup.position.set(0, HEAD_Y + 0.55, z);
+
+        // 白色陶瓷绝缘体
+        const ceramic = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.09, 0.09, 0.65, 16),
+          mats.ceramicWhite
+        );
+        ceramic.position.y = 0.2;
+        plugGroup.add(ceramic);
+
+        // 六角金属螺壳
+        const hexNut = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.13, 0.13, 0.22, 6),
+          mats.machinedSteel
+        );
+        hexNut.position.y = -0.15;
+        plugGroup.add(hexNut);
+
+        // 下端螺纹与电极尖端（伸入燃烧室顶）
+        const thread = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.075, 0.075, 0.34, 14),
+          mats.brass
+        );
+        thread.position.y = -0.38;
+        plugGroup.add(thread);
+
+        // 顶部红色点火线圈帽 (Coil-on-Plug)
+        const coilCap = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.17, 0.14, 0.28, 16),
+          mats.anodizedRed
+        );
+        coilCap.position.y = 0.62;
+        plugGroup.add(coilCap);
+
+        g.add(plugGroup);
+      });
+    }
+
+    // --- 5.8 进气歧管与燃油导轨 (intakeManifold) ---
+    {
+      const g = partGroups.intakeManifold;
+
+      // 稳压腔主体 (Intake Plenum Chamber)
+      const plenumBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.46, 0.46, 6.2, 24),
+        mats.intakePlenum
+      );
+      plenumBody.rotation.x = Math.PI / 2;
+      plenumBody.position.set(-2.15, HEAD_Y + 0.15, 0);
+      g.add(plenumBody);
+
+      // 稳压腔两端半球封头
+      for (let endZ of [-3.1, 3.1]) {
+        const cap = new THREE.Mesh(
+          new THREE.SphereGeometry(0.46, 20, 16),
+          mats.intakePlenum
+        );
+        cap.position.set(-2.15, HEAD_Y + 0.15, endZ);
+        g.add(cap);
+      }
+
+      // 四根弯曲进气歧管支管 (4 Runners) + 喷油嘴
+      CYL_Z.forEach((z) => {
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(-2.15, HEAD_Y + 0.25, z),
+          new THREE.Vector3(-1.95, HEAD_Y + 0.92, z),
+          new THREE.Vector3(-1.45, HEAD_Y + 0.72, z),
+          new THREE.Vector3(-1.12, HEAD_Y + 0.36, z)
+        ]);
+        const runnerGeo = new THREE.TubeGeometry(curve, 24, 0.24, 16, false);
+        const runner = new THREE.Mesh(runnerGeo, mats.intakePlenum);
+        g.add(runner);
+
+        // 电子喷油嘴 (Fuel Injector)
+        const injector = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.065, 0.055, 0.42, 12),
+          mats.anodizedBlue
+        );
+        injector.rotation.z = -0.45;
+        injector.position.set(-1.32, HEAD_Y + 0.68, z);
+        g.add(injector);
+      });
+
+      // 阳极氧化红高压燃油导轨 (Fuel Rail)
+      const fuelRail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.09, 0.09, 6.0, 16),
+        mats.anodizedRed
+      );
+      fuelRail.rotation.x = Math.PI / 2;
+      fuelRail.position.set(-1.42, HEAD_Y + 0.86, 0);
+      g.add(fuelRail);
+
+      // 进气法兰盘
+      const flange = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.55, 6.8),
+        mats.machinedSteel
+      );
+      flange.position.set(-1.14, HEAD_Y + 0.36, 0);
+      g.add(flange);
+    }
+
+    // --- 5.9 空气滤清器与节气门体 (airFilter) ---
+    {
+      const g = partGroups.airFilter;
+
+      // 铝合金节气门体 (Throttle Body)
+      const tbHousing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.38, 0.38, 0.65, 24),
+        mats.machinedSteel
+      );
+      tbHousing.rotation.x = Math.PI / 2;
+      tbHousing.position.set(-2.15, HEAD_Y + 0.15, -3.55);
+      g.add(tbHousing);
+
+      // 节气门内部黄铜蝴蝶翻板 (Butterfly Valve Plate)
+      const butterfly = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.34, 0.34, 0.03, 20),
+        mats.brass
+      );
+      butterfly.rotation.z = 0.5;
+      butterfly.position.set(-2.15, HEAD_Y + 0.15, -3.55);
+      g.add(butterfly);
+
+      // 节气门位置传感器与回位弹簧盒
+      const tpsBox = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.22, 0.22, 0.25, 16),
+        mats.oilPanDark
+      );
+      tpsBox.rotation.z = Math.PI / 2;
+      tpsBox.position.set(-2.6, HEAD_Y + 0.15, -3.55);
+      g.add(tpsBox);
+
+      // 90° 弯管进气风管
+      const intakePipeCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-2.15, HEAD_Y + 0.15, -3.85),
+        new THREE.Vector3(-2.35, HEAD_Y + 0.22, -4.45),
+        new THREE.Vector3(-3.05, HEAD_Y + 0.38, -4.35),
+        new THREE.Vector3(-3.35, HEAD_Y + 0.45, -3.5)
+      ]);
+      const intakePipe = new THREE.Mesh(
+        new THREE.TubeGeometry(intakePipeCurve, 24, 0.33, 18, false),
+        mats.chrome
+      );
+      g.add(intakePipe);
+
+      // 红色硅胶连接套箍
+      const coupler = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.39, 0.39, 0.32, 24),
+        mats.anodizedRed
+      );
+      coupler.rotation.x = Math.PI / 2;
+      coupler.position.set(-2.15, HEAD_Y + 0.15, -3.9);
+      g.add(coupler);
+
+      // 高流量锥形冬菇头空气滤清器 (Conical High-Flow Air Filter)
+      const filterCone = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.52, 0.78, 1.45, 28),
+        mats.airFilterMat
+      );
+      filterCone.rotation.x = Math.PI / 2;
+      filterCone.position.set(-3.35, HEAD_Y + 0.45, -2.65);
+      g.add(filterCone);
+
+      // 滤清器前后镀铬端盖
+      const capFront = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.53, 0.53, 0.1, 28),
+        mats.chrome
+      );
+      capFront.rotation.x = Math.PI / 2;
+      capFront.position.set(-3.35, HEAD_Y + 0.45, -1.92);
+      g.add(capFront);
+
+      const capBase = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.79, 0.79, 0.12, 28),
+        mats.oilPanDark
+      );
+      capBase.rotation.x = Math.PI / 2;
+      capBase.position.set(-3.35, HEAD_Y + 0.45, -3.38);
+      g.add(capBase);
+    }
+
+    // --- 5.10 4-2-1 排气芭蕉歧管 (exhaustManifold) ---
+    {
+      const g = partGroups.exhaustManifold;
+
+      // 气缸盖排气侧厚法兰
+      const flange = new THREE.Mesh(
+        new THREE.BoxGeometry(0.14, 0.56, 6.9),
+        mats.machinedSteel
+      );
+      flange.position.set(1.14, HEAD_Y + 0.34, 0);
+      g.add(flange);
+
+      // 四根流线型古铜色不锈钢排气管汇入底部总管
+      const collectorPos = new THREE.Vector3(2.25, -0.45, 0.6);
+      CYL_Z.forEach((z, idx) => {
+        const spreadY = HEAD_Y + 0.35 + (idx === 1 || idx === 2 ? 0.22 : -0.05);
+        const curve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(1.15, HEAD_Y + 0.34, z),
+          new THREE.Vector3(2.05, spreadY, z * 0.92),
+          new THREE.Vector3(2.45, 0.35, z * 0.48 + 0.25),
+          new THREE.Vector3(collectorPos.x, collectorPos.y, collectorPos.z + (idx - 1.5) * 0.14)
+        ]);
+        const pipe = new THREE.Mesh(
+          new THREE.TubeGeometry(curve, 28, 0.23, 16, false),
+          mats.exhaustBronze
+        );
+        g.add(pipe);
+      });
+
+      // 四合一集气锥与向后延伸排气管段
+      const tailCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(collectorPos.x, collectorPos.y, collectorPos.z - 0.1),
+        new THREE.Vector3(2.25, -1.05, 1.8),
+        new THREE.Vector3(2.1, -1.25, 3.8)
+      ]);
+      const tailPipe = new THREE.Mesh(
+        new THREE.TubeGeometry(tailCurve, 20, 0.38, 20, false),
+        mats.exhaustBronze
+      );
+      g.add(tailPipe);
+
+      // 氧传感器 (O2 Lambda Sensor)
+      const o2Sensor = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.07, 0.09, 0.48, 12),
+        mats.chrome
+      );
+      o2Sensor.rotation.z = -Math.PI / 4;
+      o2Sensor.position.set(2.48, -0.72, 1.15);
+      g.add(o2Sensor);
+    }
+
+    // --- 5.11 正时皮带与同步齿轮轮系 (timingBelt) ---
+    const timingPulleys = [];
+    {
+      const g = partGroups.timingBelt;
+      const BELT_Z = -4.18;
+      const CAM_Y = HEAD_Y + 1.05;
+      const CAM_X = 0.56;
+
+      // 制作带辐条与外齿的同步带轮辅助函数
+      function createSprocket(radius, thickness, colorMat, zPos) {
+        const pGroup = new THREE.Group();
+        pGroup.position.z = zPos;
+
+        const rim = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius, radius, thickness, 28),
+          colorMat
+        );
+        rim.rotation.x = Math.PI / 2;
+        pGroup.add(rim);
+
+        const hub = new THREE.Mesh(
+          new THREE.CylinderGeometry(radius * 0.36, radius * 0.36, thickness * 1.18, 16),
+          mats.chrome
+        );
+        hub.rotation.x = Math.PI / 2;
+        pGroup.add(hub);
+
+        // 齿圈细节
+        const teethCount = Math.floor(radius * 32);
+        for (let t = 0; t < teethCount; t++) {
+          const a = (t / teethCount) * Math.PI * 2;
+          const tooth = new THREE.Mesh(
+            new THREE.BoxGeometry(0.05, 0.05, thickness * 0.96),
+            mats.machinedSteel
+          );
+          tooth.position.set(Math.cos(a) * radius, Math.sin(a) * radius, 0);
+          tooth.rotation.z = a;
+          pGroup.add(tooth);
+        }
+        return pGroup;
+      }
+
+      // 进气与排气凸轮正时大齿轮 (半径 0.52, 转速 0.5x)
+      const inCamGear = createSprocket(0.52, 0.32, mats.anodizedBlue, BELT_Z);
+      inCamGear.position.set(-CAM_X, CAM_Y, BELT_Z);
+      g.add(inCamGear);
+      timingPulleys.push({ mesh: inCamGear, ratio: 0.5 });
+
+      const exCamGear = createSprocket(0.52, 0.32, mats.anodizedRed, BELT_Z);
+      exCamGear.position.set(CAM_X, CAM_Y, BELT_Z);
+      g.add(exCamGear);
+      timingPulleys.push({ mesh: exCamGear, ratio: 0.5 });
+
+      // 曲轴正时驱动小齿轮 (半径 0.32, 转速 1.0x)
+      const crankGear = createSprocket(0.32, 0.32, mats.machinedSteel, BELT_Z);
+      crankGear.position.set(0, CRANK_Y, BELT_Z);
+      g.add(crankGear);
+      timingPulleys.push({ mesh: crankGear, ratio: 1.0 });
+
+      // 惰轮与自动张紧轮 (Idler & Tensioner Pulleys)
+      const tensioner = createSprocket(0.26, 0.3, mats.brass, BELT_Z);
+      tensioner.position.set(-0.62, 0.35, BELT_Z);
+      g.add(tensioner);
+      timingPulleys.push({ mesh: tensioner, ratio: -1.3 });
+
+      const waterPumpPulley = createSprocket(0.28, 0.3, mats.castAluminum, BELT_Z);
+      waterPumpPulley.position.set(0.62, 0.35, BELT_Z);
+      g.add(waterPumpPulley);
+      timingPulleys.push({ mesh: waterPumpPulley, ratio: 1.2 });
+
+      // 闭合环绕正时皮带几何体 (Closed-Loop Ribbon Geometry along pulley tangents)
+      const beltCurve = new THREE.CatmullRomCurve3(
+        [
+          new THREE.Vector3(-CAM_X, CAM_Y + 0.54, BELT_Z),
+          new THREE.Vector3(CAM_X, CAM_Y + 0.54, BELT_Z),
+          new THREE.Vector3(CAM_X + 0.54, CAM_Y, BELT_Z),
+          new THREE.Vector3(0.86, 0.35, BELT_Z),
+          new THREE.Vector3(0.35, CRANK_Y, BELT_Z),
+          new THREE.Vector3(0, CRANK_Y - 0.35, BELT_Z),
+          new THREE.Vector3(-0.35, CRANK_Y, BELT_Z),
+          new THREE.Vector3(-0.86, 0.35, BELT_Z),
+          new THREE.Vector3(-CAM_X - 0.54, CAM_Y, BELT_Z)
+        ],
+        true,
+        'catmullrom',
+        0.25
+      );
+
+      // 生成扁平皮带条带网格
+      const beltSegments = 160;
+      const beltWidth = 0.28;
+      const pts = beltCurve.getSpacedPoints(beltSegments);
+      const positions = [];
+      const normals = [];
+      const uvs = [];
+      const indices = [];
+
+      for (let i = 0; i <= beltSegments; i++) {
+        const p = pts[i];
+        const tangent = beltCurve.getTangent(i / beltSegments);
+        // 法向量在 XY 平面外法线方向
+        const normal = new THREE.Vector3(-tangent.y, tangent.x, 0).normalize();
+
+        positions.push(p.x, p.y, p.z - beltWidth / 2);
+        positions.push(p.x, p.y, p.z + beltWidth / 2);
+
+        normals.push(normal.x, normal.y, normal.z);
+        normals.push(normal.x, normal.y, normal.z);
+
+        const u = i / beltSegments;
+        uvs.push(u, 0);
+        uvs.push(u, 1);
+
+        if (i < beltSegments) {
+          const a = i * 2;
+          const b = i * 2 + 1;
+          const c = (i + 1) * 2;
+          const d = (i + 1) * 2 + 1;
+          indices.push(a, b, d, a, d, c);
+        }
+      }
+
+      const beltGeo = new THREE.BufferGeometry();
+      beltGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      beltGeo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+      beltGeo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+      beltGeo.setIndex(indices);
+
+      const beltMesh = new THREE.Mesh(beltGeo, mats.timingBeltMat);
+      g.add(beltMesh);
+    }
+
+    // --- 5.12 飞轮与齿圈总成 (flywheel) ---
+    const flywheelSpinner = new THREE.Group();
+    flywheelSpinner.position.set(0, CRANK_Y, 4.02);
+    partGroups.flywheel.add(flywheelSpinner);
+    {
+      // 飞轮主盘
+      const disc = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.42, 1.42, 0.26, 40),
+        mats.flywheelMat
+      );
+      disc.rotation.x = Math.PI / 2;
+      flywheelSpinner.add(disc);
+
+      // 离合器摩擦镜面环
+      const frictionFace = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.22, 1.22, 0.29, 36),
+        mats.machinedSteel
+      );
+      frictionFace.rotation.x = Math.PI / 2;
+      flywheelSpinner.add(frictionFace);
+
+      // 中心螺栓法兰与减重孔
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const hole = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.14, 0.14, 0.32, 16),
+          mats.oilPanDark
+        );
+        hole.rotation.x = Math.PI / 2;
+        hole.position.set(Math.cos(a) * 0.78, Math.sin(a) * 0.78, 0);
+        flywheelSpinner.add(hole);
+      }
+
+      // 外缘起动机飞轮齿圈 (Starter Ring Gear Teeth)
+      const toothCount = 48;
+      for (let i = 0; i < toothCount; i++) {
+        const a = (i / toothCount) * Math.PI * 2;
+        const tooth = new THREE.Mesh(
+          new THREE.BoxGeometry(0.06, 0.08, 0.24),
+          mats.brass
+        );
+        tooth.position.set(Math.cos(a) * 1.44, Math.sin(a) * 1.44, 0);
+        tooth.rotation.z = a;
+        flywheelSpinner.add(tooth);
+      }
+    }
+
+    // --- 5.13 铝合金散热油底壳 (oilPan) ---
+    {
+      const g = partGroups.oilPan;
+
+      // 油底壳上沿密封法兰圈
+      const flange = new THREE.Mesh(
+        new THREE.BoxGeometry(2.65, 0.14, 7.55),
+        mats.castAluminum
+      );
+      flange.position.set(0, -2.72, 0);
+      g.add(flange);
+
+      // 油底壳主体盆腔
+      const upperSump = new THREE.Mesh(
+        new THREE.BoxGeometry(2.38, 0.65, 7.25),
+        mats.oilPanDark
+      );
+      upperSump.position.set(0, -3.1, 0);
+      g.add(upperSump);
+
+      // 后部深油槽 (Deep Rear Sump Reservoir)
+      const deepSump = new THREE.Mesh(
+        new THREE.BoxGeometry(2.15, 0.55, 3.8),
+        mats.oilPanDark
+      );
+      deepSump.position.set(0, -3.65, 1.4);
+      g.add(deepSump);
+
+      // 底部纵向散热鳍片
+      for (let x of [-0.75, -0.45, -0.15, 0.15, 0.45, 0.75]) {
+        const fin = new THREE.Mesh(
+          new THREE.BoxGeometry(0.05, 0.08, 3.65),
+          mats.castAluminum
+        );
+        fin.position.set(x, -3.95, 1.4);
+        g.add(fin);
+      }
+
+      // 黄铜放油螺丝 (Oil Drain Plug)
+      const drainPlug = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.11, 0.18, 6),
+        mats.brass
+      );
+      drainPlug.rotation.x = Math.PI / 2;
+      drainPlug.position.set(0, -3.72, 3.35);
+      g.add(drainPlug);
+    }
+
+    // 为所有部件组注册射线拾取映射
+    PARTS_SPEC.forEach((spec) => {
+      registerGroupMeshes(partGroups[spec.id], spec);
+    });
+
+    // ============================================================================
+    // 6. 交互逻辑：爆炸分解动画、悬停高亮提示、透视切换
+    // ============================================================================
+    let isExploded = false;
+    let explodeProgress = 0; // 0 = 组装状态, 1 = 完全爆炸分解
+    let isRunning = true;
+    let isCutaway = true;
+    let targetRPM = 650;
+    let crankPhase = 0; // [0, 4π) 四冲程曲轴转角
+
+    const btnExplode = document.getElementById('btn-explode');
+    const btnToggleRun = document.getElementById('btn-toggle-run');
+    const btnCutaway = document.getElementById('btn-cutaway');
+    const rpmSlider = document.getElementById('rpm-slider');
+    const rpmDisplay = document.getElementById('rpm-display');
+
+    btnExplode.addEventListener('click', () => {
+      isExploded = !isExploded;
+      btnExplode.classList.toggle('active', isExploded);
+      btnExplode.textContent = isExploded ? '🔧 组装复位 (Assemble)' : '💥 爆炸分解 (Explode)';
+    });
+
+    btnToggleRun.addEventListener('click', () => {
+      isRunning = !isRunning;
+      btnToggleRun.textContent = isRunning ? '⏸️ 暂停运转' : '▶️ 继续运转';
+    });
+
+    btnCutaway.addEventListener('click', () => {
+      isCutaway = !isCutaway;
+      mats.castIronBlock.opacity = isCutaway ? 0.88 : 1.0;
+      mats.cylinderLiner.opacity = isCutaway ? 0.42 : 0.95;
+      btnCutaway.textContent = isCutaway ? '🔍 缸体透视: 开' : '🔍 缸体透视: 关';
+    });
+
+    rpmSlider.addEventListener('input', (e) => {
+      targetRPM = parseFloat(e.target.value);
+      rpmDisplay.textContent = `${Math.round(targetRPM)} RPM`;
+    });
+
+    // 悬停高亮与底部一句话说明栏
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2(-999, -999);
+    const hoverBanner = document.getElementById('hover-banner');
+    const hoverNameZh = document.getElementById('hover-name-zh');
+    const hoverNameEn = document.getElementById('hover-name-en');
+    const hoverDesc = document.getElementById('hover-desc');
+
+    let hoveredSpec = null;
+    const savedEmissives = new Map();
+
+    function setHoveredPart(spec) {
+      if (hoveredSpec === spec) return;
+
+      // 恢复上一个高亮部件的材质
+      if (hoveredSpec) {
+        const prevGroup = partGroups[hoveredSpec.id];
+        prevGroup.traverse((child) => {
+          if (child.isMesh && savedEmissives.has(child)) {
+            const orig = savedEmissives.get(child);
+            if (child.material && child.material.emissive) {
+              child.material.emissive.copy(orig);
+              child.material.emissiveIntensity = 0;
+            }
+          }
+        });
+        const prevLabel = partLabelEls[hoveredSpec.id];
+        if (prevLabel) prevLabel.classList.remove('highlighted');
+      }
+
+      hoveredSpec = spec;
+
+      if (spec) {
+        // 克隆或单独高亮当前部件组材质
+        const group = partGroups[spec.id];
+        group.traverse((child) => {
+          if (child.isMesh && child.material && child.material.emissive) {
+            if (! child.userData.clonedMat) {
+              child.material = child.material.clone();
+              child.userData.clonedMat = true;
+            }
+            if (!savedEmissives.has(child)) {
+              savedEmissives.set(child, child.material.emissive.clone());
+            }
+            child.material.emissive.setHex(0x38bdf8);
+            child.material.emissiveIntensity = 0.42;
+          }
+        });
+
+        hoverNameZh.textContent = spec.nameZh;
+        hoverNameEn.textContent = spec.nameEn;
+        hoverDesc.textContent = spec.desc;
+        hoverBanner.classList.add('visible');
+        document.body.style.cursor = 'pointer';
+
+        const labelEl = partLabelEls[spec.id];
+        if (labelEl) labelEl.classList.add('highlighted');
+      } else {
+        hoverBanner.classList.remove('visible');
+        document.body.style.cursor = 'default';
+      }
+    }
+
+    const pickableMeshes = Array.from(partMeshesMap.keys());
+    let isDraggingCamera = false;
+
+    controls.addEventListener('start', () => { isDraggingCamera = true; });
+    controls.addEventListener('end', () => { isDraggingCamera = false; });
+
+    window.addEventListener('pointermove', (e) => {
+      if (isDraggingCamera) return;
+      // 如果鼠标悬停在 UI 按钮或标签上，不覆盖标签触发的高亮
+      if (e.target !== renderer.domElement) return;
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(pointer, camera);
+      const intersects = raycaster.intersectObjects(pickableMeshes, false);
+
+      if (intersects.length > 0) {
+        const hitMesh = intersects[0].object;
+        const spec = partMeshesMap.get(hitMesh);
+        setHoveredPart(spec || null);
+      } else {
+        setHoveredPart(null);
+      }
+    });
+
+    // ============================================================================
+    // 7. 机械运动学求解与主渲染循环 (60FPS)
+    // ============================================================================
+    const pillEls = {
+      0: document.getElementById('pill-1'),
+      1: document.getElementById('pill-2'),
+      2: document.getElementById('pill-3'),
+      3: document.getElementById('pill-4')
+    };
+
+    function easeInOutCubic(t) {
+      return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    const tempVec = new THREE.Vector3();
+    let lastTime = performance.now();
+
+    function animate(now) {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+
+      // 1. 曲轴转角更新 (为了便于肉眼观察活塞、气门与火花，将视觉角速度优雅映射)
+      if (isRunning) {
+        const visualRadPerSec = (targetRPM / 60) * 1.15;
+        crankPhase = (crankPhase + visualRadPerSec * dt) % (Math.PI * 4);
+      }
+
+      // 2. 曲轴、飞轮与凸轮轴旋转
+      crankshaftSpinner.rotation.z = -crankPhase;
+      flywheelSpinner.rotation.z = -crankPhase;
+      intakeCamSpinner.rotation.z = -crankPhase * 0.5;
+      exhaustCamSpinner.rotation.z = -crankPhase * 0.5;
+
+      // 正时皮带轮系与皮带纹理滚动
+      timingPulleys.forEach((p) => {
+        p.mesh.rotation.z = -crankPhase * p.ratio;
+      });
+      beltTex.offset.x = (crankPhase * 0.42) % 1;
+
+      // 3. 四缸活塞往复运动、连杆摆角与 1-3-4-2 点火爆燃光效
+      for (let i = 0; i < 4; i++) {
+        const alpha = crankPhase + CRANK_PIN_OFFSET[i];
+        // 曲柄销在 XY 平面坐标（考虑右手定则绕 Z 轴旋转 -crankPhase）
+        const pinX = Math.sin(alpha) * CRANK_R;
+        const pinY = CRANK_Y + Math.cos(alpha) * CRANK_R;
+
+        // 精确曲柄连杆机构活塞高度公式: y = y_pin + sqrt(L^2 - x_pin^2)
+        const rodVertical = Math.sqrt(ROD_LEN * ROD_LEN - pinX * pinX);
+        const wristY = pinY + rodVertical;
+
+        // 更新第 i 缸活塞高度
+        pistonAssemblyList[i].position.y = wristY;
+
+        // 更新第 i 缸连杆位置与摆角
+        const rodGroup = conRodAssemblyList[i];
+        rodGroup.position.y = wristY;
+        rodGroup.rotation.z = Math.atan2(pinX, rodVertical);
+
+        // 计算该气缸在 720°(4π) 四冲程循环中的相对相位 Δφ ∈ [0, 4π)
+        const deltaPhi = (crankPhase - FIRE_PHASE[i] + Math.PI * 4) % (Math.PI * 4);
+
+        // 点火爆燃阶段: Δφ ∈ [0, 0.72π) 为做功冲程初段
+        const comb = combustionVisuals[i];
+        if (deltaPhi < Math.PI * 0.72) {
+          const progress = deltaPhi / (Math.PI * 0.72);
+          // 初始电火花蓝白亮光 (前 18%)
+          const sparkIntensity = progress < 0.18 ? Math.sin((progress / 0.18) * Math.PI) : 0;
+          comb.sparkMat.opacity = sparkIntensity * 0.95;
+          comb.sparkCore.scale.setScalar(0.8 + sparkIntensity * 0.9);
+
+          // 橙红爆燃火焰随活塞下行膨胀并渐隐
+          const flameIntensity = Math.pow(1 - progress, 1.6);
+          comb.flameMat.opacity = flameIntensity * 0.78;
+          const chamberHeight = Math.max(0.18, HEAD_Y - (wristY + 0.56));
+          comb.flameMesh.scale.set(1, chamberHeight / 0.65, 1);
+          comb.flameMesh.position.y = HEAD_Y - chamberHeight * 0.5;
+
+          comb.light.intensity = flameIntensity * 4.5 + sparkIntensity * 3.0;
+          pillEls[i].classList.add('firing');
+        } else {
+          comb.sparkMat.opacity = 0;
+          comb.flameMat.opacity = 0;
+          comb.light.intensity = 0;
+          pillEls[i].classList.remove('firing');
+        }
+      }
+
+      // 4. 16 支进排气门开闭与弹簧压缩动画
+      valveItems.forEach((v) => {
+        const deltaPhi = (crankPhase - FIRE_PHASE[v.cylIdx] + Math.PI * 4) % (Math.PI * 4);
+        let lift = 0;
+        if (!v.isIntake && deltaPhi >= Math.PI && deltaPhi < 2 * Math.PI) {
+          // 排气冲程 [π, 2π): 排气门开启
+          lift = Math.sin(deltaPhi - Math.PI) * 0.25;
+        } else if (v.isIntake && deltaPhi >= 2 * Math.PI && deltaPhi < 3 * Math.PI) {
+          // 进气冲程 [2π, 3π): 进气门开启
+          lift = Math.sin(deltaPhi - 2 * Math.PI) * 0.25;
+        }
+        v.movingStemGroup.position.y = -lift;
+        v.springGroup.scale.y = 1 - lift * 1.15;
+      });
+
+      // 5. 爆炸分解平滑过渡与 3D 部件标签屏幕投影更新
+      const targetExplode = isExploded ? 1 : 0;
+      explodeProgress += (targetExplode - explodeProgress) * Math.min(1, dt * 6.5);
+      const easedExplode = easeInOutCubic(explodeProgress);
+
+      const showLabels = explodeProgress > 0.25;
+      const halfW = window.innerWidth / 2;
+      const halfH = window.innerHeight / 2;
+
+      PARTS_SPEC.forEach((spec) => {
+        const group = partGroups[spec.id];
+        group.position.copy(spec.explodeOffset).multiplyScalar(easedExplode);
+
+        const labelEl = partLabelEls[spec.id];
+        if (showLabels) {
+          tempVec.copy(spec.labelAnchor).add(group.position);
+          tempVec.project(camera);
+
+          if (tempVec.z < 1) {
+            const x = tempVec.x * halfW + halfW;
+            const y = -(tempVec.y * halfH) + halfH;
+            labelEl.style.transform = `translate(-50%, -50%) translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`;
+            labelEl.classList.add('visible');
+          } else {
+            labelEl.classList.remove('visible');
+          }
+        } else {
+          labelEl.classList.remove('visible');
+        }
+      });
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    // 窗口自适应
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    requestAnimationFrame(animate);
+  </script>
+  <script src="../prompt-panel.js" data-id="inline-four-web"></script>
+</body>
+</html>
