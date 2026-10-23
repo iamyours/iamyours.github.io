@@ -48,17 +48,9 @@ window.GALLERY_MODELS = {
     "badgeClass": "is-kiro",
     "note": "同一提示词，用 Claude Opus 5.5 生成。",
     "suffix": "-kiro-opus"
-  },
-  "kiro-opus-v1": {
-    "key": "kiro-opus-v1",
-    "badge": "Opus 5.5（初版）",
-    "short": "Opus 5.5 初版",
-    "badgeClass": "is-kiro",
-    "note": "同一场景的早一版：Claude Opus 5.5 按较早的提示词草稿生成。草稿原文没有保留，这里展示的是定稿提示词。",
-    "suffix": "-kiro-opus-v1"
   }
 };
-window.GALLERY_MODEL_ORDER = ["cli", "web", "flash", "deepseek", "opus", "kiro-opus", "kiro-opus-v1"];
+window.GALLERY_MODEL_ORDER = ["cli", "web", "flash", "deepseek", "opus", "kiro-opus"];
 window.GALLERY_CATEGORIES = [
   {
     "id": "classic",
@@ -416,8 +408,7 @@ window.GALLERY_CATEGORIES = [
         "description": "蒸汽列车沿 C 形圆弧轨道驶过云海上的维多利亚玻璃车站，25 秒一镜到底循环运镜，可拖动自由观察。",
         "models": [
           "deepseek",
-          "kiro-opus",
-          "kiro-opus-v1"
+          "kiro-opus"
         ],
         "gradient": "linear-gradient(135deg, #1d2a52 0%, #3b4f86 50%, #f2b27a 100%)"
       },
