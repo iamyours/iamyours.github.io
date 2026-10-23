@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>SpaceX 猛禽发动机 (Raptor Engine) - 3D 工业级结构演示</title>
+  <style>
+    :root {
+      --bg-primary: #f5f7fa;
+      --panel-bg: rgba(255, 255, 255, 0.86);
+      --panel-border: rgba(15, 23, 42, 0.1);
+      --text-main: #0f172a;
+      --text-sub: #475569;
+      --accent-blue: #0284c7;
+      --accent-teal: #0d9488;
+      --accent-Flame: #6366f1;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: radial-gradient(circle at 50% 38%, #ffffff 0%, #eef2f6 60%, #dde4ed 100%);
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角固定返回按钮（半透明奶油色圆角小按钮样式） */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 15px;
+      background: rgba(253, 248, 238, 0.85);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(214, 199, 172, 0.65);
+      border-radius: 999px;
+      color: #4a3f31;
+      font-size: 13.5px;
+      font-weight: 600;
+      text-decoration: none;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.07);
+      transition: all 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 251, 242, 0.96);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+    }
+
+    /* 顶部标题栏 */
+    .header-hud {
+      position: fixed;
+      top: 18px;
+      left: 170px;
+      z-index: 20;
+      pointer-events: none;
+    }
+
+    .engine-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 3px 10px;
+      background: rgba(15, 23, 42, 0.06);
+      border-left: 3px solid var(--accent-blue);
+      border-radius: 0 6px 6px 0;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.2px;
+      color: #334155;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .header-hud h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+      color: #0f172a;
+      line-height: 1.2;
+    }
+
+    .header-hud p {
+      font-size: 12.5px;
+      color: var(--text-sub);
+      margin-top: 2px;
+    }
+
+    /* 右侧遥测数据与控制面板 */
+    .control-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      width: 300px;
+      z-index: 30;
+      background: var(--panel-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+    }
+
+    .panel-section-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #64748b;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .spec-card {
+      background: rgba(241, 245, 249, 0.85);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      border-radius: 10px;
+      padding: 8px 10px;
+    }
+
+    .spec-label {
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .spec-value {
+      font-size: 14.5px;
+      font-weight: 800;
+      color: #0f172a;
+      margin-top: 2px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .spec-unit {
+      font-size: 11px;
+      font-weight: 600;
+      color: #475569;
+      margin-left: 2px;
+    }
+
+    /* 控制滑块与按钮 */
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: #1e293b;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #0f172a;
+      border: 2px solid #ffffff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.25);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+
+    .btn-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .action-btn {
+      padding: 9px 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(15, 23, 42, 0.12);
+      background: #ffffff;
+      color: #1e293b;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .action-btn:hover {
+      background: #f1f5f9;
+      border-color: rgba(15, 23, 42, 0.25);
+    }
+
+    .action-btn.active {
+      background: #0f172a;
+      color: #ffffff;
+      border-color: #0f172a;
+    }
+
+    .fire-btn {
+      grid-column: span 2;
+      padding: 11px 14px;
+      background: linear-gradient(135deg, #4f46e5 0%, #0284c7 100%);
+      color: #ffffff;
+      border: none;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.28);
+      font-size: 13.5px;
+      font-weight: 700;
+    }
+
+    .fire-btn:hover {
+      background: linear-gradient(135deg, #4338ca 0%, #0369a1 100%);
+      transform: translateY(-1px);
+    }
+
+    .fire-btn.firing {
+      background: linear-gradient(135deg, #dc2626 0%, #ea580c 100%);
+      box-shadow: 0 4px 16px rgba(220, 38, 38, 0.35);
+    }
+
+    .cam-presets {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+    }
+
+    .preset-btn {
+      padding: 6px 8px;
+      font-size: 11.5px;
+      border-radius: 8px;
+      border: 1px solid rgba(15, 23, 42, 0.1);
+      background: rgba(248, 250, 252, 0.9);
+      color: #334155;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.15s;
+    }
+
+    .preset-btn:hover {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    /* 3D 空间结构标注点 */
+    #labels-container {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 15;
+    }
+
+    .hotspot {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: opacity 0.25s ease;
+    }
+
+    .hotspot-dot {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: rgba(15, 23, 42, 0.85);
+      color: #ffffff;
+      border: 2px solid #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      transition: transform 0.2s ease, background 0.2s ease;
+    }
+
+    .hotspot:hover .hotspot-dot,
+    .hotspot.selected .hotspot-dot {
+      transform: scale(1.18);
+      background: var(--accent-blue);
+    }
+
+    .hotspot-tag {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(15, 23, 42, 0.14);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 600;
+      color: #0f172a;
+      white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.08);
+    }
+
+    /* 底部组件详情弹窗 */
+    .info-toast {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      max-width: 400px;
+      background: var(--panel-bg);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      border: 1px solid var(--panel-border);
+      border-left: 4px solid var(--accent-blue);
+      border-radius: 12px;
+      padding: 13px 16px;
+      z-index: 25;
+      box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+      transition: all 0.25s ease;
+    }
+
+    .info-toast h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #0f172a;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .info-toast p {
+      font-size: 12.2px;
+      line-height: 1.55;
+      color: #334155;
+    }
+
+    /* 响应式移动端适配 */
+    @media (max-width: 768px) {
+      .header-hud {
+        top: 62px;
+        left: 18px;
+      }
+      .header-hud h1 {
+        font-size: 18px;
+      }
+      .control-panel {
+        top: auto;
+        bottom: 12px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+        max-height: 44vh;
+        padding: 12px;
+        gap: 10px;
+      }
+      .info-toast {
+        display: none;
+      }
+      .hotspot-tag {
+        display: none;
+      }
+    }
+  </style>
+
+  <!-- Three.js r160 固定版本 ImportMap -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <!-- 左上角返回按钮 -->
+  <a href="../" class="back-btn" title="返回 3D 作品集">← 返回 3D 作品</a>
+
+  <!-- 顶部标题说明 -->
+  <div class="header-hud">
+    <div class="engine-badge">FFSC · 全流量分级燃烧循环</div>
+    <h1>SpaceX 猛禽火箭发动机 (Raptor)</h1>
+    <p>液氧/甲烷推进剂 · 3D 程序化精密机械结构与试车演示</p>
+  </div>
+
+  <!-- 3D 画布容器 -->
+  <div id="canvas-container"></div>
+
+  <!-- 3D 结构热点标注层 -->
+  <div id="labels-container"></div>
+
+  <!-- 左下角结构说明卡片 -->
+  <div class="info-toast" id="info-card">
+    <h3 id="info-title">猛禽发动机总成 (Raptor Assembly)</h3>
+    <p id="info-desc">人类首款投入实用的全流量分级燃烧循环（FFSC）液氧甲烷发动机。富氧与富燃两套预燃室分别驱动涡轮泵，室压突破 300 bar，兼具极高推重比与快速复用能力。点击模型标注点可查看子系统详情。</p>
+  </div>
+
+  <!-- 右侧交互控制面板 -->
+  <aside class="control-panel">
+    <div>
+      <div class="panel-section-title">
+        <span>实时工况遥测 (Telemetry)</span>
+        <span id="status-indicator" style="color: #0284c7;">● 待机检测</span>
+      </div>
+      <div class="specs-grid">
+        <div class="spec-card">
+          <div class="spec-label">主燃烧室压力</div>
+          <div class="spec-value"><span id="val-pressure">1.0</span><span class="spec-unit">bar</span></div>
+        </div>
+        <div class="spec-card">
+          <div class="spec-label">海平面推力</div>
+          <div class="spec-value"><span id="val-thrust">0</span><span class="spec-unit">tf</span></div>
+        </div>
+        <div class="spec-card">
+          <div class="spec-label">氧/燃涡轮转速</div>
+          <div class="spec-value"><span id="val-rpm">0</span><span class="spec-unit">RPM</span></div>
+        </div>
+        <div class="spec-card">
+          <div class="spec-label">真空比冲 (Isp)</div>
+          <div class="spec-value">350<span class="spec-unit">s</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="control-group">
+      <div class="slider-header">
+        <span>节流阀推力 (Throttle)</span>
+        <span id="throttle-label">0%</span>
+      </div>
+      <input type="range" id="throttle-slider" min="0" max="100" value="0" step="1" />
+    </div>
+
+    <div class="control-group">
+      <div class="slider-header">
+        <span>结构爆炸分解 (Exploded View)</span>
+        <span id="explode-label">0%</span>
+      </div>
+      <input type="range" id="explode-slider" min="0" max="100" value="0" step="1" />
+    </div>
+
+    <div class="control-group">
+      <div class="slider-header">
+        <span>TVC 矢量摆角测试 (Gimbal)</span>
+        <span id="gimbal-label">0.0°</span>
+      </div>
+      <input type="range" id="gimbal-slider" min="-15" max="15" value="0" step="0.5" />
+    </div>
+
+    <div class="btn-row">
+      <button class="action-btn fire-btn" id="btn-ignite">🔥 启动全推力点火试车</button>
+      <button class="action-btn active" id="btn-labels">📍 结构标注</button>
+      <button class="action-btn active" id="btn-rotate">🔄 自动环绕</button>
+      <button class="action-btn" id="btn-cutaway">🔍 喷管半剖透视</button>
+      <button class="action-btn" id="btn-flow">💧 推进剂流向</button>
+    </div>
+
+    <div>
+      <div class="panel-section-title">视角快速切换 (Camera Views)</div>
+      <div class="cam-presets">
+        <button class="preset-btn" data-view="full">全景标准视图</button>
+        <button class="preset-btn" data-view="powerhead">涡轮泵动力头</button>
+        <button class="preset-btn" data-view="plumbing">高压管网特写</button>
+        <button class="preset-btn" data-view="nozzle">拉瓦尔喷管与尾焰</button>
+      </div>
+    </div>
+  </aside>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ==========================================
+    // 1. 场景、相机、渲染器与白色工业摄影棚环境
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf3f6fa);
+    scene.fog = new THREE.Fog(0xf3f6fa, 28, 65);
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 150);
+    camera.position.set(6.8, 2.2, 8.2);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.localClippingEnabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.target.set(0, 0.3, 0);
+    controls.minDistance = 2.5;
+    controls.maxDistance = 24;
+    controls.maxPolarAngle = Math.PI * 0.88;
+    controls.autoRotate = true;
+    controls.autoRotateSpeed = 0.65;
+
+    // 程序化构建高对比度摄影棚环境反射贴图 (使金属在白色背景下极具质感与轮廓感)
+    function createStudioEnvironment(renderer) {
+      const pmremGenerator = new THREE.PMREMGenerator(renderer);
+      pmremGenerator.compileEquirectangularShader();
+
+      const envScene = new THREE.Scene();
+      envScene.background = new THREE.Color(0xdbe2ec);
+
+      // 顶部柔光箱与侧向高对比冷暖反光板，增强金属管路高光边缘
+      const panelGeo = new THREE.PlaneGeometry(20, 20);
+      const topLight = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(4.5, 4.6, 4.8), side: THREE.DoubleSide }));
+      topLight.position.set(0, 12, 0);
+      topLight.rotation.x = Math.PI / 2;
+      envScene.add(topLight);
+
+      const keyLightPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(3.8, 3.6, 3.3), side: THREE.DoubleSide }));
+      keyLightPanel.position.set(12, 4, 10);
+      keyLightPanel.lookAt(0, 0, 0);
+      envScene.add(keyLightPanel);
+
+      const rimLightPanel = new THREE.Mesh(panelGeo, new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 3.0, 4.2), side: THREE.DoubleSide }));
+      rimLightPanel.position.set(-12, 3, -10);
+      rimLightPanel.lookAt(0, 0, 0);
+      envScene.add(rimLightPanel);
+
+      // 深色吸光条，给金属表面提供深邃工业反射对比
+      const darkStripGeo = new THREE.CylinderGeometry(14, 14, 5, 32, 1, true);
+      const darkStripMat = new THREE.MeshBasicMaterial({ color: 0x1e2633, side: THREE.BackSide });
+      const darkStrip = new THREE.Mesh(darkStripGeo, darkStripMat);
+      darkStrip.position.y = -1;
+      envScene.add(darkStrip);
+
+      const envTexture = pmremGenerator.fromScene(envScene, 0.035).texture;
+      pmremGenerator.dispose();
+      return envTexture;
+    }
+
+    scene.environment = createStudioEnvironment(renderer);
+
+    // 灯光系统
+    const ambientLight = new THREE.HemisphereLight(0xffffff, 0xcbd5e1, 1.1);
+    scene.add(ambientLight);
+
+    const mainDirLight = new THREE.DirectionalLight(0xfffcf5, 2.4);
+    mainDirLight.position.set(8, 12, 9);
+    mainDirLight.castShadow = true;
+    mainDirLight.shadow.mapSize.width = 2048;
+    mainDirLight.shadow.mapSize.height = 2048;
+    mainDirLight.shadow.camera.near = 2;
+    mainDirLight.shadow.camera.far = 28;
+    const d = 5.5;
+    mainDirLight.shadow.camera.left = -d;
+    mainDirLight.shadow.camera.right = d;
+    mainDirLight.shadow.camera.top = d;
+    mainDirLight.shadow.camera.bottom = -d;
+    mainDirLight.shadow.bias = -0.0005;
+    scene.add(mainDirLight);
+
+    const rimDirLight = new THREE.DirectionalLight(0xdbeafe, 1.5);
+    rimDirLight.position.set(-9, 5, -7);
+    scene.add(rimDirLight);
+
+    // 点火尾焰动态光源
+    const plumeLight = new THREE.PointLight(0x6366f1, 0, 18, 1.5);
+    plumeLight.position.set(0, -3.5, 0);
+    scene.add(plumeLight);
+
+    // ==========================================
+    // 2. 程序化纹理生成 (冷却沟槽、金属拉丝、地面刻度盘)
+    // ==========================================
+    function createNozzleMaps() {
+      const width = 1024;
+      const height = 512;
+      const bumpCanvas = document.createElement('canvas');
+      bumpCanvas.width = width;
+      bumpCanvas.height = height;
+      const bCtx = bumpCanvas.getContext('2d');
+
+      const roughCanvas = document.createElement('canvas');
+      roughCanvas.width = width;
+      roughCanvas.height = height;
+      const rCtx = roughCanvas.getContext('2d');
+
+      // 绘制 180 条纵向微细再生冷却通道凹槽
+      const channels = 180;
+      const colW = width / channels;
+      for (let i = 0; i < channels; i++) {
+        const x = i * colW;
+        const grad = bCtx.createLinearGradient(x, 0, x + colW, 0);
+        grad.addColorStop(0, '#202020');
+        grad.addColorStop(0.25, '#dcdcdc');
+        grad.addColorStop(0.5, '#ffffff');
+        grad.addColorStop(0.75, '#dcdcdc');
+        grad.addColorStop(1, '#202020');
+        bCtx.fillStyle = grad;
+        bCtx.fillRect(x, 0, colW, height);
+
+        rCtx.fillStyle = i % 2 === 0 ? '#555555' : '#686868';
+        rCtx.fillRect(x, 0, colW, height);
+      }
+
+      // 叠加横向焊接环纹
+      bCtx.fillStyle = 'rgba(255,255,255,0.22)';
+      for (let y = 0; y < height; y += 32) {
+        bCtx.fillRect(0, y, width, 2);
+        rCtx.fillStyle = '#383838';
+        rCtx.fillRect(0, y, width, 3);
+      }
+
+      const bumpTex = new THREE.CanvasTexture(bumpCanvas);
+      bumpTex.wrapS = THREE.RepeatWrapping;
+      bumpTex.wrapT = THREE.RepeatWrapping;
+
+      const roughTex = new THREE.CanvasTexture(roughCanvas);
+      roughTex.wrapS = THREE.RepeatWrapping;
+      roughTex.wrapT = THREE.RepeatWrapping;
+
+      return { bumpTex, roughTex };
+    }
+
+    function createBellowsBumpMap() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 64;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const rings = 48;
+      const step = canvas.height / rings;
+      for (let i = 0; i < rings; i++) {
+        const y = i * step;
+        const g = ctx.createLinearGradient(0, y, 0, y + step);
+        g.addColorStop(0, '#111');
+        g.addColorStop(0.5, '#fff');
+        g.addColorStop(1, '#111');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, y, canvas.width, step);
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createStudioFloorTexture() {
+      const size = 1024;
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      const cx = size / 2;
+      const cy = size / 2;
+
+      ctx.clearRect(0, 0, size, size);
+
+      // 同心工程刻度环
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.12)';
+      ctx.lineWidth = 2;
+      [140, 240, 340, 440].forEach(r => {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+      });
+
+      // 角度刻度线
+      for (let a = 0; a < 360; a += 5) {
+        const rad = (a * Math.PI) / 180;
+        const inner = a % 30 === 0 ? 318 : (a % 15 === 0 ? 326 : 332);
+        const outer = 340;
+        ctx.strokeStyle = a % 30 === 0 ? 'rgba(15, 23, 42, 0.28)' : 'rgba(15, 23, 42, 0.12)';
+        ctx.lineWidth = a % 30 === 0 ? 2.5 : 1.2;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(rad) * inner, cy + Math.sin(rad) * inner);
+        ctx.lineTo(cx + Math.cos(rad) * outer, cy + Math.sin(rad) * outer);
+        ctx.stroke();
+      }
+
+      // 十字准星虚线
+      ctx.setLineDash([8, 8]);
+      ctx.strokeStyle = 'rgba(15, 23, 42, 0.14)';
+      ctx.beginPath();
+      ctx.moveTo(cx - 460, cy);
+      ctx.lineTo(cx + 460, cy);
+      ctx.moveTo(cx, cy - 460);
+      ctx.lineTo(cx, cy + 460);
+      ctx.stroke();
+
+      const tex = new THREE.CanvasTexture(canvas);
+      return tex;
+    }
+
+    const { bumpTex: nozzleBump, roughTex: nozzleRough } = createNozzleMaps();
+    const bellowsBump = createBellowsBumpMap();
+
+    // 喷管半剖裁剪平面
+    const cutawayPlane = new THREE.Plane(new THREE.Vector3(-1, 0, 0.25).normalize(), 0);
+    let isCutaway = false;
+
+    // ==========================================
+    // 3. 工业材质库 (PBR 航空合金材质)
+    // ==========================================
+    const mats = {
+      // 深色高温镍基合金 (Inconel 718 / SX500) - 喷管外壁与预燃室
+      darkInconel: new THREE.MeshStandardMaterial({
+        color: 0x262b33,
+        metalness: 0.86,
+        roughness: 0.36,
+        bumpMap: nozzleBump,
+        bumpScale: 0.015,
+        roughnessMap: nozzleRough,
+        side: THREE.DoubleSide
+      }),
+      // 喷管内壁再生冷却铜镍内衬 (高导热铜合金 CuCrZr)
+      copperLiner: new THREE.MeshStandardMaterial({
+        color: 0xc87543,
+        metalness: 0.88,
+        roughness: 0.26,
+        bumpMap: nozzleBump,
+        bumpScale: 0.012,
+        side: THREE.DoubleSide
+      }),
+      // 亮面不锈钢与精密机加工法兰 (304L / 316L)
+      brightSteel: new THREE.MeshStandardMaterial({
+        color: 0xd0d7e1,
+        metalness: 0.92,
+        roughness: 0.2
+      }),
+      // 哑光钛合金壳体 (涡轮泵与推力座)
+      titanium: new THREE.MeshStandardMaterial({
+        color: 0x7a8494,
+        metalness: 0.82,
+        roughness: 0.34
+      }),
+      // 锻造深灰钢结构箍环
+      heavySteel: new THREE.MeshStandardMaterial({
+        color: 0x3b424f,
+        metalness: 0.85,
+        roughness: 0.32
+      }),
+      // 波纹管柔性补偿管
+      bellowsSteel: new THREE.MeshStandardMaterial({
+        color: 0xbac4d0,
+        metalness: 0.9,
+        roughness: 0.28,
+        bumpMap: bellowsBump,
+        bumpScale: 0.025
+      }),
+      // SpaceX 猛禽标志性松石青绿保护涂层 (Raptor Turquoise Accent)
+      raptorTeal: new THREE.MeshStandardMaterial({
+        color: 0x0d8a7b,
+        metalness: 0.45,
+        roughness: 0.32
+      }),
+      // 聚酰亚胺黄金隔热包覆层 (Kapton Gold Foil)
+      kaptonGold: new THREE.MeshStandardMaterial({
+        color: 0xeab308,
+        metalness: 0.88,
+        roughness: 0.28
+      }),
+      // 航天阳极氧化红/蓝阀门接头
+      anodizedRed: new THREE.MeshStandardMaterial({
+        color: 0xdc2626,
+        metalness: 0.65,
+        roughness: 0.28
+      }),
+      anodizedBlue: new THREE.MeshStandardMaterial({
+        color: 0x0284c7,
+        metalness: 0.65,
+        roughness: 0.28
+      })
+    };
+
+    // ==========================================
+    // 4. 几何体辅助构造函数 (法兰、螺栓环、三维弯管、加强筋)
+    // ==========================================
+    const boltGeo = new THREE.CylinderGeometry(0.018, 0.018, 0.032, 6);
+
+    // 创建带一圈螺栓的工业法兰盘
+    function createFlange(radius, thickness = 0.045, boltCount = 12, mat = mats.brightSteel) {
+      const group = new THREE.Group();
+      const ringGeo = new THREE.CylinderGeometry(radius, radius, thickness, 32);
+      const ring = new THREE.Mesh(ringGeo, mat);
+      ring.castShadow = true;
+      ring.receiveShadow = true;
+      group.add(ring);
+
+      const boltRadius = radius * 0.84;
+      for (let i = 0; i < boltCount; i++) {
+        const angle = (i / boltCount) * Math.PI * 2;
+        const bolt = new THREE.Mesh(boltGeo, mats.heavySteel);
+        bolt.position.set(Math.cos(angle) * boltRadius, thickness * 0.5, Math.sin(angle) * boltRadius);
+        group.add(bolt);
+      }
+      return group;
+    }
+
+    // 创建带波纹管与法兰卡箍的 3D 复杂流体管路
+    function createComplexPipe(pointsArray, radius, mat = mats.brightSteel, addBellows = true, flangeIndices = []) {
+      const group = new THREE.Group();
+      const vectors = pointsArray.map(p => new THREE.Vector3(...p));
+      const curve = new THREE.CatmullRomCurve3(vectors, false, 'catmullrom', 0.35);
+
+      const tubeGeo = new THREE.TubeGeometry(curve, 64, radius, 20, false);
+      const tubeMesh = new THREE.Mesh(tubeGeo, mat);
+      tubeMesh.castShadow = true;
+      tubeMesh.receiveShadow = true;
+      group.add(tubeMesh);
+
+      // 在指定分位点添加法兰或波纹管节
+      flangeIndices.forEach((t, idx) => {
+        const pt = curve.getPointAt(t);
+        const tangent = curve.getTangentAt(t).normalize();
+        const quat = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), tangent);
+
+        if (addBellows && idx % 2 === 1) {
+          const belGeo = new THREE.CylinderGeometry(radius * 1.16, radius * 1.16, radius * 2.8, 24);
+          const bel = new THREE.Mesh(belGeo, mats.bellowsSteel);
+          bel.position.copy(pt);
+          bel.quaternion.copy(quat);
+          bel.castShadow = true;
+          group.add(bel);
+        } else {
+          const flange = createFlange(radius * 1.38, 0.04, 8, mats.brightSteel);
+          flange.position.copy(pt);
+          flange.quaternion.copy(quat);
+          group.add(flange);
+        }
+      });
+
+      return { group, curve };
+    }
+
+    // ==========================================
+    // 5. 构建 SpaceX 猛禽发动机 (Raptor Engine) 六大核心子系统
+    // ==========================================
+    const raptorRoot = new THREE.Group();
+    scene.add(raptorRoot);
+
+    // TVC 矢量摆动中心点设在顶部万向节 (y = 2.8)
+    const gimbalPivot = new THREE.Group();
+    gimbalPivot.position.set(0, 2.8, 0);
+    raptorRoot.add(gimbalPivot);
+
+    // 存储子系统用于爆炸视图平滑插值
+    const subsystems = [];
+    function registerSubsystem(name, group, explodeOffset) {
+      group.userData.basePos = group.position.clone();
+      group.userData.explodeOffset = explodeOffset.clone();
+      subsystems.push(group);
+      return group;
+    }
+
+    // --------------------------------------------------
+    // 子系统 A: 顶部推力座、万向节轴承与 TVC 液压伺服作动器 (Gimbal & TVC)
+    // --------------------------------------------------
+    const sysGimbal = new THREE.Group();
+    sysGimbal.position.set(0, -2.8, 0); // 还原至世界原点局部坐标系
+    gimbalPivot.add(sysGimbal);
+    registerSubsystem('gimbal', sysGimbal, new THREE.Vector3(0, 1.35, 0));
+
+    {
+      // 顶部十字推力座安装盘 (Thrust Puck Mount)
+      const mountBase = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.52, 0.22, 32), mats.titanium);
+      mountBase.position.y = 2.95;
+      mountBase.castShadow = true;
+      sysGimbal.add(mountBase);
+
+      const topFlange = createFlange(0.68, 0.05, 16, mats.brightSteel);
+      topFlange.position.y = 3.06;
+      sysGimbal.add(topFlange);
+
+      // 球形万向节十字轴座 (Gimbal Bearing Assembly)
+      const gimbalSphere = new THREE.Mesh(new THREE.SphereGeometry(0.36, 32, 24), mats.heavySteel);
+      gimbalSphere.position.y = 2.68;
+      sysGimbal.add(gimbalSphere);
+
+      const gimbalCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.25, 24), mats.raptorTeal);
+      gimbalCollar.position.y = 2.52;
+      gimbalCollar.castShadow = true;
+      sysGimbal.add(gimbalCollar);
+
+      // 两具 TVC 推力矢量控制液压作动筒 (左右对称斜拉至主燃烧室肩部)
+      [-1, 1].forEach(side => {
+        const actuatorGroup = new THREE.Group();
+        const topAnchor = new THREE.Vector3(side * 0.56, 2.88, 0.28);
+        const botAnchor = new THREE.Vector3(side * 0.72, 1.15, 0.42);
+        const dir = new THREE.Vector3().subVectors(botAnchor, topAnchor);
+        const len = dir.length();
+
+        // 外缸筒 (松石绿涂装)
+        const cylOuter = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, len * 0.58, 20), mats.raptorTeal);
+        cylOuter.position.y = -len * 0.29;
+        cylOuter.castShadow = true;
+        actuatorGroup.add(cylOuter);
+
+        // 镀铬活塞杆
+        const pistonRod = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, len * 0.52, 16), mats.brightSteel);
+        pistonRod.position.y = -len * 0.72;
+        actuatorGroup.add(pistonRod);
+
+        // 伺服阀块与金箔包覆传感器
+        const servoBlock = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.22, 0.14), mats.kaptonGold);
+        servoBlock.position.set(side * 0.06, -len * 0.3, 0.05);
+        actuatorGroup.add(servoBlock);
+
+        // 两端球头耳轴
+        const topJoint = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), mats.heavySteel);
+        const botJoint = new THREE.Mesh(new THREE.SphereGeometry(0.09, 16, 16), mats.heavySteel);
+        botJoint.position.y = -len;
+        actuatorGroup.add(topJoint, botJoint);
+
+        actuatorGroup.position.copy(topAnchor);
+        actuatorGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), dir.clone().normalize());
+        sysGimbal.add(actuatorGroup);
+      });
+    }
+
+    // --------------------------------------------------
+    // 子系统 B: 富氧预燃室与主氧涡轮泵总成 (LOX Preburner & Turbopump - 中轴上置)
+    // --------------------------------------------------
+    const sysLOXPump = new THREE.Group();
+    sysLOXPump.position.set(0, -2.8, 0);
+    gimbalPivot.add(sysLOXPump);
+    registerSubsystem('loxPump', sysLOXPump, new THREE.Vector3(-0.95, 0.65, 0.55));
+
+    let loxRotorMesh;
+    {
+      // 液氧主入口弯管 (LOX Inlet)
+      createComplexPipe(
+        [[-0.32, 3.05, -0.25], [-0.42, 2.65, -0.35], [-0.22, 2.25, -0.18]],
+        0.15, mats.brightSteel, true, [0.2, 0.8]
+      ).group.children.forEach(c => sysLOXPump.add(c.clone()));
+
+      // 氧涡轮泵蜗壳 (Volute Casing)
+      const loxVolute = new THREE.Mesh(new THREE.TorusGeometry(0.36, 0.16, 20, 36), mats.titanium);
+      loxVolute.position.set(0, 2.15, -0.05);
+      loxVolute.rotation.x = Math.PI / 2;
+      loxVolute.castShadow = true;
+      sysLOXPump.add(loxVolute);
+
+      // 涡轮泵腔体与加强肋片
+      const pumpBody = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.46, 0.68, 32), mats.darkInconel);
+      pumpBody.position.set(0, 1.88, 0);
+      pumpBody.castShadow = true;
+      sysLOXPump.add(pumpBody);
+
+      // 轴向加强筋
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        const rib = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.62, 0.08), mats.titanium);
+        rib.position.set(Math.cos(a) * 0.44, 1.88, Math.sin(a) * 0.44);
+        rib.rotation.y = -a;
+        sysLOXPump.add(rib);
+      }
+
+      // 富氧预燃室圆顶与双点火器 (LOX Preburner Dome)
+      const preburnerDome = new THREE.Mesh(new THREE.SphereGeometry(0.42, 32, 20, 0, Math.PI * 2, 0, Math.PI * 0.55), mats.copperLiner);
+      preburnerDome.position.set(0, 2.18, 0);
+      sysLOXPump.add(preburnerDome);
+
+      const midFlange = createFlange(0.54, 0.06, 18, mats.brightSteel);
+      midFlange.position.set(0, 1.54, 0);
+      sysLOXPump.add(midFlange);
+
+      // 内部可见高速旋转叶轮指示体 (用于半剖/透视时观察转速)
+      loxRotorMesh = new THREE.Group();
+      loxRotorMesh.position.set(0, 1.95, 0);
+      const hub = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.18, 0.35, 16), mats.brightSteel);
+      loxRotorMesh.add(hub);
+      for (let b = 0; b < 10; b++) {
+        const ang = (b / 10) * Math.PI * 2;
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.22, 0.02), mats.anodizedBlue);
+        blade.position.set(Math.cos(ang) * 0.18, 0, Math.sin(ang) * 0.18);
+        blade.rotation.y = -ang + 0.4;
+        loxRotorMesh.add(blade);
+      }
+      sysLOXPump.add(loxRotorMesh);
+    }
+
+    // --------------------------------------------------
+    // 子系统 C: 富燃预燃室与液态甲烷涡轮泵总成 (CH4 Preburner & Fuel Turbopump - 侧置斜装)
+    // --------------------------------------------------
+    const sysCH4Pump = new THREE.Group();
+    sysCH4Pump.position.set(0, -2.8, 0);
+    gimbalPivot.add(sysCH4Pump);
+    registerSubsystem('ch4Pump', sysCH4Pump, new THREE.Vector3(1.25, 0.45, 0.65));
+
+    let ch4RotorMesh;
+    {
+      const fuelAssembly = new THREE.Group();
+      fuelAssembly.position.set(0.68, 1.78, 0.22);
+      fuelAssembly.rotation.z = -0.32;
+      fuelAssembly.rotation.x = 0.15;
+
+      // 多级离心甲烷泵壳体
+      const housing = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.72, 28), mats.titanium);
+      housing.castShadow = true;
+      fuelAssembly.add(housing);
+
+      // 高压离心蜗壳环
+      const volute1 = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.12, 18, 32), mats.brightSteel);
+      volute1.position.y = 0.24;
+      volute1.rotation.x = Math.PI / 2;
+      fuelAssembly.add(volute1);
+
+      const volute2 = new THREE.Mesh(new THREE.TorusGeometry(0.31, 0.13, 18, 32), mats.raptorTeal);
+      volute2.position.y = -0.18;
+      volute2.rotation.x = Math.PI / 2;
+      fuelAssembly.add(volute2);
+
+      // 富燃预燃室头锥
+      const fDome = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.32, 0.34, 24), mats.darkInconel);
+      fDome.position.y = 0.52;
+      fuelAssembly.add(fDome);
+
+      const fFlange1 = createFlange(0.41, 0.045, 14, mats.brightSteel);
+      fFlange1.position.y = 0.35;
+      fuelAssembly.add(fFlange1);
+
+      const fFlange2 = createFlange(0.42, 0.045, 14, mats.brightSteel);
+      fFlange2.position.y = -0.35;
+      fuelAssembly.add(fFlange2);
+
+      // 内部甲烷涡轮转子
+      ch4RotorMesh = new THREE.Group();
+      for (let b = 0; b < 8; b++) {
+        const ang = (b / 8) * Math.PI * 2;
+        const blade = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.02), mats.anodizedRed);
+        blade.position.set(Math.cos(ang) * 0.14, 0, Math.sin(ang) * 0.14);
+        blade.rotation.y = -ang;
+        ch4RotorMesh.add(blade);
+      }
+      fuelAssembly.add(ch4RotorMesh);
+
+      sysCH4Pump.add(fuelAssembly);
+
+      // 富燃热燃气跨越歧管 (Hot Gas Transfer Duct -> 汇入主喷注器环)
+      const hotGasDuct = createComplexPipe(
+        [[0.78, 1.38, 0.26], [0.64, 1.12, 0.18], [0.35, 1.05, 0.05]],
+        0.165, mats.darkInconel, true, [0.3, 0.75]
+      );
+      sysCH4Pump.add(hotGasDuct.group);
+    }
+
+    // --------------------------------------------------
+    // 子系统 D: 主燃烧室、同轴旋流喷注器与再生冷却集液环 (Main Combustion Chamber)
+    // --------------------------------------------------
+    const sysChamber = new THREE.Group();
+    sysChamber.position.set(0, -2.8, 0);
+    gimbalPivot.add(sysChamber);
+    registerSubsystem('chamber', sysChamber, new THREE.Vector3(0, 0.05, -1.1));
+
+    {
+      // 主燃烧室至喉部车削轮廓 (y 从 1.54 到 0.15)
+      const chamberPoints = [
+        new THREE.Vector2(0.46, 1.54),
+        new THREE.Vector2(0.51, 1.32),
+        new THREE.Vector2(0.52, 0.95),
+        new THREE.Vector2(0.48, 0.68),
+        new THREE.Vector2(0.34, 0.42), // 收缩段
+        new THREE.Vector2(0.28, 0.22), // 喉部 (Throat)
+        new THREE.Vector2(0.32, 0.08)
+      ];
+      const chamberGeo = new THREE.LatheGeometry(chamberPoints, 48);
+      const chamberMesh = new THREE.Mesh(chamberGeo, mats.darkInconel);
+      chamberMesh.castShadow = true;
+      chamberMesh.receiveShadow = true;
+      sysChamber.add(chamberMesh);
+
+      // 内部铜合金再生冷却内壁与主喷注器面板 (Injector Plate)
+      const innerChamberPoints = chamberPoints.map(p => new THREE.Vector2(p.x - 0.025, p.y));
+      const innerChamberGeo = new THREE.LatheGeometry(innerChamberPoints, 48);
+      const innerChamberMesh = new THREE.Mesh(innerChamberGeo, mats.copperLiner);
+      sysChamber.add(innerChamberMesh);
+
+      // 同轴旋流喷注器蜂窝阵列面板 (Coaxial Swirl Injector Elements)
+      const injectorPlate = new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.44, 0.05, 32), mats.copperLiner);
+      injectorPlate.position.y = 1.48;
+      sysChamber.add(injectorPlate);
+
+      for (let ring = 1; ring <= 3; ring++) {
+        const count = ring * 8;
+        const r = ring * 0.11;
+        for (let i = 0; i < count; i++) {
+          const a = (i / count) * Math.PI * 2;
+          const nozzleTip = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.018, 0.06, 12), mats.brightSteel);
+          nozzleTip.position.set(Math.cos(a) * r, 1.44, Math.sin(a) * r);
+          sysChamber.add(nozzleTip);
+        }
+      }
+
+      // 主燃烧室高压环道歧管 (Main Regeneratively Cooled Manifold Rings)
+      const upperManifold = new THREE.Mesh(new THREE.TorusGeometry(0.55, 0.11, 20, 48), mats.brightSteel);
+      upperManifold.position.y = 1.18;
+      upperManifold.rotation.x = Math.PI / 2;
+      upperManifold.castShadow = true;
+      sysChamber.add(upperManifold);
+
+      const throatJacket = new THREE.Mesh(new THREE.CylinderGeometry(0.39, 0.37, 0.36, 36), mats.titanium);
+      throatJacket.position.y = 0.28;
+      throatJacket.castShadow = true;
+      sysChamber.add(throatJacket);
+
+      const throatFlange = createFlange(0.46, 0.05, 16, mats.brightSteel);
+      throatFlange.position.y = 0.45;
+      sysChamber.add(throatFlange);
+    }
+
+    // --------------------------------------------------
+    // 子系统 E: 高压流体管路、回流歧管与电子控制阀组 (Plumbing & Avionics Manifolds)
+    // --------------------------------------------------
+    const sysPlumbing = new THREE.Group();
+    sysPlumbing.position.set(0, -2.8, 0);
+    gimbalPivot.add(sysPlumbing);
+    registerSubsystem('plumbing', sysPlumbing, new THREE.Vector3(-1.35, -0.1, 0.85));
+
+    // 保存用于推进剂粒子流动的核心曲线
+    const flowCurves = [];
+
+    {
+      // 1. 主甲烷再生冷却下降大管 (Main CH4 Coolant Downcomer - 沿燃烧室侧面直通喷管底部集液环)
+      const downcomer1 = createComplexPipe(
+        [
+          [0.52, 1.62, 0.48],
+          [0.72, 1.25, 0.62],
+          [0.78, 0.55, 0.68],
+          [0.92, -0.45, 0.78],
+          [1.08, -1.45, 0.88],
+          [1.12, -2.28, 0.62]
+        ],
+        0.095, mats.brightSteel, true, [0.15, 0.38, 0.65, 0.88]
+      );
+      sysPlumbing.add(downcomer1.group);
+      flowCurves.push({ curve: downcomer1.curve, color: 0x06b6d4 });
+
+      // 2. 再生冷却热甲烷上升回流大管 (Coolant Return Upcomer -> 输往富燃预燃室)
+      const upcomer1 = createComplexPipe(
+        [
+          [-1.08, -1.92, 0.68],
+          [-1.02, -0.95, 0.78],
+          [-0.82, 0.15, 0.72],
+          [-0.68, 0.95, 0.58],
+          [-0.52, 1.68, 0.35],
+          [0.38, 1.98, 0.38]
+        ],
+        0.09, mats.titanium, true, [0.18, 0.45, 0.72, 0.9]
+      );
+      sysPlumbing.add(upcomer1.group);
+      flowCurves.push({ curve: upcomer1.curve, color: 0xf59e0b });
+
+      // 3. 背侧高压液氧旁通与预燃室供给管路
+      const loxBypass = createComplexPipe(
+        [
+          [-0.36, 2.15, -0.38],
+          [-0.75, 1.75, -0.62],
+          [-0.78, 1.15, -0.64],
+          [-0.54, 0.82, -0.42]
+        ],
+        0.075, mats.brightSteel, true, [0.25, 0.75]
+      );
+      sysPlumbing.add(loxBypass.group);
+      flowCurves.push({ curve: loxBypass.curve, color: 0x3b82f6 });
+
+      // 4. 侧向辅助吹除、氦气起动管线与金箔包覆线束 (6条精细辅助管线)
+      const auxConfigs = [
+        { pts: [[0.25, 2.35, 0.45], [0.58, 1.85, 0.72], [0.62, 1.18, 0.62]], r: 0.036, mat: mats.kaptonGold },
+        { pts: [[-0.25, 2.35, 0.45], [-0.58, 1.85, 0.72], [-0.55, 1.18, 0.48]], r: 0.038, mat: mats.brightSteel },
+        { pts: [[0.45, 1.15, -0.48], [0.76, 0.45, -0.68], [0.85, -0.55, -0.76], [0.95, -1.15, -0.62]], r: 0.048, mat: mats.brightSteel },
+        { pts: [[-0.45, 1.15, -0.48], [-0.72, 0.35, -0.68], [-0.78, -0.48, -0.65]], r: 0.044, mat: mats.kaptonGold },
+        { pts: [[0.0, 1.18, 0.65], [0.22, 0.65, 0.72], [0.38, 0.28, 0.45]], r: 0.032, mat: mats.raptorTeal },
+        { pts: [[0.35, 2.05, -0.42], [0.68, 1.55, -0.58], [0.52, 1.18, -0.42]], r: 0.052, mat: mats.titanium }
+      ];
+
+      auxConfigs.forEach(cfg => {
+        const p = createComplexPipe(cfg.pts, cfg.r, cfg.mat, false, [0.5]);
+        sysPlumbing.add(p.group);
+      });
+
+      // 5. 猛禽标志性中段环形刚性管路支架与航空电子控制盒 (Avionics & Valve Modules)
+      const supportRing = new THREE.Mesh(new THREE.TorusGeometry(0.76, 0.032, 16, 48), mats.raptorTeal);
+      supportRing.position.y = 0.85;
+      supportRing.rotation.x = Math.PI / 2;
+      sysPlumbing.add(supportRing);
+
+      for (let i = 0; i < 4; i++) {
+        const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+        const boxGroup = new THREE.Group();
+        const box = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.32, 0.14), i % 2 === 0 ? mats.heavySteel : mats.raptorTeal);
+        box.castShadow = true;
+        boxGroup.add(box);
+
+        // 顶部红蓝阳极氧化快卸接头
+        const plug1 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.08, 12), mats.anodizedRed);
+        plug1.position.set(-0.05, 0.18, 0);
+        const plug2 = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.08, 12), mats.anodizedBlue);
+        plug2.position.set(0.05, 0.18, 0);
+        boxGroup.add(plug1, plug2);
+
+        boxGroup.position.set(Math.cos(a) * 0.68, 0.85, Math.sin(a) * 0.68);
+        boxGroup.lookAt(0, 0.85, 0);
+        sysPlumbing.add(boxGroup);
+      }
+    }
+
+    // --------------------------------------------------
+    // 子系统 F: 再生冷却拉瓦尔扩张喷管 (De Laval Bell Nozzle)
+    // --------------------------------------------------
+    const sysNozzle = new THREE.Group();
+    sysNozzle.position.set(0, -2.8, 0);
+    gimbalPivot.add(sysNozzle);
+    registerSubsystem('nozzle', sysNozzle, new THREE.Vector3(0, -1.25, 0));
+
+    let nozzleThermalMesh;
+    const nozzleClipMaterials = [];
+    {
+      // 抛物线型拉瓦尔喷管轮廓点 (y 从 0.12 延伸至 -2.55)
+      const nozzleCount = 40;
+      const outerPoints = [];
+      const innerPoints = [];
+      for (let i = 0; i <= nozzleCount; i++) {
+        const t = i / nozzleCount;
+        const y = 0.12 - t * 2.67;
+        // 经典的 Rao 抛物线近似扩张曲线
+        const r = 0.30 + 0.96 * Math.pow(t, 0.74);
+        outerPoints.push(new THREE.Vector2(r, y));
+        innerPoints.push(new THREE.Vector2(r - 0.026, y));
+      }
+
+      const outerNozzleMat = mats.darkInconel.clone();
+      const innerNozzleMat = mats.copperLiner.clone();
+      nozzleClipMaterials.push(outerNozzleMat, innerNozzleMat);
+
+      const outerNozzleGeo = new THREE.LatheGeometry(outerPoints, 72);
+      const outerNozzle = new THREE.Mesh(outerNozzleGeo, outerNozzleMat);
+      outerNozzle.castShadow = true;
+      outerNozzle.receiveShadow = true;
+      sysNozzle.add(outerNozzle);
+
+      const innerNozzleGeo = new THREE.LatheGeometry(innerPoints, 72);
+      const innerNozzle = new THREE.Mesh(innerNozzleGeo, innerNozzleMat);
+      sysNozzle.add(innerNozzle);
+
+      // 喷管内壁高温热辐射发光层 (点火试车时随节流阀亮起橘红/蓝白高温辉光)
+      const thermalMat = new THREE.MeshBasicMaterial({
+        color: 0xff6b2b,
+        transparent: true,
+        opacity: 0,
+        side: THREE.BackSide,
+        blending: THREE.AdditiveBlending
+      });
+      nozzleClipMaterials.push(thermalMat);
+      nozzleThermalMesh = new THREE.Mesh(new THREE.LatheGeometry(innerPoints.map(p => new THREE.Vector2(p.x - 0.005, p.y)), 64), thermalMat);
+      sysNozzle.add(nozzleThermalMesh);
+
+      // 喷管外部 8 道横向高强度防屈曲加强箍环 (Stiffening Hoops / Structural Bands)
+      const hoopPositions = [0.12, 0.25, 0.4, 0.55, 0.7, 0.84, 0.94];
+      hoopPositions.forEach((t, idx) => {
+        const y = 0.12 - t * 2.67;
+        const r = 0.30 + 0.96 * Math.pow(t, 0.74);
+        const hoopMat = (idx === 2 || idx === 5 ? mats.brightSteel : mats.heavySteel).clone();
+        nozzleClipMaterials.push(hoopMat);
+
+        const hoopGeo = new THREE.TorusGeometry(r + 0.018, idx % 3 === 0 ? 0.032 : 0.02, 16, 64);
+        const hoop = new THREE.Mesh(hoopGeo, hoopMat);
+        hoop.position.y = y;
+        hoop.rotation.x = Math.PI / 2;
+        hoop.castShadow = true;
+        sysNozzle.add(hoop);
+      });
+
+      // 喷管中段与底部大型再生冷却集液环 (Mid & Exit Coolant Manifolds)
+      const midT = 0.48;
+      const midY = 0.12 - midT * 2.67;
+      const midR = 0.30 + 0.96 * Math.pow(midT, 0.74);
+      const midManifoldMat = mats.brightSteel.clone();
+      nozzleClipMaterials.push(midManifoldMat);
+      const midManifold = new THREE.Mesh(new THREE.TorusGeometry(midR + 0.055, 0.058, 20, 64), midManifoldMat);
+      midManifold.position.y = midY;
+      midManifold.rotation.x = Math.PI / 2;
+      midManifold.castShadow = true;
+      sysNozzle.add(midManifold);
+
+      // 喷口底部巨型回流环
+      const botManifoldMat = mats.titanium.clone();
+      nozzleClipMaterials.push(botManifoldMat);
+      const botManifold = new THREE.Mesh(new THREE.TorusGeometry(1.28, 0.072, 24, 72), botManifoldMat);
+      botManifold.position.y = -2.48;
+      botManifold.rotation.x = Math.PI / 2;
+      botManifold.castShadow = true;
+      sysNozzle.add(botManifold);
+    }
+
+    // ==========================================
+    // 6. 甲烷/液氧超音速马赫环尾焰 (Methalox Mach Diamonds Plume Shader)
+    // ==========================================
+    const plumeGroup = new THREE.Group();
+    plumeGroup.position.set(0, -2.52, 0);
+    sysNozzle.add(plumeGroup);
+
+    const plumeVertexShader = `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      uniform float uTime;
+      uniform float uThrottle;
+
+      void main() {
+        vUv = uv;
+        vec3 pos = position;
+        // 尾焰高速气流微幅脉动
+        float wave = sin(uv.y * 28.0 - uTime * 42.0) * 0.025 * (1.0 - uv.y) * uThrottle;
+        pos.x += normal.x * wave;
+        pos.z += normal.z * wave;
+
+        vec4 mvPosition = modelViewMatrix * vec4(pos, 1.0);
+        vViewPosition = -mvPosition.xyz;
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * mvPosition;
+      }
+    `;
+
+    const plumeFragmentShader = `
+      varying vec2 vUv;
+      varying vec3 vNormal;
+      varying vec3 vViewPosition;
+      uniform float uTime;
+      uniform float uThrottle;
+
+      void main() {
+        if (uThrottle <= 0.005) discard;
+
+        // vUv.y = 1.0 在喷管口，0.0 在尾焰末端
+        float axial = 1.0 - vUv.y;
+
+        // 视线边缘柔和衰减 (Fresnel)
+        vec3 normal = normalize(vNormal);
+        vec3 viewDir = normalize(vViewPosition);
+        float fresnel = pow(abs(dot(normal, viewDir)), 1.6);
+
+        // 马赫激波菱形环 (Mach Diamonds) 周期性驻波
+        float shockWave = pow(max(0.0, cos(axial * 26.0 - uTime * 8.0)), 6.0) * exp(-axial * 1.8);
+        float coreBeam = exp(-axial * 1.4);
+
+        // 液氧甲烷尾焰特征光谱：亮青蓝 -> 紫罗兰 -> 激波粉白核心
+        vec3 colCyan = vec3(0.18, 0.72, 1.0);
+        vec3 colViolet = vec3(0.48, 0.28, 0.98);
+        vec3 colShock = vec3(1.0, 0.92, 0.98);
+
+        vec3 baseColor = mix(colViolet, colCyan, coreBeam);
+        vec3 finalColor = mix(baseColor, colShock, shockWave * 0.85 + pow(coreBeam, 3.0) * 0.5);
+
+        // 高频湍流闪烁
+        float flicker = 0.92 + 0.08 * sin(uTime * 65.0 + axial * 15.0);
+        float alpha = (coreBeam * 0.75 + shockWave * 0.65) * fresnel * (1.0 - pow(axial, 1.35)) * uThrottle * flicker;
+
+        gl_FragColor = vec4(finalColor * 2.2, clamp(alpha, 0.0, 0.95));
+      }
+    `;
+
+    const plumeUniforms = {
+      uTime: { value: 0 },
+      uThrottle: { value: 0 }
+    };
+
+    // 外层主激波尾焰锥与内层高能马赫核心柱
+    const outerPlumeGeo = new THREE.CylinderGeometry(1.18, 0.15, 7.2, 48, 64, true);
+    outerPlumeGeo.translate(0, -3.6, 0);
+    const outerPlumeMat = new THREE.ShaderMaterial({
+      vertexShader: plumeVertexShader,
+      fragmentShader: plumeFragmentShader,
+      uniforms: plumeUniforms,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      side: THREE.DoubleSide
+    });
+    const outerPlumeMesh = new THREE.Mesh(outerPlumeGeo, outerPlumeMat);
+    plumeGroup.add(outerPlumeMesh);
+
+    const innerPlumeGeo = new THREE.CylinderGeometry(0.68, 0.05, 5.6, 36, 48, true);
+    innerPlumeGeo.translate(0, -2.8, 0);
+    const innerPlumeMesh = new THREE.Mesh(innerPlumeGeo, outerPlumeMat);
+    plumeGroup.add(innerPlumeMesh);
+
+    // ==========================================
+    // 7. 推进剂管路流向可视化粒子系统 (LOX & CH4 Flow Particles)
+    // ==========================================
+    const flowParticlesGroup = new THREE.Group();
+    flowParticlesGroup.visible = false;
+    sysPlumbing.add(flowParticlesGroup);
+
+    const flowItems = [];
+    const sphereParticleGeo = new THREE.SphereGeometry(0.032, 10, 10);
+    flowCurves.forEach(fc => {
+      const pMat = new THREE.MeshBasicMaterial({ color: fc.color });
+      for (let i = 0; i < 14; i++) {
+        const mesh = new THREE.Mesh(sphereParticleGeo, pMat);
+        flowParticlesGroup.add(mesh);
+        flowItems.push({
+          mesh,
+          curve: fc.curve,
+          offset: i / 14
+        });
+      }
+    });
+
+    // ==========================================
+    // 8. 地面实验室校准转台与阴影接收平面
+    // ==========================================
+    const floorGroup = new THREE.Group();
+    floorGroup.position.y = -3.65;
+    scene.add(floorGroup);
+
+    const shadowPlaneGeo = new THREE.PlaneGeometry(36, 36);
+    const shadowPlaneMat = new THREE.ShadowMaterial({ opacity: 0.14 });
+    const shadowPlane = new THREE.Mesh(shadowPlaneGeo, shadowPlaneMat);
+    shadowPlane.rotation.x = -Math.PI / 2;
+    shadowPlane.receiveShadow = true;
+    floorGroup.add(shadowPlane);
+
+    const dialGeo = new THREE.PlaneGeometry(9.5, 9.5);
+    const dialMat = new THREE.MeshBasicMaterial({
+      map: createStudioFloorTexture(),
+      transparent: true,
+      depthWrite: false
+    });
+    const dialMesh = new THREE.Mesh(dialGeo, dialMat);
+    dialMesh.rotation.x = -Math.PI / 2;
+    dialMesh.position.y = 0.01;
+    floorGroup.add(dialMesh);
+
+    // ==========================================
+    // 9. 3D 工程热点标注系统 (Interactive Engineering Hotspots)
+    // ==========================================
+    const hotspotData = [
+      {
+        id: 'gimbal',
+        num: '01',
+        name: '万向节与 TVC 矢量作动器',
+        desc: '承载超过 230~280 吨海平面推力的万向节球轴承，配合双液压/机电伺服作动器（TVC），实现 ±15° 高响应推力矢量摆动控制。',
+        targetSub: sysGimbal,
+        localPos: new THREE.Vector3(0.45, 2.75, 0.25),
+        camPos: new THREE.Vector3(3.6, 3.2, 4.2),
+        camTarget: new THREE.Vector3(0, 2.2, 0)
+      },
+      {
+        id: 'lox',
+        num: '02',
+        name: '富氧预燃室与主氧涡轮泵 (OTP)',
+        desc: '与主燃烧室同轴布置的富氧预燃室及液氧涡轮泵，全部过流部件采用 SpaceX 研发的 SX500 高温抗氧化单晶超级合金制造。',
+        targetSub: sysLOXPump,
+        localPos: new THREE.Vector3(-0.42, 2.02, 0.25),
+        camPos: new THREE.Vector3(-3.8, 2.5, 4.2),
+        camTarget: new THREE.Vector3(0, 1.8, 0)
+      },
+      {
+        id: 'ch4',
+        num: '03',
+        name: '富燃预燃室与甲烷涡轮泵 (FTP)',
+        desc: '侧置斜装的高转速多级离心液态甲烷涡轮泵，将经喷管再生冷却加热后的气态甲烷增压至超过 600 bar 送入富燃预燃室。',
+        targetSub: sysCH4Pump,
+        localPos: new THREE.Vector3(0.92, 1.88, 0.35),
+        camPos: new THREE.Vector3(4.5, 2.2, 3.8),
+        camTarget: new THREE.Vector3(0.5, 1.6, 0.1)
+      },
+      {
+        id: 'chamber',
+        num: '04',
+        name: '300+ bar 高压主燃烧室与喷注器',
+        desc: '全流量分级燃烧循环使富氧燃气与富燃燃气以全气态进入同轴旋流喷注器混合，燃烧室工作压力突破 300~350 bar 世界纪录。',
+        targetSub: sysChamber,
+        localPos: new THREE.Vector3(0.0, 0.95, -0.58),
+        camPos: new THREE.Vector3(3.2, 1.1, -4.4),
+        camTarget: new THREE.Vector3(0, 0.8, 0)
+      },
+      {
+        id: 'plumbing',
+        num: '05',
+        name: '高密度再生冷却流体管网',
+        desc: '精密排布的低温甲烷下降管、热燃气歧管、柔性波纹管补偿节与闭环电控阀门，实时调控两套预燃室与主室的混合比。',
+        targetSub: sysPlumbing,
+        localPos: new THREE.Vector3(0.88, 0.35, 0.72),
+        camPos: new THREE.Vector3(4.2, 0.8, 4.5),
+        camTarget: new THREE.Vector3(0.3, 0.5, 0.2)
+      },
+      {
+        id: 'nozzle',
+        num: '06',
+        name: '铣槽式再生冷却拉瓦尔喷管',
+        desc: '内衬高导热铜铬锆（CuCrZr）合金铣削出数百条微细螺旋冷却通道，外套高强度 Inconel 合金与防屈曲刚性加强箍环。',
+        targetSub: sysNozzle,
+        localPos: new THREE.Vector3(0.95, -1.45, 0.55),
+        camPos: new THREE.Vector3(5.2, -1.2, 5.4),
+        camTarget: new THREE.Vector3(0, -1.2, 0)
+      }
+    ];
+
+    const labelsContainer = document.getElementById('labels-container');
+    const infoTitle = document.getElementById('info-title');
+    const infoDesc = document.getElementById('info-desc');
+    let activeCameraTween = null;
+
+    hotspotData.forEach(item => {
+      const el = document.createElement('div');
+      el.className = 'hotspot';
+      el.innerHTML = `
+        <div class="hotspot-dot">${item.num}</div>
+        <div class="hotspot-tag">${item.name}</div>
+      `;
+      el.addEventListener('click', (e) => {
+        e.stopPropagation();
+        document.querySelectorAll('.hotspot').forEach(h => h.classList.remove('selected'));
+        el.classList.add('selected');
+        infoTitle.textContent = `${item.num} · ${item.name}`;
+        infoDesc.textContent = item.desc;
+        tweenCameraTo(item.camPos, item.camTarget);
+      });
+      labelsContainer.appendChild(el);
+      item.element = el;
+    });
+
+    function tweenCameraTo(targetPos, targetLookAt) {
+      activeCameraTween = {
+        startPos: camera.position.clone(),
+        endPos: targetPos.clone(),
+        startTarget: controls.target.clone(),
+        endTarget: targetLookAt.clone(),
+        progress: 0
+      };
+    }
+
+    // ==========================================
+    // 10. UI 交互事件绑定与工况状态管理
+    // ==========================================
+    let targetThrottle = 0;
+    let currentThrottle = 0;
+    let targetExplode = 0;
+    let currentExplode = 0;
+    let targetGimbalDeg = 0;
+    let currentGimbalDeg = 0;
+    let labelsVisible = true;
+
+    const throttleSlider = document.getElementById('throttle-slider');
+    const throttleLabel = document.getElementById('throttle-label');
+    const explodeSlider = document.getElementById('explode-slider');
+    const explodeLabel = document.getElementById('explode-label');
+    const gimbalSlider = document.getElementById('gimbal-slider');
+    const gimbalLabel = document.getElementById('gimbal-label');
+
+    const btnIgnite = document.getElementById('btn-ignite');
+    const btnLabels = document.getElementById('btn-labels');
+    const btnRotate = document.getElementById('btn-rotate');
+    const btnCutaway = document.getElementById('btn-cutaway');
+    const btnFlow = document.getElementById('btn-flow');
+
+    const valPressure = document.getElementById('val-pressure');
+    const valThrust = document.getElementById('val-thrust');
+    const valRpm = document.getElementById('val-rpm');
+    const statusIndicator = document.getElementById('status-indicator');
+
+    function updateThrottleUI(val) {
+      targetThrottle = val / 100;
+      throttleSlider.value = val;
+      throttleLabel.textContent = `${Math.round(val)}%`;
+
+      if (targetThrottle > 0.02) {
+        btnIgnite.classList.add('firing');
+        btnIgnite.textContent = '⏹ 紧急关机 (Engine Cutoff)';
+        statusIndicator.textContent = '● 试车点火中';
+        statusIndicator.style.color = '#dc2626';
+      } else {
+        btnIgnite.classList.remove('firing');
+        btnIgnite.textContent = '🔥 启动全推力点火试车';
+        statusIndicator.textContent = '● 待机检测';
+        statusIndicator.style.color = '#0284c7';
+      }
+    }
+
+    throttleSlider.addEventListener('input', (e) => {
+      updateThrottleUI(parseFloat(e.target.value));
+    });
+
+    btnIgnite.addEventListener('click', () => {
+      if (targetThrottle > 0.05) {
+        updateThrottleUI(0);
+      } else {
+        updateThrottleUI(100);
+      }
+    });
+
+    explodeSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      targetExplode = v / 100;
+      explodeLabel.textContent = `${Math.round(v)}%`;
+    });
+
+    gimbalSlider.addEventListener('input', (e) => {
+      const v = parseFloat(e.target.value);
+      targetGimbalDeg = v;
+      gimbalLabel.textContent = `${v.toFixed(1)}°`;
+    });
+
+    btnLabels.addEventListener('click', () => {
+      labelsVisible = !labelsVisible;
+      btnLabels.classList.toggle('active', labelsVisible);
+      labelsContainer.style.display = labelsVisible ? 'block' : 'none';
+    });
+
+    btnRotate.addEventListener('click', () => {
+      controls.autoRotate = !controls.autoRotate;
+      btnRotate.classList.toggle('active', controls.autoRotate);
+    });
+
+    btnCutaway.addEventListener('click', () => {
+      isCutaway = !isCutaway;
+      btnCutaway.classList.toggle('active', isCutaway);
+      nozzleClipMaterials.forEach(m => {
+        m.clippingPlanes = isCutaway ? [cutawayPlane] : [];
+        m.needsUpdate = true;
+      });
+    });
+
+    btnFlow.addEventListener('click', () => {
+      flowParticlesGroup.visible = !flowParticlesGroup.visible;
+      btnFlow.classList.toggle('active', flowParticlesGroup.visible);
+    });
+
+    // 相机快速视角切换
+    const viewConfigs = {
+      full: { pos: new THREE.Vector3(6.8, 2.2, 8.2), target: new THREE.Vector3(0, 0.3, 0) },
+      powerhead: { pos: new THREE.Vector3(3.4, 2.6, 3.6), target: new THREE.Vector3(0.1, 1.9, 0) },
+      plumbing: { pos: new THREE.Vector3(-4.2, 1.1, 4.0), target: new THREE.Vector3(0, 0.7, 0) },
+      nozzle: { pos: new THREE.Vector3(6.2, -2.4, 6.4), target: new THREE.Vector3(0, -1.8, 0) }
+    };
+
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const key = btn.getAttribute('data-view');
+        if (viewConfigs[key]) {
+          tweenCameraTo(viewConfigs[key].pos, viewConfigs[key].target);
+        }
+      });
+    });
+
+    // 响应式窗口大小适配
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ==========================================
+    // 11. 主渲染与物理动画循环 (稳定 60FPS)
+    // ==========================================
+    const clock = new THREE.Clock();
+    const tempVec = new THREE.Vector3();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      // 1. 平滑插值节流阀、爆炸分解与 TVC 摆角
+      currentThrottle += (targetThrottle - currentThrottle) * Math.min(1, dt * 5.0);
+      currentExplode += (targetExplode - currentExplode) * Math.min(1, dt * 6.5);
+      currentGimbalDeg += (targetGimbalDeg - currentGimbalDeg) * Math.min(1, dt * 8.0);
+
+      // 更新子系统爆炸位移
+      subsystems.forEach(sub => {
+        sub.position.copy(sub.userData.basePos).addScaledVector(sub.userData.explodeOffset, currentExplode);
+      });
+
+      // 更新 TVC 矢量摆动与点火高频微幅机械震颤
+      const gimbalRad = THREE.MathUtils.degToRad(currentGimbalDeg);
+      const vibX = currentThrottle > 0.02 ? (Math.sin(elapsed * 95.0) * 0.004 * currentThrottle) : 0;
+      const vibZ = currentThrottle > 0.02 ? (Math.cos(elapsed * 110.0) * 0.004 * currentThrottle) : 0;
+      gimbalPivot.rotation.z = gimbalRad + vibZ;
+      gimbalPivot.rotation.x = Math.sin(elapsed * 1.6) * gimbalRad * 0.35 + vibX;
+
+      // 2. 更新马赫环尾焰 Shader 与热辐射辉光
+      plumeUniforms.uTime.value = elapsed;
+      plumeUniforms.uThrottle.value = currentThrottle;
+      plumeLight.intensity = currentThrottle * 6.5 * (0.92 + 0.08 * Math.sin(elapsed * 50.0));
+      if (nozzleThermalMesh) {
+        nozzleThermalMesh.material.opacity = currentThrottle * 0.55;
+      }
+
+      // 3. 涡轮泵叶轮旋转与遥测数字更新
+      const spinSpeed = 1.5 + currentThrottle * 32.0;
+      if (loxRotorMesh) loxRotorMesh.rotation.y += dt * spinSpeed;
+      if (ch4RotorMesh) ch4RotorMesh.rotation.y -= dt * spinSpeed * 1.25;
+
+      const simPressure = 1.0 + currentThrottle * 329.0;
+      const simThrust = Math.round(currentThrottle * 255);
+      const simRpm = Math.round(currentThrottle * 36800);
+      valPressure.textContent = simPressure.toFixed(1);
+      valThrust.textContent = simThrust.toString();
+      valRpm.textContent = simRpm.toLocaleString();
+
+      // 4. 推进剂管路粒子流动动画
+      if (flowParticlesGroup.visible) {
+        const flowSpeed = 0.28 + currentThrottle * 0.85;
+        flowItems.forEach(item => {
+          const t = (item.offset + elapsed * flowSpeed) % 1.0;
+          item.curve.getPointAt(t, item.mesh.position);
+        });
+      }
+
+      // 5. 相机预设补间平滑过渡
+      if (activeCameraTween) {
+        activeCameraTween.progress += dt * 2.2;
+        const p = Math.min(1, activeCameraTween.progress);
+        const ease = 1 - Math.pow(1 - p, 3);
+        camera.position.lerpVectors(activeCameraTween.startPos, activeCameraTween.endPos, ease);
+        controls.target.lerpVectors(activeCameraTween.startTarget, activeCameraTween.endTarget, ease);
+        if (p >= 1) activeCameraTween = null;
+      }
+
+      controls.update();
+
+      // 6. 更新 3D 标注点在屏幕上的 2D 投影坐标
+      if (labelsVisible) {
+        const halfW = window.innerWidth / 2;
+        const halfH = window.innerHeight / 2;
+
+        hotspotData.forEach(item => {
+          tempVec.copy(item.localPos);
+          item.targetSub.localToWorld(tempVec);
+          tempVec.project(camera);
+
+          if (tempVec.z > 1) {
+            item.element.style.opacity = '0';
+            item.element.style.pointerEvents = 'none';
+          } else {
+            const x = (tempVec.x * halfW) + halfW;
+            const y = -(tempVec.y * halfH) + halfH;
+            item.element.style.left = `${x}px`;
+            item.element.style.top = `${y}px`;
+            item.element.style.opacity = '1';
+            item.element.style.pointerEvents = 'auto';
+          }
+        });
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+  <script src="../prompt-panel.js" data-id="raptor-web"></script>
+</body>
+</html>

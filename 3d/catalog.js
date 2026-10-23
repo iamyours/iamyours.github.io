@@ -229,10 +229,14 @@ window.GALLERY_CATEGORIES = [
         "description": "玻璃瓶里的小船在波浪中航行，整个场景都装在瓶子里。",
         "description_en": "A little ship sails through waves inside a glass bottle—the entire scene contained within.",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/Bitturing/status/2110716381968879863"
+        "source": "https://x.com/Bitturing/status/2110716381968879863",
+        "chats": {
+          "web": "https://share.gemini.google/JaevqicW9zco"
+        }
       },
       {
         "id": "kingdom",
@@ -367,10 +371,14 @@ window.GALLERY_CATEGORIES = [
         "description": "SpaceX 猛禽（Raptor）火箭发动机，白色背景。",
         "description_en": "SpaceX Raptor rocket engine against a white background.",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/LinearUncle/status/2091127601314308541"
+        "source": "https://x.com/LinearUncle/status/2091127601314308541",
+        "chats": {
+          "web": "https://share.gemini.google/xuphBzcElRMf"
+        }
       },
       {
         "id": "steam-engine",
@@ -379,10 +387,14 @@ window.GALLERY_CATEGORIES = [
         "description": "一台能运转的蒸汽机原型。",
         "description_en": "A working prototype of a steam engine.",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/vikktorrrre/status/2091965269048475659"
+        "source": "https://x.com/vikktorrrre/status/2091965269048475659",
+        "chats": {
+          "web": "https://share.gemini.google/UmF4F4yeKHqI"
+        }
       },
       {
         "id": "starship",

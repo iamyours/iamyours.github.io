@@ -1,0 +1,2002 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>瓶中星海：体素帆船奇遇记 - 3D 物理交互艺术</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0d131f;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #f5eedc;
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角固定返回按钮：半透明奶油色圆角小按钮样式 */
+    .back-btn {
+      position: fixed;
+      top: 18px;
+      left: 18px;
+      z-index: 20;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 15px;
+      background: rgba(255, 248, 231, 0.82);
+      color: #3a2b1c;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 252, 242, 0.95);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 251, 240, 0.96);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+    }
+
+    .back-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 顶部标题徽标 */
+    .header-badge {
+      position: fixed;
+      top: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      pointer-events: none;
+      text-align: center;
+      background: rgba(16, 24, 38, 0.65);
+      border: 1px solid rgba(255, 236, 196, 0.2);
+      padding: 8px 20px;
+      border-radius: 999px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.35);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .header-badge .title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #fff6df, #ffd479, #8ae9ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .header-badge .sub {
+      font-size: 12px;
+      color: rgba(245, 238, 220, 0.72);
+      border-left: 1px solid rgba(255, 255, 255, 0.2);
+      padding-left: 10px;
+    }
+
+    /* 右侧交互控制面板 */
+    .control-panel {
+      position: fixed;
+      top: 18px;
+      right: 18px;
+      z-index: 15;
+      width: 288px;
+      background: rgba(16, 23, 36, 0.76);
+      border: 1px solid rgba(255, 235, 195, 0.18);
+      border-radius: 18px;
+      padding: 15px;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.45);
+      transition: transform 0.3s ease, opacity 0.3s ease;
+      max-height: calc(100vh - 36px);
+      overflow-y: auto;
+    }
+
+    .control-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 235, 195, 0.25);
+      border-radius: 4px;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(255, 235, 195, 0.12);
+    }
+
+    .panel-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffdf9a;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toggle-panel-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #f5eedc;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    .section-label {
+      font-size: 11.5px;
+      color: rgba(245, 238, 220, 0.68);
+      margin: 10px 0 6px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .preset-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .btn {
+      appearance: none;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 238, 205, 0.16);
+      color: #f5eedc;
+      padding: 7px 10px;
+      border-radius: 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      transition: all 0.18s ease;
+    }
+
+    .btn:hover {
+      background: rgba(255, 220, 150, 0.18);
+      border-color: rgba(255, 220, 150, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .btn:active {
+      transform: translateY(0);
+    }
+
+    .btn.active {
+      background: linear-gradient(135deg, rgba(255, 196, 88, 0.34), rgba(86, 195, 255, 0.28));
+      border-color: #ffd275;
+      color: #fff8e8;
+      box-shadow: 0 0 12px rgba(255, 205, 105, 0.25);
+    }
+
+    .action-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .btn-highlight {
+      background: linear-gradient(135deg, rgba(242, 142, 56, 0.28), rgba(217, 74, 74, 0.28));
+      border-color: rgba(255, 168, 96, 0.45);
+    }
+
+    .btn-highlight:hover {
+      background: linear-gradient(135deg, rgba(242, 142, 56, 0.45), rgba(217, 74, 74, 0.45));
+      border-color: #ffb673;
+    }
+
+    .slider-row {
+      margin: 8px 0;
+    }
+
+    .slider-top {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      margin-bottom: 4px;
+      color: #ebe2ce;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      height: 5px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 5px;
+      outline: none;
+      -webkit-appearance: none;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #ffd175;
+      border: 2px solid #fff;
+      cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .stats-bar {
+      margin-top: 10px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 235, 195, 0.12);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: rgba(245, 238, 220, 0.65);
+    }
+
+    .hint-footer {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      pointer-events: none;
+      background: rgba(14, 21, 34, 0.65);
+      border: 1px solid rgba(255, 235, 195, 0.15);
+      padding: 6px 16px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: rgba(245, 238, 220, 0.78);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      white-space: nowrap;
+    }
+
+    .panel-collapsed .panel-body {
+      display: none;
+    }
+
+    .panel-collapsed {
+      width: auto;
+      padding: 10px 14px;
+    }
+
+    .panel-collapsed .panel-header {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+      gap: 10px;
+    }
+
+    @media (max-width: 768px) {
+      .header-badge {
+        display: none;
+      }
+      .control-panel {
+        width: 246px;
+        top: 14px;
+        right: 14px;
+        padding: 12px;
+      }
+      .back-btn {
+        top: 14px;
+        left: 14px;
+        padding: 7px 12px;
+        font-size: 12.5px;
+      }
+      .hint-footer {
+        font-size: 11px;
+        bottom: 12px;
+        padding: 5px 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 左上角固定返回链接 -->
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <!-- 顶部作品标题栏 -->
+  <div class="header-badge">
+    <span class="title">🍾 瓶中星海 · 体素帆船奇遇记</span>
+    <span class="sub">实时浮力物理 · 流体波浪 · 微缩体素世界</span>
+  </div>
+
+  <!-- 右侧控制面板 -->
+  <aside class="control-panel" id="controlPanel">
+    <div class="panel-header">
+      <div class="panel-title">🧭 航海物理控制台</div>
+      <button class="toggle-panel-btn" id="togglePanelBtn">收起</button>
+    </div>
+
+    <div class="panel-body">
+      <div class="section-label">天气与光影氛围</div>
+      <div class="preset-grid">
+        <button class="btn active" data-weather="sunny">☀️ 晴空微风</button>
+        <button class="btn" data-weather="sunset">🌅 落日余晖</button>
+        <button class="btn" data-weather="storm">⛈️ 狂风暴雨</button>
+        <button class="btn" data-weather="night">🌌 荧光星海</button>
+      </div>
+
+      <div class="section-label">物理玩具互动</div>
+      <div class="action-grid">
+        <button class="btn btn-highlight" id="shakeBottleBtn">🍾 摇晃瓶子</button>
+        <button class="btn btn-highlight" id="rogueWaveBtn">🌊 掀起巨浪</button>
+        <button class="btn" id="fireCannonBtn">💥 舷炮齐射</button>
+        <button class="btn" id="krakenToggleBtn">🐙 唤醒海怪</button>
+      </div>
+
+      <div class="section-label">镜头机位切换</div>
+      <div class="preset-grid">
+        <button class="btn active" data-cam="overview">🔭 全景鉴赏</button>
+        <button class="btn" data-cam="ship">⛵ 船长甲板</button>
+        <button class="btn" data-cam="lighthouse">🚨 灯塔守望</button>
+        <button class="btn" data-cam="cork">🔍 瓶口窥视</button>
+      </div>
+
+      <div class="section-label">流体与环境参数</div>
+      <div class="slider-row">
+        <div class="slider-top">
+          <span>风力与浪高</span>
+          <span id="waveAmpVal">1.0x</span>
+        </div>
+        <input type="range" id="waveAmpSlider" min="0.2" max="2.2" step="0.05" value="1.0" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-top">
+          <span>波浪涌动速度</span>
+          <span id="waveSpeedVal">1.0x</span>
+        </div>
+        <input type="range" id="waveSpeedSlider" min="0.3" max="2.2" step="0.05" value="1.0" />
+      </div>
+
+      <div class="slider-row">
+        <div class="slider-top">
+          <span>玻璃瓶身通透度</span>
+          <span id="glassOpacityVal">高透</span>
+        </div>
+        <input type="range" id="glassSlider" min="0.08" max="0.85" step="0.02" value="0.35" />
+      </div>
+
+      <div class="stats-bar">
+        <span id="voxelCountText">体素总数: 计算中...</span>
+        <span id="shipTiltText">横摇: 0.0°</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="hint-footer">
+    💡 拖动鼠标旋转视角 · 滚轮/双指缩放 · 点击瓶身或海面可激起物理涟漪与炮火
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ==========================================
+    // 1. 场景、相机与渲染器初始化
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0d1524);
+    scene.fog = new THREE.FogExp2(0x0d1524, 0.011);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 220);
+    camera.position.set(3.5, 9.5, 29.5);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      powerPreference: 'high-performance'
+    });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxDistance = 62;
+    controls.minDistance = 6;
+    controls.maxPolarAngle = Math.PI * 0.56;
+    controls.target.set(0, 0.2, 0);
+
+    // ==========================================
+    // 2. 程序化生成贴图与环境反射图 (零外部图片)
+    // ==========================================
+    function createVoxelBumpTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+
+      // 填充中性灰底
+      ctx.fillStyle = '#d8d8d8';
+      ctx.fillRect(0, 0, 128, 128);
+
+      // 边缘柔和倒角阴影，使每个体素方块拥有精致微缩积木质感
+      const grad = ctx.createLinearGradient(0, 0, 128, 128);
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(1, '#b0b0b0');
+      ctx.fillStyle = grad;
+      ctx.fillRect(6, 6, 116, 116);
+
+      ctx.strokeStyle = '#606060';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, 122, 122);
+
+      // 微小颗粒噪点
+      for (let i = 0; i < 400; i++) {
+        const x = Math.random() * 128;
+        const y = Math.random() * 128;
+        const v = 190 + Math.floor(Math.random() * 50);
+        ctx.fillStyle = `rgb(${v},${v},${v})`;
+        ctx.fillRect(x, y, 2, 2);
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createEnvMapTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      const grad = ctx.createLinearGradient(0, 0, 0, 256);
+      grad.addColorStop(0.0, '#1b3556');
+      grad.addColorStop(0.45, '#598ec2');
+      grad.addColorStop(0.5, '#ffe7ba');
+      grad.addColorStop(0.55, '#193e52');
+      grad.addColorStop(1.0, '#09111c');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 256);
+
+      // 模拟高光灯带，让玻璃瓶折射与高光极具立体感
+      ctx.fillStyle = 'rgba(255, 250, 235, 0.85)';
+      ctx.fillRect(60, 28, 130, 18);
+      ctx.fillRect(310, 42, 150, 14);
+      ctx.fillStyle = 'rgba(150, 225, 255, 0.5)';
+      ctx.fillRect(180, 75, 90, 22);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createLabelTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 160;
+      const ctx = canvas.getContext('2d');
+
+      // 复古羊皮纸与黄铜铭牌
+      const grad = ctx.createLinearGradient(0, 0, 512, 160);
+      grad.addColorStop(0, '#c89b52');
+      grad.addColorStop(0.5, '#f5dca4');
+      grad.addColorStop(1, '#b6853c');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 512, 160);
+
+      ctx.strokeStyle = '#5c3c14';
+      ctx.lineWidth = 8;
+      ctx.strokeRect(10, 10, 492, 140);
+
+      ctx.fillStyle = '#3b2309';
+      ctx.font = 'bold 36px "Microsoft YaHei", serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('黄金体素号 · S.S. VOXELIA', 256, 76);
+
+      ctx.font = '600 22px "Microsoft YaHei", sans-serif';
+      ctx.fillStyle = '#5a3812';
+      ctx.fillText('瓶中星海微缩航海志 · EST. 1742', 256, 118);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createDeskCompassTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      // 深色航海桌垫底色
+      const rad = ctx.createRadialGradient(512, 512, 50, 512, 512, 512);
+      rad.addColorStop(0, '#18263a');
+      rad.addColorStop(0.7, '#101a29');
+      rad.addColorStop(1, '#090f18');
+      ctx.fillStyle = rad;
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // 绘制金色罗盘刻度线与经纬网
+      ctx.strokeStyle = 'rgba(255, 214, 138, 0.14)';
+      ctx.lineWidth = 2;
+      for (let r = 120; r <= 460; r += 85) {
+        ctx.beginPath();
+        ctx.arc(512, 512, r, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      for (let i = 0; i < 36; i++) {
+        const ang = (i * Math.PI) / 18;
+        ctx.beginPath();
+        ctx.moveTo(512 + Math.cos(ang) * 120, 512 + Math.sin(ang) * 120);
+        ctx.lineTo(512 + Math.cos(ang) * 460, 512 + Math.sin(ang) * 460);
+        ctx.stroke();
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    const voxelBumpTex = createVoxelBumpTexture();
+    const envMapTex = createEnvMapTexture();
+    scene.environment = envMapTex;
+
+    // ==========================================
+    // 3. 灯光系统
+    // ==========================================
+    const ambientLight = new THREE.AmbientLight(0xd9ecff, 0.85);
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0xfff4da, 0x18304c, 0.9);
+    hemiLight.position.set(0, 25, 0);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff1d6, 2.3);
+    sunLight.position.set(14, 24, 16);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 2;
+    sunLight.shadow.camera.far = 65;
+    const d = 19;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0005;
+    scene.add(sunLight);
+
+    // 瓶内灯塔旋转聚光灯与船舱暖光
+    const lighthousePointLight = new THREE.PointLight(0xffcf6b, 2.5, 18);
+    const shipCabinLight = new THREE.PointLight(0xffaa44, 1.6, 9);
+
+    // ==========================================
+    // 4. 体素构建工具类 (InstancedMesh 高性能批处理)
+    // ==========================================
+    const dummy = new THREE.Object3D();
+    const tempColor = new THREE.Color();
+    let totalVoxelCount = 0;
+
+    class VoxelBatchBuilder {
+      constructor(voxelSize = 0.25, materialOptions = {}) {
+        this.voxelSize = voxelSize;
+        this.voxels = [];
+        this.materialOptions = materialOptions;
+      }
+
+      add(x, y, z, hexColor, scaleX = 1, scaleY = 1, scaleZ = 1) {
+        this.voxels.push({ x, y, z, color: hexColor, sx: scaleX, sy: scaleY, sz: scaleZ });
+      }
+
+      addBox(x1, y1, z1, x2, y2, z2, colorFnOrHex) {
+        const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+        const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+        const minZ = Math.min(z1, z2), maxZ = Math.max(z1, z2);
+        for (let x = minX; x <= maxX; x++) {
+          for (let y = minY; y <= maxY; y++) {
+            for (let z = minZ; z <= maxZ; z++) {
+              const c = typeof colorFnOrHex === 'function' ? colorFnOrHex(x, y, z) : colorFnOrHex;
+              if (c !== null && c !== undefined) {
+                this.add(x, y, z, c);
+              }
+            }
+          }
+        }
+      }
+
+      build(parentGroup, castShadow = true, receiveShadow = true) {
+        if (this.voxels.length === 0) return null;
+        const s = this.voxelSize;
+        const geo = new THREE.BoxGeometry(s * 0.97, s * 0.97, s * 0.97);
+        const mat = new THREE.MeshStandardMaterial({
+          roughness: 0.42,
+          metalness: 0.08,
+          bumpMap: voxelBumpTex,
+          bumpScale: 0.015,
+          ...this.materialOptions
+        });
+
+        const mesh = new THREE.InstancedMesh(geo, mat, this.voxels.length);
+        mesh.castShadow = castShadow;
+        mesh.receiveShadow = receiveShadow;
+
+        for (let i = 0; i < this.voxels.length; i++) {
+          const v = this.voxels[i];
+          dummy.position.set(v.x * s, v.y * s, v.z * s);
+          dummy.rotation.set(0, 0, 0);
+          dummy.scale.set(v.sx, v.sy, v.sz);
+          dummy.updateMatrix();
+          mesh.setMatrixAt(i, dummy.matrix);
+          tempColor.setHex(v.color);
+          mesh.setColorAt(i, tempColor);
+        }
+
+        mesh.instanceMatrix.needsUpdate = true;
+        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        parentGroup.add(mesh);
+        totalVoxelCount += this.voxels.length;
+        return mesh;
+      }
+    }
+
+    // ==========================================
+    // 5. 瓶子整体容器 (支持摇晃物理)
+    // ==========================================
+    const worldPivot = new THREE.Group();
+    scene.add(worldPivot);
+
+    // 底部航海圆盘桌面
+    const deskGeo = new THREE.CylinderGeometry(24, 25, 0.8, 64);
+    const deskMat = new THREE.MeshStandardMaterial({
+      map: createDeskCompassTexture(),
+      roughness: 0.65,
+      metalness: 0.15
+    });
+    const deskMesh = new THREE.Mesh(deskGeo, deskMat);
+    deskMesh.position.y = -9.4;
+    deskMesh.receiveShadow = true;
+    scene.add(deskMesh);
+
+    // 摇晃瓶子与支架的总容器
+    const bottleRig = new THREE.Group();
+    worldPivot.add(bottleRig);
+
+    // ==========================================
+    // 6. 构建复古木质体素瓶架与铭牌 (瓶外)
+    // ==========================================
+    function buildWoodenStand(parent) {
+      const standGroup = new THREE.Group();
+      const builder = new VoxelBatchBuilder(0.38, { roughness: 0.5, metalness: 0.12 });
+
+      const woodDark = 0x4a2912;
+      const woodMid = 0x693b1a;
+      const woodLight = 0x824c24;
+      const brass = 0xdba843;
+
+      // 前后两座弧形体素木托架 (x = -6.5 与 x = 5.5 对应 gridX = -17 与 +14)
+      const supportXs = [-18, 14];
+      supportXs.forEach((gx) => {
+        for (let z = -19; z <= 19; z++) {
+          // 计算半圆弧托槽高度 (适配瓶子外半径 R=7.45 -> grid 19.6)
+          const rGrid = 19.5;
+          const arcY = -Math.sqrt(Math.max(0, rGrid * rGrid - z * z));
+          const bottomY = -23;
+          for (let y = bottomY; y <= Math.floor(arcY) + 1; y++) {
+            const isRim = y >= Math.floor(arcY);
+            const isBrassCorner = Math.abs(z) >= 17 && y <= bottomY + 3;
+            const col = isBrassCorner ? brass : isRim ? brass : ((xHash(gx, y, z) % 2 === 0) ? woodMid : woodDark);
+            builder.add(gx, y, z, col);
+            builder.add(gx + 1, y, z, col);
+          }
+        }
+      });
+
+      // 连接前后的两条厚实底座横梁
+      for (let gx = -21; gx <= 18; gx++) {
+        for (let y = -23; y <= -20; y++) {
+          builder.add(gx, y, -14, y === -20 ? woodLight : woodDark);
+          builder.add(gx, y, -13, woodMid);
+          builder.add(gx, y, 13, woodMid);
+          builder.add(gx, y, 14, y === -20 ? woodLight : woodDark);
+        }
+      }
+
+      // 装饰黄铜铆钉
+      for (let gx = -16; gx <= 12; gx += 4) {
+        builder.add(gx, -21, 15, brass);
+        builder.add(gx, -21, -15, brass);
+      }
+
+      builder.build(standGroup, true, true);
+
+      // 复古铭牌
+      const plaqueGeo = new THREE.BoxGeometry(5.2, 1.5, 0.22);
+      const plaqueMat = new THREE.MeshStandardMaterial({
+        map: createLabelTexture(),
+        roughness: 0.35,
+        metalness: 0.55
+      });
+      const plaque = new THREE.Mesh(plaqueGeo, plaqueMat);
+      plaque.position.set(-0.6, -8.0, 5.75);
+      plaque.rotation.x = -0.18;
+      plaque.castShadow = true;
+      standGroup.add(plaque);
+
+      parent.add(standGroup);
+    }
+
+    function xHash(x, y, z) {
+      return Math.abs((x * 73856093) ^ (y * 19349663) ^ (z * 83492791));
+    }
+
+    buildWoodenStand(bottleRig);
+
+    // ==========================================
+    // 7. 构建体素软木塞、火漆印章与瓶颈麻绳
+    // ==========================================
+    function buildCorkAndSeal(parent) {
+      const corkGroup = new THREE.Group();
+      const builder = new VoxelBatchBuilder(0.28, { roughness: 0.72, metalness: 0.05 });
+
+      const corkColors = [0xc5935a, 0xb58149, 0xd4a46a, 0x9e6d38];
+      const waxColors = [0xb81d24, 0x99141b, 0xd42a32];
+      const ropeColors = [0xd9b46e, 0xc29b53];
+
+      // 软木塞主体 (位于瓶颈 x: 14.2 ~ 18.2 -> gridX: 51 ~ 65)
+      for (let gx = 50; gx <= 65; gx++) {
+        const taperR = gx < 57 ? 6.8 : 7.6; // 外侧略粗卡住瓶口
+        for (let gy = -8; gy <= 8; gy++) {
+          for (let gz = -8; gz <= 8; gz++) {
+            const dist = Math.sqrt(gy * gy + gz * gz);
+            if (dist <= taperR) {
+              const c = corkColors[xHash(gx, gy, gz) % corkColors.length];
+              builder.add(gx, gy, gz, c);
+            }
+          }
+        }
+      }
+
+      // 红色火漆封蜡包裹瓶口外端與垂滴效果
+      for (let gx = 63; gx <= 67; gx++) {
+        for (let gy = -8; gy <= 8; gy++) {
+          for (let gz = -8; gz <= 8; gz++) {
+            const dist = Math.sqrt(gy * gy + gz * gz);
+            if (gx <= 66 && dist <= 8.1 && dist >= 5.5) {
+              builder.add(gx, gy, gz, waxColors[xHash(gx, gy, gz) % waxColors.length]);
+            }
+            if (gx === 66 && dist <= 6.2) {
+              builder.add(gx, gy, gz, waxColors[(gx + gy) & 1]);
+            }
+          }
+        }
+      }
+
+      // 瓶颈金色缆绳圈 (x around 49~52)
+      for (let gx = 48; gx <= 51; gx++) {
+        for (let a = 0; a < 36; a++) {
+          const rad = (a * Math.PI * 2) / 36;
+          const ry = Math.round(Math.cos(rad) * 9.3);
+          const rz = Math.round(Math.sin(rad) * 9.3);
+          builder.add(gx, ry, rz, ropeColors[(gx + a) % 2]);
+        }
+      }
+
+      builder.build(corkGroup, true, true);
+      parent.add(corkGroup);
+    }
+
+    buildCorkAndSeal(bottleRig);
+
+    // ==========================================
+    // 8. 瓶内微缩景观：灯塔岛屿、珊瑚礁、拱门、云朵
+    // ==========================================
+    const lighthouseBeaconGroup = new THREE.Group();
+
+    function buildBottleInteriorScenery(parent) {
+      const sceneryGroup = new THREE.Group();
+      const builder = new VoxelBatchBuilder(0.28, { roughness: 0.45, metalness: 0.08 });
+      const glowBuilder = new VoxelBatchBuilder(0.28, {
+        roughness: 0.2,
+        metalness: 0.1,
+        emissive: new THREE.Color(0xffcc55),
+        emissiveIntensity: 1.8
+      });
+
+      // --- A. 左侧：灯塔海岛 (x: -10.5 ~ -6.8 => gx: -37 ~ -24) ---
+      for (let gx = -37; gx <= -24; gx++) {
+        for (let gz = -16; gz <= 14; gz++) {
+          // 椭圆岛屿轮廓
+          const dx = (gx + 31) / 6.2;
+          const dz = (gz + 1) / 11.5;
+          const d2 = dx * dx + dz * dz;
+          if (d2 <= 1.0) {
+            const topY = Math.floor((1.0 - d2) * 8) - 4;
+            // 确保不超出瓶子内壁半径
+            const bottleR = Math.sqrt(Math.max(0, 24.5 * 24.5 - gz * gz));
+            const bottomY = Math.max(-18, -Math.floor(bottleR) + 2);
+            for (let gy = bottomY; gy <= topY; gy++) {
+              let col = 0x4b535c; // 岩石灰
+              if (gy === topY && gy >= -2) col = 0x4ba847; // 翠绿草地
+              else if (gy >= topY - 1 && gy < -2) col = 0xe3c588; // 沙滩金
+              else if ((gx + gy + gz) % 3 === 0) col = 0x5d6770;
+              builder.add(gx, gy, gz, col);
+            }
+          }
+        }
+      }
+
+      // 灯塔塔身 (中心位于 gx = -31, gz = -3, 底部 gy = 3 到 gy = 17)
+      const lhX = -31, lhZ = -3;
+      for (let gy = 3; gy <= 16; gy++) {
+        const radius = gy < 8 ? 3.2 : gy < 13 ? 2.6 : 2.2;
+        const isRedBand = Math.floor((gy - 3) / 3) % 2 === 0;
+        for (let dx = -3; dx <= 3; dx++) {
+          for (let dz = -3; dz <= 3; dz++) {
+            if (dx * dx + dz * dz <= radius * radius) {
+              const col = isRedBand ? 0xd9383a : 0xf4f1ea;
+              builder.add(lhX + dx, gy, lhZ + dz, col);
+            }
+          }
+        }
+      }
+
+      // 灯塔观景阳台与发光灯室 (gy = 17 ~ 20)
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dz = -3; dz <= 3; dz++) {
+          if (dx * dx + dz * dz <= 9.5) {
+            builder.add(lhX + dx, 17, lhZ + dz, 0x2b3138);
+          }
+          if (dx * dx + dz * dz <= 4.2) {
+            glowBuilder.add(lhX + dx, 18, lhZ + dz, 0xffe484);
+            glowBuilder.add(lhX + dx, 19, lhZ + dz, 0xffe484);
+          }
+          if (dx * dx + dz * dz <= 6.5) {
+            builder.add(lhX + dx, 20, lhZ + dz, 0xb8282a);
+          }
+        }
+      }
+      builder.add(lhX, 21, lhZ, 0xffd15c);
+      builder.add(lhX, 22, lhZ, 0xffd15c);
+
+      // 岛上的椰子树与黄金宝箱
+      const palmX = -27, palmZ = 5;
+      for (let i = 0; i < 7; i++) {
+        builder.add(palmX + Math.floor(i * 0.3), 1 + i, palmZ, 0x8a582c);
+      }
+      const topPx = palmX + 2, topPy = 8, topPz = palmZ;
+      const leafOffsets = [
+        [1, 0, 0], [2, 0, 0], [3, -1, 0],
+        [-1, 0, 0], [-2, 0, 0], [-3, -1, 0],
+        [0, 0, 1], [0, 0, 2], [0, -1, 3],
+        [0, 0, -1], [0, 0, -2], [0, -1, -3],
+        [0, 1, 0]
+      ];
+      leafOffsets.forEach(([lx, ly, lz]) => {
+        builder.add(topPx + lx, topPy + ly, topPz + lz, 0x389c3b);
+      });
+
+      // 岛屿黄金宝箱
+      builder.add(-26, 0, -1, 0x704214);
+      builder.add(-26, 0, 0, 0x704214);
+      glowBuilder.add(-26, 1, -1, 0xffd700);
+      glowBuilder.add(-26, 1, 0, 0xffd700);
+
+      // --- B. 右侧：奇幻海上石拱门与水下绚丽珊瑚礁 (gx: 24 ~ 33) ---
+      for (let gz = -11; gz <= 11; gz++) {
+        const archHeight = Math.round(Math.cos((gz / 11) * (Math.PI * 0.5)) * 14) - 3;
+        const isHole = Math.abs(gz) <= 5;
+        const minY = isHole ? Math.max(2, archHeight - 4) : -16;
+        for (let gy = minY; gy <= archHeight; gy++) {
+          for (let gx = 26; gx <= 29; gx++) {
+            const c = gy === archHeight ? 0x4ca64c : ((gx + gy + gz) % 2 === 0 ? 0x566370 : 0x444f59);
+            builder.add(gx, gy, gz, c);
+          }
+        }
+      }
+
+      // 海底多彩体素珊瑚礁 (透过瓶底玻璃清晰可见)
+      const coralColors = [0xff5e7e, 0xff9a3c, 0xa855f7, 0x2dd4bf, 0xfacc15];
+      for (let i = 0; i < 28; i++) {
+        const cx = -20 + Math.floor((xHash(i, 1, 2) % 44));
+        const cz = -12 + Math.floor((xHash(i, 3, 4) % 24));
+        const cy = -18 + Math.floor((cz * cz) / 18);
+        const col = coralColors[i % coralColors.length];
+        builder.add(cx, cy, cz, col);
+        builder.add(cx, cy + 1, cz, col);
+        if (i % 2 === 0) {
+          builder.add(cx + 1, cy + 1, cz, col);
+          builder.add(cx, cy + 2, cz, col);
+        }
+      }
+
+      // --- C. 瓶顶漂浮的体素白云朵 ---
+      const cloudCenters = [
+        { x: -16, y: 17, z: -6 },
+        { x: 4, y: 18, z: 5 },
+        { x: 19, y: 16, z: -4 }
+      ];
+      cloudCenters.forEach((c) => {
+        for (let dx = -4; dx <= 4; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dz = -2; dz <= 2; dz++) {
+              if ((dx * dx) / 16 + dy * dy + (dz * dz) / 4 <= 1.0) {
+                builder.add(c.x + dx, c.y + dy, c.z + dz, 0xfafcff);
+              }
+            }
+          }
+        }
+      });
+
+      builder.build(sceneryGroup, true, true);
+      glowBuilder.build(sceneryGroup, false, false);
+
+      // 灯塔旋转体积光束
+      lighthouseBeaconGroup.position.set(lhX * 0.28, 18.5 * 0.28, lhZ * 0.28);
+      lighthousePointLight.position.set(0, 0, 0);
+      lighthouseBeaconGroup.add(lighthousePointLight);
+
+      const beamGeo = new THREE.ConeGeometry(2.6, 12, 24, 1, true);
+      beamGeo.translate(0, -6, 0);
+      beamGeo.rotateZ(Math.PI / 2);
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: 0xffe494,
+        transparent: true,
+        opacity: 0.16,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending
+      });
+      const beam1 = new THREE.Mesh(beamGeo, beamMat);
+      const beam2 = beam1.clone();
+      beam2.rotation.y = Math.PI;
+      lighthouseBeaconGroup.add(beam1, beam2);
+
+      sceneryGroup.add(lighthouseBeaconGroup);
+      parent.add(sceneryGroup);
+    }
+
+    buildBottleInteriorScenery(bottleRig);
+
+    // ==========================================
+    // 9. 精致体素大帆船 (“黄金体素号”)
+    // ==========================================
+    const shipGroup = new THREE.Group();
+    bottleRig.add(shipGroup);
+
+    const sailMeshes = [];
+    const flagVoxels = [];
+
+    function buildVoxelGalleon() {
+      const vSize = 0.21;
+      const builder = new VoxelBatchBuilder(vSize, { roughness: 0.38, metalness: 0.1 });
+      const glowBuilder = new VoxelBatchBuilder(vSize, {
+        roughness: 0.2,
+        emissive: new THREE.Color(0xffb84d),
+        emissiveIntensity: 2.0
+      });
+
+      const hullDark = 0x3d2210;
+      const hullMid = 0x5c3419;
+      const hullLight = 0x7c4925;
+      const deckWood = 0xc49358;
+      const gold = 0xf5bd42;
+      const mastWood = 0x4a2a14;
+      const cannonMetal = 0x262b30;
+
+      // 1. 船体龙骨与船壳 (gx: -16 船尾 ~ +18 船首)
+      for (let gx = -16; gx <= 18; gx++) {
+        // 船宽随前后收窄
+        let halfW = 6;
+        if (gx > 6) halfW = Math.max(1, Math.round(6 * (1 - (gx - 6) / 13)));
+        else if (gx < -10) halfW = Math.max(3, Math.round(6 * (1 - (-10 - gx) / 14)));
+
+        // 船尾楼与船首楼抬升
+        let deckH = 2;
+        if (gx <= -8) deckH = 5;
+        else if (gx <= -4) deckH = 3;
+        else if (gx >= 11) deckH = 4;
+
+        for (let gy = -4; gy <= deckH + 1; gy++) {
+          // 底部向内收窄形成 V 型吃水船底
+          const bottomPinch = gy < 0 ? Math.max(0, Math.floor((gy + 4) * 0.65) - 2) : 0;
+          const curW = Math.max(1, halfW + bottomPinch);
+
+          for (let gz = -curW; gz <= curW; gz++) {
+            const isEdge = Math.abs(gz) === curW || gx === -16 || gx === 18;
+            if (gy === -4 && Math.abs(gz) <= 1) {
+              builder.add(gx, gy, gz, hullDark); // 龙骨
+            } else if (gy < deckH) {
+              if (isEdge || gy === -3) {
+                // 舷窗与金边装饰
+                if (gy === 1 && Math.abs(gz) === curW && gx % 3 === 0 && gx >= -12 && gx <= 8) {
+                  glowBuilder.add(gx, gy, gz, 0xffd269);
+                } else if (gy === 2 && isEdge) {
+                  builder.add(gx, gy, gz, gold);
+                } else {
+                  builder.add(gx, gy, gz, gy < 0 ? hullDark : (gy % 2 === 0 ? hullMid : hullLight));
+                }
+              } else if (gy === deckH - 1) {
+                builder.add(gx, gy, gz, deckWood); // 甲板木板
+              }
+            } else if (gy === deckH && isEdge) {
+              // 船舷护栏
+              builder.add(gx, gy, gz, (gx + gz) % 2 === 0 ? hullLight : gold);
+            }
+          }
+        }
+      }
+
+      // 2. 船首斜桅杆与黄金海神船首像
+      for (let i = 1; i <= 8; i++) {
+        builder.add(17 + i, 3 + Math.floor(i * 0.45), 0, i >= 7 ? gold : mastWood);
+      }
+      builder.add(19, 3, 0, gold);
+      builder.add(20, 4, 0, gold);
+      builder.add(18, 2, 0, gold);
+
+      // 3. 船尾黄金尾灯与舵轮
+      glowBuilder.add(-17, 6, 0, 0xffe07d);
+      glowBuilder.add(-17, 7, 0, 0xffe07d);
+      builder.add(-17, 8, 0, gold);
+      builder.add(-9, 6, 0, gold); // 舵轮
+
+      // 4. 甲板两侧体素火炮
+      [-4, 0, 4, 8].forEach((cx) => {
+        builder.add(cx, 2, 5, cannonMetal);
+        builder.add(cx, 2, 6, cannonMetal);
+        builder.add(cx, 2, -5, cannonMetal);
+        builder.add(cx, 2, -6, cannonMetal);
+      });
+
+      // 5. 三根高耸主桅杆与横桁 (后桅 gx=-8, 主桅 gx=0, 前桅 gx=9)
+      const masts = [
+        { x: -8, h: 19, w: 6 },
+        { x: 0, h: 24, w: 8 },
+        { x: 9, h: 18, w: 6 }
+      ];
+
+      masts.forEach((m) => {
+        for (let gy = 2; gy <= m.h; gy++) {
+          builder.add(m.x, gy, 0, mastWood);
+        }
+        // 瞭望篮
+        const crowY = m.h - 4;
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dz = -1; dz <= 1; dz++) {
+            builder.add(m.x + dx, crowY, dz, hullLight);
+          }
+        }
+        // 上下两条帆桁
+        const yards = [Math.floor(m.h * 0.45), Math.floor(m.h * 0.78)];
+        yards.forEach((yy) => {
+          for (let gz = -m.w; gz <= m.w; gz++) {
+            builder.add(m.x, yy, gz, mastWood);
+          }
+        });
+      });
+
+      // 6. 鼓满海风的红白条纹体素风帆
+      const sailBuilder = new VoxelBatchBuilder(vSize, { roughness: 0.55, metalness: 0.02 });
+      const sailWhite = 0xfaf6eb;
+      const sailRed = 0xd63638;
+      const sailGold = 0xf2b841;
+
+      masts.forEach((m, idx) => {
+        const ranges = [
+          { y1: 6, y2: Math.floor(m.h * 0.45) - 1, w: m.w },
+          { y1: Math.floor(m.h * 0.48), y2: Math.floor(m.h * 0.78) - 1, w: m.w - 1 }
+        ];
+        ranges.forEach((r) => {
+          for (let gy = r.y1; gy <= r.y2; gy++) {
+            for (let gz = -r.w; gz <= r.w; gz++) {
+              // 向前鼓起的弧形曲率
+              const normY = (gy - r.y1) / Math.max(1, r.y2 - r.y1);
+              const normZ = gz / r.w;
+              const belly = Math.round(Math.sin(normY * Math.PI) * (1.8 - normZ * normZ * 0.8)) + 1;
+              const isStripe = Math.abs(gz) % 3 === 1;
+              const isEmblem = idx === 1 && Math.abs(gz) <= 1 && Math.abs(gy - (r.y1 + r.y2) / 2) <= 1.2;
+              const col = isEmblem ? sailGold : isStripe ? sailRed : sailWhite;
+              sailBuilder.add(m.x + belly, gy, gz, col);
+            }
+          }
+        });
+      });
+
+      // 主桅顶端迎风飘扬的黄金红旗
+      for (let i = 1; i <= 6; i++) {
+        sailBuilder.add(-i, 24, 0, i === 1 ? sailGold : sailRed);
+      }
+
+      builder.build(shipGroup, true, true);
+      glowBuilder.build(shipGroup, false, false);
+      const sailInst = sailBuilder.build(shipGroup, true, true);
+      if (sailInst) sailMeshes.push(sailInst);
+
+      // 桅杆缆绳线条
+      const ropeMat = new THREE.LineBasicMaterial({ color: 0xd8c398, transparent: true, opacity: 0.55 });
+      const ropePoints = [
+        new THREE.Vector3(-8 * vSize, 19 * vSize, 0),
+        new THREE.Vector3(0, 24 * vSize, 0),
+        new THREE.Vector3(9 * vSize, 18 * vSize, 0),
+        new THREE.Vector3(24 * vSize, 6.5 * vSize, 0)
+      ];
+      const ropeGeo = new THREE.BufferGeometry().setFromPoints(ropePoints);
+      shipGroup.add(new THREE.Line(ropeGeo, ropeMat));
+
+      shipCabinLight.position.set(-3.2, 1.3, 0);
+      shipGroup.add(shipCabinLight);
+    }
+
+    buildVoxelGalleon();
+
+    // ==========================================
+    // 10. 海怪触手 (Kraken) 与漂浮木桶、盘旋海鸥
+    // ==========================================
+    const krakenGroup = new THREE.Group();
+    krakenGroup.position.set(3.2, -5.5, -2.5);
+    bottleRig.add(krakenGroup);
+    let krakenActive = false;
+
+    function buildKrakenTentacles() {
+      const builder = new VoxelBatchBuilder(0.24, { roughness: 0.35, metalness: 0.1 });
+      const bodyPurple = 0x7c2d92;
+      const suckerPink = 0xf472b6;
+
+      // 两条弯曲巨型触手
+      for (let t = 0; t < 2; t++) {
+        const offsetX = t === 0 ? 0 : -4.2 / 0.24;
+        const offsetZ = t === 0 ? 0 : 4.2 / 0.24;
+        for (let gy = 0; gy <= 20; gy++) {
+          const r = Math.max(0.8, 3.2 * (1 - gy / 23));
+          const curveX = Math.round(Math.sin(gy * 0.25 + t) * 2.5);
+          const curveZ = Math.round(Math.cos(gy * 0.2) * 1.8);
+          for (let dx = -3; dx <= 3; dx++) {
+            for (let dz = -3; dz <= 3; dz++) {
+              if (dx * dx + dz * dz <= r * r) {
+                const isSucker = dx === -Math.round(r) && gy % 2 === 0;
+                builder.add(offsetX + curveX + dx, gy, offsetZ + curveZ + dz, isSucker ? suckerPink : bodyPurple);
+              }
+            }
+          }
+        }
+      }
+      builder.build(krakenGroup, true, true);
+    }
+    buildKrakenTentacles();
+
+    // 漂浮物理道具：木桶与漂流宝箱
+    const floatingProps = [];
+    function buildFloatingProps() {
+      const configs = [
+        { x: -3.6, z: 3.4, type: 'barrel' },
+        { x: 4.2, z: -2.8, type: 'barrel' },
+        { x: 2.2, z: 3.9, type: 'crate' },
+        { x: -4.8, z: -3.4, type: 'buoy' }
+      ];
+
+      configs.forEach((cfg) => {
+        const g = new THREE.Group();
+        const b = new VoxelBatchBuilder(0.18);
+        if (cfg.type === 'barrel') {
+          b.addBox(-1, -1, -1, 1, 1, 1, (x, y, z) => (y === 0 ? 0x3b4248 : 0x8c5327));
+        } else if (cfg.type === 'crate') {
+          b.addBox(-1, -1, -1, 1, 1, 1, (x, y, z) => (y === 1 ? 0xffcf40 : 0x6e411c));
+        } else {
+          b.addBox(-1, -1, -1, 1, 0, 1, 0xd9383a);
+          b.add(0, 1, 0, 0xfafafa);
+          b.add(0, 2, 0, 0xffd54f);
+        }
+        b.build(g, true, true);
+        bottleRig.add(g);
+        floatingProps.push({
+          group: g,
+          baseX: cfg.x,
+          baseZ: cfg.z,
+          vy: 0,
+          y: -1.6
+        });
+      });
+    }
+    buildFloatingProps();
+
+    // 瓶内盘旋飞行的体素海鸥
+    const seagulls = [];
+    function buildSeagulls() {
+      for (let i = 0; i < 5; i++) {
+        const birdGroup = new THREE.Group();
+        const bodyB = new VoxelBatchBuilder(0.15);
+        bodyB.add(0, 0, 0, 0xffffff);
+        bodyB.add(1, 0, 0, 0xffffff);
+        bodyB.add(2, 0, 0, 0xffaa00); // 鸟喙
+        bodyB.add(-1, 0, 0, 0xdbe4ee);
+        bodyB.build(birdGroup, false, false);
+
+        const leftWing = new THREE.Group();
+        const lwB = new VoxelBatchBuilder(0.15);
+        lwB.add(0, 0, 1, 0xffffff);
+        lwB.add(0, 0, 2, 0xcbd5e1);
+        lwB.build(leftWing, false, false);
+
+        const rightWing = new THREE.Group();
+        const rwB = new VoxelBatchBuilder(0.15);
+        rwB.add(0, 0, -1, 0xffffff);
+        rwB.add(0, 0, -2, 0xcbd5e1);
+        rwB.build(rightWing, false, false);
+
+        birdGroup.add(leftWing, rightWing);
+        bottleRig.add(birdGroup);
+
+        seagulls.push({
+          group: birdGroup,
+          leftWing,
+          rightWing,
+          angle: (i * Math.PI * 2) / 5,
+          radiusX: 4.5 + (i % 3) * 1.4,
+          radiusZ: 2.6 + (i % 2) * 1.1,
+          centerY: 3.2 + (i % 3) * 0.5,
+          speed: 0.75 + i * 0.12
+        });
+      }
+    }
+    buildSeagulls();
+
+    // ==========================================
+    // 11. 瓶内体素海洋系统 (Gerstner波浪 + 晃动物理)
+    // ==========================================
+    const waterVoxelColumns = [];
+    const WATER_GRID_STEP = 0.42;
+    const BOTTLE_INNER_R = 6.85;
+    const MEAN_WATER_Y = -1.65;
+
+    // 采集所有在瓶子横截面内的水面体素柱坐标
+    for (let x = -10.5; x <= 11.8; x += WATER_GRID_STEP) {
+      // 瓶肩收窄半径曲线
+      let localR = BOTTLE_INNER_R;
+      if (x > 8.5) {
+        const t = (x - 8.5) / 4.2;
+        localR = BOTTLE_INNER_R * (1 - 0.62 * t * t);
+      } else if (x < -9.5) {
+        const t = (-9.5 - x) / 1.5;
+        localR = BOTTLE_INNER_R * (1 - 0.18 * t * t);
+      }
+
+      const maxZ = Math.sqrt(Math.max(0, localR * localR - MEAN_WATER_Y * MEAN_WATER_Y)) - 0.22;
+      for (let z = -maxZ; z <= maxZ; z += WATER_GRID_STEP) {
+        // 避开左侧灯塔岛屿核心陆地，减少冗余体素
+        const dxIsland = (x + 8.6) / 1.65;
+        const dzIsland = (z + 0.3) / 3.0;
+        if (dxIsland * dxIsland + dzIsland * dzIsland < 0.72) continue;
+
+        const bottomY = -Math.sqrt(Math.max(0.2, localR * localR - z * z));
+        waterVoxelColumns.push({
+          x,
+          z,
+          bottomY,
+          localR,
+          seed: Math.sin(x * 12.7 + z * 31.3) * 0.5 + 0.5
+        });
+      }
+    }
+
+    const waterColGeo = new THREE.BoxGeometry(WATER_GRID_STEP * 0.96, 1.0, WATER_GRID_STEP * 0.96);
+    const waterColMat = new THREE.MeshPhysicalMaterial({
+      roughness: 0.16,
+      metalness: 0.05,
+      transmission: 0.38,
+      transparent: true,
+      opacity: 0.88,
+      bumpMap: voxelBumpTex,
+      bumpScale: 0.01
+    });
+
+    const waterInstancedMesh = new THREE.InstancedMesh(waterColGeo, waterColMat, waterVoxelColumns.length);
+    waterInstancedMesh.receiveShadow = true;
+    bottleRig.add(waterInstancedMesh);
+    totalVoxelCount += waterVoxelColumns.length;
+
+    // 实时波浪高度计算函数 (多列 Gerstner 波 + 瓶身摇晃倾角 + 巨浪脉冲 + 点击涟漪)
+    const physicsState = {
+      waveAmp: 1.0,
+      waveSpeed: 1.0,
+      sloshAngleZ: 0,
+      sloshVelZ: 0,
+      sloshAngleX: 0,
+      sloshVelX: 0,
+      rogueWaveX: -22,
+      rogueWaveActive: false,
+      ripples: [], // { x, z, t0, strength }
+      weather: 'sunny'
+    };
+
+    function sampleWaveHeight(x, z, time) {
+      const amp = physicsState.waveAmp * 0.38;
+      const spd = physicsState.waveSpeed;
+      const t = time * spd;
+
+      // 三组不同方向的叠加海浪
+      const w1 = Math.sin(x * 0.58 - t * 2.1 + z * 0.18) * amp;
+      const w2 = Math.cos(x * 0.33 + z * 0.72 - t * 1.65) * (amp * 0.55);
+      const w3 = Math.sin((x - z) * 1.15 + t * 3.1) * (amp * 0.24);
+
+      // 摇晃瓶子带来的液体整体倾斜晃动 (Sloshing)
+      const slosh = x * Math.sin(physicsState.sloshAngleZ) * 0.85 + z * Math.sin(physicsState.sloshAngleX) * 0.85;
+
+      // 巨浪脉冲
+      let rogue = 0;
+      if (physicsState.rogueWaveActive) {
+        const dist = x - physicsState.rogueWaveX;
+        rogue = Math.exp(-(dist * dist) / 3.8) * 1.15;
+      }
+
+      // 鼠标点击激发的环形涟漪
+      let rippleSum = 0;
+      for (let i = 0; i < physicsState.ripples.length; i++) {
+        const rp = physicsState.ripples[i];
+        const age = time - rp.t0;
+        const d = Math.hypot(x - rp.x, z - rp.z);
+        const waveFront = d - age * 5.2;
+        if (Math.abs(waveFront) < 2.2) {
+          rippleSum += Math.cos(waveFront * 3.0) * Math.exp(-age * 1.35) * rp.strength;
+        }
+      }
+
+      // 转换成具有微缩体素韵律的阶梯连续高度
+      const rawH = MEAN_WATER_Y + w1 + w2 + w3 + slosh + rogue + rippleSum;
+      return rawH;
+    }
+
+    // 海洋颜色调色板
+    const colorDeep = new THREE.Color(0x0b4678);
+    const colorMid = new THREE.Color(0x1482b8);
+    const colorCrest = new THREE.Color(0x4de3f7);
+    const colorFoam = new THREE.Color(0xf5fcff);
+    const colorNightGlow = new THREE.Color(0x00f5d4);
+
+    function updateVoxelOcean(time) {
+      const isNight = physicsState.weather === 'night';
+      const isStorm = physicsState.weather === 'storm';
+
+      for (let i = 0; i < waterVoxelColumns.length; i++) {
+        const col = waterVoxelColumns[i];
+        const surfaceY = sampleWaveHeight(col.x, col.z, time);
+        const clampedTop = Math.min(col.localR - 0.5, Math.max(col.bottomY + 0.22, surfaceY));
+        const height = Math.max(0.2, clampedTop - col.bottomY);
+        const centerY = col.bottomY + height * 0.5;
+
+        dummy.position.set(col.x, centerY, col.z);
+        dummy.rotation.set(0, 0, 0);
+        dummy.scale.set(1, height, 1);
+        dummy.updateMatrix();
+        waterInstancedMesh.setMatrixAt(i, dummy.matrix);
+
+        // 根据浪峰高度、船体尾流、岛屿岸线动态着色
+        const deltaH = surfaceY - MEAN_WATER_Y;
+        const distToShip = Math.hypot((col.x - shipPhysics.x) * 0.65, col.z - shipPhysics.z);
+        const isShipWake = distToShip < 1.95 && distToShip > 0.7;
+
+        if (deltaH > 0.42 || isShipWake) {
+          if (isNight) {
+            tempColor.lerpColors(colorCrest, colorNightGlow, 0.75);
+          } else {
+            tempColor.copy(colorFoam);
+          }
+        } else if (deltaH > 0.14) {
+          tempColor.lerpColors(colorMid, isNight ? colorNightGlow : colorCrest, (deltaH - 0.14) * 3.2);
+        } else {
+          const t = THREE.MathUtils.clamp((deltaH + 0.5) / 0.65, 0, 1);
+          tempColor.lerpColors(colorDeep, colorMid, t);
+          if (isStorm) tempColor.multiplyScalar(0.68);
+        }
+
+        waterInstancedMesh.setColorAt(i, tempColor);
+      }
+
+      waterInstancedMesh.instanceMatrix.needsUpdate = true;
+      if (waterInstancedMesh.instanceColor) waterInstancedMesh.instanceColor.needsUpdate = true;
+    }
+
+    // ==========================================
+    // 12. 玻璃瓶身模型 (高精度车削曲面 + 折射高光)
+    // ==========================================
+    let glassMaterials = [];
+
+    function buildGlassBottle(parent) {
+      // 使用 LatheGeometry 生成水平放置的复古航海玻璃瓶内外轮廓
+      const profilePoints = [
+        new THREE.Vector2(0.0, -11.3),
+        new THREE.Vector2(6.5, -11.3),
+        new THREE.Vector2(7.35, -10.5),
+        new THREE.Vector2(7.42, -9.2),
+        new THREE.Vector2(7.42, 8.6),
+        new THREE.Vector2(7.1, 10.1),
+        new THREE.Vector2(5.2, 11.8),
+        new THREE.Vector2(2.75, 13.4),
+        new THREE.Vector2(2.45, 14.3),
+        new THREE.Vector2(2.45, 16.9),
+        new THREE.Vector2(2.85, 17.2),
+        new THREE.Vector2(2.85, 17.6),
+        new THREE.Vector2(2.35, 17.6)
+      ];
+
+      const bottleGeo = new THREE.LatheGeometry(profilePoints, 72);
+      bottleGeo.rotateZ(-Math.PI / 2); // 沿 X 轴水平放置
+
+      const glassMat = new THREE.MeshPhysicalMaterial({
+        color: 0xdff6ff,
+        roughness: 0.06,
+        metalness: 0.02,
+        transmission: 0.65,
+        transparent: true,
+        opacity: 0.35,
+        ior: 1.48,
+        reflectivity: 0.9,
+        envMapIntensity: 1.6,
+        side: THREE.FrontSide,
+        depthWrite: false
+      });
+
+      const backGlassMat = glassMat.clone();
+      backGlassMat.side = THREE.BackSide;
+      backGlassMat.opacity = 0.18;
+
+      glassMaterials = [glassMat, backGlassMat];
+
+      const bottleBackMesh = new THREE.Mesh(bottleGeo, backGlassMat);
+      const bottleFrontMesh = new THREE.Mesh(bottleGeo, glassMat);
+      bottleFrontMesh.renderOrder = 2;
+
+      parent.add(bottleBackMesh, bottleFrontMesh);
+      return bottleFrontMesh;
+    }
+
+    const bottleGlassMesh = buildGlassBottle(bottleRig);
+
+    // ==========================================
+    // 13. 帆船 6-DOF 浮力物理模拟与粒子系统 (炮弹/浪花/雨滴)
+    // ==========================================
+    const shipPhysics = {
+      x: -0.6,
+      y: -1.4,
+      z: 0.0,
+      vy: 0,
+      pitch: 0,
+      roll: 0,
+      yaw: 0,
+      vPitch: 0,
+      vRoll: 0,
+      recoilRollVel: 0
+    };
+
+    function updateShipBuoyancy(time, dt) {
+      // 在船首、船尾、左舷、右舷四个浮力采样点读取实时波浪高度
+      const bowY = sampleWaveHeight(shipPhysics.x + 2.8, shipPhysics.z, time);
+      const sternY = sampleWaveHeight(shipPhysics.x - 2.8, shipPhysics.z, time);
+      const portY = sampleWaveHeight(shipPhysics.x, shipPhysics.z + 1.35, time);
+      const stbdY = sampleWaveHeight(shipPhysics.x, shipPhysics.z - 1.35, time);
+      const centerWaveY = (bowY + sternY + portY + stbdY) * 0.25;
+
+      // 弹簧阻尼浮力计算
+      const targetY = centerWaveY + 0.35;
+      const springForceY = (targetY - shipPhysics.y) * 28.0;
+      shipPhysics.vy += springForceY * dt;
+      shipPhysics.vy *= Math.pow(0.18, dt);
+      shipPhysics.y += shipPhysics.vy * dt;
+
+      // 纵摇 (Pitch) 与 横摇 (Roll) 扭矩物理
+      const targetPitch = Math.atan2(bowY - sternY, 5.6);
+      const targetRoll = Math.atan2(portY - stbdY, 2.7);
+
+      shipPhysics.vPitch += (targetPitch - shipPhysics.pitch) * 22.0 * dt;
+      shipPhysics.vPitch *= Math.pow(0.14, dt);
+      shipPhysics.pitch += shipPhysics.vPitch * dt;
+
+      shipPhysics.vRoll += (targetRoll - shipPhysics.roll) * 24.0 * dt + shipPhysics.recoilRollVel * dt;
+      shipPhysics.recoilRollVel *= Math.pow(0.05, dt);
+      shipPhysics.vRoll *= Math.pow(0.12, dt);
+      shipPhysics.roll += shipPhysics.vRoll * dt;
+
+      // 轻微前后随浪漂移
+      shipPhysics.x = -0.6 + Math.sin(time * 0.55) * 0.45;
+      shipPhysics.yaw = Math.sin(time * 0.4) * 0.06;
+
+      shipGroup.position.set(shipPhysics.x, shipPhysics.y, shipPhysics.z);
+      shipGroup.rotation.set(shipPhysics.roll, shipPhysics.yaw, shipPhysics.pitch);
+
+      // 更新面板横摇角度读数
+      const deg = ((shipPhysics.roll * 180) / Math.PI).toFixed(1);
+      document.getElementById('shipTiltText').textContent = `横摇: ${deg}°`;
+    }
+
+    // 舷炮齐射粒子与物理炮弹系统
+    const projectiles = [];
+    const projectileGeo = new THREE.BoxGeometry(0.24, 0.24, 0.24);
+
+    function spawnVoxelParticle(pos, vel, colorHex, life = 1.2, scale = 1.0) {
+      const mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        emissive: colorHex,
+        emissiveIntensity: 0.45,
+        roughness: 0.3
+      });
+      const mesh = new THREE.Mesh(projectileGeo, mat);
+      mesh.position.copy(pos);
+      mesh.scale.setScalar(scale);
+      bottleRig.add(mesh);
+      projectiles.push({ mesh, vel: vel.clone(), life, maxLife: life, isCannonball: scale > 0.9 });
+    }
+
+    function fireBroadsideCannons() {
+      // 给船体施加后坐力横摇冲击
+      shipPhysics.recoilRollVel += (Math.random() > 0.5 ? 1 : -1) * 4.5;
+
+      const cannonOffsets = [-0.8, 0.0, 0.8, 1.6];
+      cannonOffsets.forEach((ox) => {
+        [-1, 1].forEach((side) => {
+          const startPos = new THREE.Vector3(
+            shipPhysics.x + ox,
+            shipPhysics.y + 0.55,
+            shipPhysics.z + side * 1.15
+          );
+          const vel = new THREE.Vector3(
+            (Math.random() - 0.5) * 1.2,
+            2.4 + Math.random() * 1.2,
+            side * (4.2 + Math.random() * 1.4)
+          );
+          // 发射炮弹
+          spawnVoxelParticle(startPos, vel, 0xffae34, 1.8, 1.0);
+
+          // 炮口火焰与白烟体素块
+          for (let k = 0; k < 4; k++) {
+            const smokeVel = new THREE.Vector3(
+              (Math.random() - 0.5) * 1.5,
+              0.8 + Math.random() * 1.2,
+              side * (1.2 + Math.random() * 1.5)
+            );
+            spawnVoxelParticle(startPos, smokeVel, k === 0 ? 0xff6b2b : 0xf1f5f9, 0.55 + Math.random() * 0.3, 0.75);
+          }
+        });
+      });
+    }
+
+    function updateProjectiles(time, dt) {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.life -= dt;
+        p.vel.y -= 9.8 * dt;
+        p.mesh.position.addScaledVector(p.vel, dt);
+        p.mesh.rotation.x += 5 * dt;
+        p.mesh.rotation.y += 4 * dt;
+
+        // 檢測炮弹落入海面激起体素水花与涟漪
+        const waveY = sampleWaveHeight(p.mesh.position.x, p.mesh.position.z, time);
+        if (p.isCannonball && p.mesh.position.y <= waveY) {
+          physicsState.ripples.push({
+            x: p.mesh.position.x,
+            z: p.mesh.position.z,
+            t0: time,
+            strength: 0.35
+          });
+          // 溅起白色浪花体素
+          for (let s = 0; s < 5; s++) {
+            const splashVel = new THREE.Vector3(
+              (Math.random() - 0.5) * 2.4,
+              2.2 + Math.random() * 2.0,
+              (Math.random() - 0.5) * 2.4
+            );
+            spawnVoxelParticle(p.mesh.position, splashVel, 0xe0f7ff, 0.55, 0.65);
+          }
+          p.life = 0;
+        }
+
+        if (p.life <= 0) {
+          bottleRig.remove(p.mesh);
+          p.mesh.material.dispose();
+          projectiles.splice(i, 1);
+        } else {
+          const s = (p.life / p.maxLife) * (p.isCannonball ? 1.0 : 0.8);
+          p.mesh.scale.setScalar(Math.max(0.1, s));
+        }
+      }
+    }
+
+    // 瓶内天气粒子 (风暴雨滴 & 荧光星海萤火)
+    const WEATHER_PARTICLE_COUNT = 180;
+    const weatherGeo = new THREE.BoxGeometry(0.1, 0.35, 0.1);
+    const weatherMat = new THREE.MeshBasicMaterial({ color: 0xa5f3fc, transparent: true, opacity: 0.75 });
+    const weatherParticles = new THREE.InstancedMesh(weatherGeo, weatherMat, WEATHER_PARTICLE_COUNT);
+    bottleRig.add(weatherParticles);
+
+    const weatherParticleData = [];
+    for (let i = 0; i < WEATHER_PARTICLE_COUNT; i++) {
+      weatherParticleData.push({
+        x: (Math.random() - 0.5) * 20,
+        y: Math.random() * 9 - 2,
+        z: (Math.random() - 0.5) * 10,
+        speed: 4 + Math.random() * 4,
+        phase: Math.random() * Math.PI * 2
+      });
+    }
+
+    function updateWeatherParticles(time, dt) {
+      const mode = physicsState.weather;
+      const visible = mode === 'storm' || mode === 'night';
+      weatherParticles.visible = visible;
+      if (!visible) return;
+
+      weatherMat.color.setHex(mode === 'storm' ? 0x93c5fd : 0x5eead4);
+
+      for (let i = 0; i < WEATHER_PARTICLE_COUNT; i++) {
+        const wp = weatherParticleData[i];
+        if (mode === 'storm') {
+          wp.y -= wp.speed * 2.2 * dt;
+          wp.x -= 2.5 * dt;
+          if (wp.y < -2.0) {
+            wp.y = 4.8;
+            wp.x = (Math.random() - 0.5) * 19;
+          }
+          dummy.position.set(wp.x, wp.y, wp.z);
+          dummy.rotation.set(0, 0, 0.25);
+          dummy.scale.set(0.7, 1.5, 0.7);
+        } else {
+          // 荧光星海模式下的漂浮发光微粒
+          const py = wp.y * 0.6 + Math.sin(time * 1.5 + wp.phase) * 0.8 + 1.2;
+          dummy.position.set(wp.x, py, wp.z);
+          dummy.rotation.set(time, time * 0.5, 0);
+          const s = 0.65 + Math.sin(time * 3 + wp.phase) * 0.35;
+          dummy.scale.set(s, s, s);
+        }
+        dummy.updateMatrix();
+        weatherParticles.setMatrixAt(i, dummy.matrix);
+      }
+      weatherParticles.instanceMatrix.needsUpdate = true;
+    }
+
+    // ==========================================
+    // 14. 界面交互事件与天气/视角切换
+    // ==========================================
+    document.getElementById('voxelCountText').textContent = `体素总数: ${totalVoxelCount.toLocaleString()}`;
+
+    // 折叠/展开控制面板
+    const controlPanel = document.getElementById('controlPanel');
+    const togglePanelBtn = document.getElementById('togglePanelBtn');
+    togglePanelBtn.addEventListener('click', () => {
+      const collapsed = controlPanel.classList.toggle('panel-collapsed');
+      togglePanelBtn.textContent = collapsed ? '展开' : '收起';
+    });
+
+    // 天气预设切换
+    const weatherPresets = {
+      sunny: {
+        bg: 0x0d172a,
+        sunColor: 0xfff2d6,
+        sunInt: 2.3,
+        ambInt: 0.88,
+        waveAmp: 1.0,
+        waveSpeed: 1.0,
+        deep: 0x0b4678,
+        mid: 0x1482b8,
+        crest: 0x4de3f7
+      },
+      sunset: {
+        bg: 0x1e1124,
+        sunColor: 0xff8c42,
+        sunInt: 2.6,
+        ambInt: 0.72,
+        waveAmp: 0.85,
+        waveSpeed: 0.85,
+        deep: 0x24205c,
+        mid: 0x993d6f,
+        crest: 0xffb26b
+      },
+      storm: {
+        bg: 0x070b12,
+        sunColor: 0x7da0c4,
+        sunInt: 1.1,
+        ambInt: 0.45,
+        waveAmp: 1.85,
+        waveSpeed: 1.65,
+        deep: 0x082338,
+        mid: 0x124559,
+        crest: 0x98c1d9
+      },
+      night: {
+        bg: 0x040814,
+        sunColor: 0x4895ef,
+        sunInt: 0.9,
+        ambInt: 0.4,
+        waveAmp: 0.95,
+        waveSpeed: 0.9,
+        deep: 0x051937,
+        mid: 0x004d7a,
+        crest: 0x00f5d4
+      }
+    };
+
+    document.querySelectorAll('[data-weather]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-weather]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const key = btn.dataset.weather;
+        const p = weatherPresets[key];
+        physicsState.weather = key;
+
+        scene.background.setHex(p.bg);
+        scene.fog.color.setHex(p.bg);
+        sunLight.color.setHex(p.sunColor);
+        sunLight.intensity = p.sunInt;
+        ambientLight.intensity = p.ambInt;
+
+        colorDeep.setHex(p.deep);
+        colorMid.setHex(p.mid);
+        colorCrest.setHex(p.crest);
+
+        physicsState.waveAmp = p.waveAmp;
+        physicsState.waveSpeed = p.waveSpeed;
+        document.getElementById('waveAmpSlider').value = p.waveAmp;
+        document.getElementById('waveAmpVal').textContent = `${p.waveAmp.toFixed(1)}x`;
+        document.getElementById('waveSpeedSlider').value = p.waveSpeed;
+        document.getElementById('waveSpeedVal').textContent = `${p.waveSpeed.toFixed(1)}x`;
+
+        if (key === 'storm' && !krakenActive) {
+          krakenActive = true;
+          document.getElementById('krakenToggleBtn').classList.add('active');
+        }
+      });
+    });
+
+    // 摇晃瓶子按钮
+    document.getElementById('shakeBottleBtn').addEventListener('click', () => {
+      physicsState.sloshVelZ += (Math.random() > 0.5 ? 1 : -1) * 1.45;
+      physicsState.sloshVelX += (Math.random() - 0.5) * 1.1;
+      shipPhysics.vy += 2.2;
+    });
+
+    // 掀起巨浪按钮
+    document.getElementById('rogueWaveBtn').addEventListener('click', () => {
+      physicsState.rogueWaveX = -12.5;
+      physicsState.rogueWaveActive = true;
+    });
+
+    // 舷炮齐射按钮
+    document.getElementById('fireCannonBtn').addEventListener('click', () => {
+      fireBroadsideCannons();
+    });
+
+    // 唤醒海怪按钮
+    const krakenBtn = document.getElementById('krakenToggleBtn');
+    krakenBtn.addEventListener('click', () => {
+      krakenActive = !krakenActive;
+      krakenBtn.classList.toggle('active', krakenActive);
+    });
+
+    // 镜头机位平滑过渡
+    const cameraTargetPos = new THREE.Vector3().copy(camera.position);
+    const controlsTargetLook = new THREE.Vector3().copy(controls.target);
+    let camTransitioning = false;
+
+    const camPresets = {
+      overview: { pos: [3.5, 9.5, 29.5], look: [0, 0.2, 0] },
+      ship: { pos: [-3.5, 2.6, 10.5], look: [-0.2, 0.2, 0] },
+      lighthouse: { pos: [-14.5, 5.2, 13.5], look: [-8.2, 1.5, -0.8] },
+      cork: { pos: [26.5, 2.8, 6.2], look: [-2.0, 0.0, 0.0] }
+    };
+
+    document.querySelectorAll('[data-cam]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('[data-cam]').forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const preset = camPresets[btn.dataset.cam];
+        cameraTargetPos.set(...preset.pos);
+        controlsTargetLook.set(...preset.look);
+        camTransitioning = true;
+      });
+    });
+
+    controls.addEventListener('start', () => {
+      camTransitioning = false;
+    });
+
+    // 滑块事件
+    document.getElementById('waveAmpSlider').addEventListener('input', (e) => {
+      physicsState.waveAmp = parseFloat(e.target.value);
+      document.getElementById('waveAmpVal').textContent = `${physicsState.waveAmp.toFixed(1)}x`;
+    });
+
+    document.getElementById('waveSpeedSlider').addEventListener('input', (e) => {
+      physicsState.waveSpeed = parseFloat(e.target.value);
+      document.getElementById('waveSpeedVal').textContent = `${physicsState.waveSpeed.toFixed(1)}x`;
+    });
+
+    document.getElementById('glassSlider').addEventListener('input', (e) => {
+      const val = parseFloat(e.target.value);
+      glassMaterials[0].opacity = val;
+      glassMaterials[1].opacity = val * 0.5;
+      document.getElementById('glassOpacityVal').textContent = val < 0.25 ? '极透' : val < 0.55 ? '高透' : '浓郁';
+    });
+
+    // 鼠标点击瓶身或海面激起物理水波与炮火互动
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    let pointerDownPos = { x: 0, y: 0 };
+
+    window.addEventListener('pointerdown', (e) => {
+      pointerDownPos = { x: e.clientX, y: e.clientY };
+    });
+
+    window.addEventListener('pointerup', (e) => {
+      if (e.target.closest('#controlPanel') || e.target.closest('.back-btn')) return;
+      const moveDist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (moveDist > 6) return;
+
+      pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+      raycaster.setFromCamera(pointer, camera);
+
+      const hits = raycaster.intersectObjects([waterInstancedMesh, bottleGlassMesh], false);
+      if (hits.length > 0) {
+        const pt = hits[0].point;
+        physicsState.ripples.push({
+          x: THREE.MathUtils.clamp(pt.x, -10, 10),
+          z: THREE.MathUtils.clamp(pt.z, -6, 6),
+          t0: clock.getElapsedTime(),
+          strength: 0.48
+        });
+        physicsState.sloshVelZ += (Math.random() - 0.5) * 0.45;
+      }
+    });
+
+    // ==========================================
+    // 15. 窗口尺寸自适应
+    // ==========================================
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ==========================================
+    // 16. 主动画与物理循环 (稳定 60FPS)
+    // ==========================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      // 1. 瓶身摇晃与液体惯性回正物理
+      const springK = 18.0;
+      const damping = 0.16;
+      physicsState.sloshVelZ += -physicsState.sloshAngleZ * springK * dt;
+      physicsState.sloshVelZ *= Math.pow(damping, dt);
+      physicsState.sloshAngleZ += physicsState.sloshVelZ * dt;
+
+      physicsState.sloshVelX += -physicsState.sloshAngleX * springK * dt;
+      physicsState.sloshVelX *= Math.pow(damping, dt);
+      physicsState.sloshAngleX += physicsState.sloshVelX * dt;
+
+      bottleRig.rotation.z = physicsState.sloshAngleZ * 0.35;
+      bottleRig.rotation.x = physicsState.sloshAngleX * 0.35;
+
+      // 2. 巨浪脉冲推进与过期涟漪清理
+      if (physicsState.rogueWaveActive) {
+        physicsState.rogueWaveX += 8.5 * dt;
+        if (physicsState.rogueWaveX > 15.0) {
+          physicsState.rogueWaveActive = false;
+        }
+      }
+      physicsState.ripples = physicsState.ripples.filter((r) => elapsed - r.t0 < 3.2);
+
+      // 3. 更新瓶内体素海洋与帆船 6-DOF 浮力物理
+      updateVoxelOcean(elapsed);
+      updateShipBuoyancy(elapsed, dt);
+
+      // 4. 更新海面漂浮木桶与浮标物理
+      for (let i = 0; i < floatingProps.length; i++) {
+        const fp = floatingProps[i];
+        const wy = sampleWaveHeight(fp.baseX, fp.baseZ, elapsed);
+        fp.vy += (wy + 0.1 - fp.y) * 20 * dt;
+        fp.vy *= Math.pow(0.2, dt);
+        fp.y += fp.vy * dt;
+        fp.group.position.set(
+          fp.baseX + Math.sin(elapsed * 0.8 + i) * 0.25,
+          fp.y,
+          fp.baseZ + Math.cos(elapsed * 0.7 + i) * 0.25
+        );
+        fp.group.rotation.z = Math.sin(elapsed * 2.2 + i) * 0.22;
+        fp.group.rotation.x = Math.cos(elapsed * 1.9 + i) * 0.22;
+      }
+
+      // 5. 海怪触手升降与摆动动画
+      const targetKrakenY = krakenActive ? -1.85 : -6.2;
+      krakenGroup.position.y = THREE.MathUtils.lerp(krakenGroup.position.y, targetKrakenY, dt * 3.5);
+      krakenGroup.rotation.z = Math.sin(elapsed * 2.1) * 0.14;
+      krakenGroup.rotation.y = Math.cos(elapsed * 1.5) * 0.2;
+
+      // 6. 盘旋海鸥扇翅动画
+      for (let i = 0; i < seagulls.length; i++) {
+        const b = seagulls[i];
+        const a = elapsed * b.speed + b.angle;
+        const bx = Math.cos(a) * b.radiusX;
+        const bz = Math.sin(a) * b.radiusZ;
+        const by = b.centerY + Math.sin(elapsed * 2.0 + i) * 0.35;
+        b.group.position.set(bx, by, bz);
+        b.group.rotation.y = -a + Math.PI;
+        const flap = Math.sin(elapsed * 11.0 + i * 1.7) * 0.55;
+        b.leftWing.rotation.x = flap;
+        b.rightWing.rotation.x = -flap;
+      }
+
+      // 7. 灯塔光束旋转与暴风雨闪电效果
+      lighthouseBeaconGroup.rotation.y = elapsed * 1.45;
+      if (physicsState.weather === 'storm') {
+        const flash = Math.random() < 0.015 ? 5.5 : 1.1;
+        sunLight.intensity = THREE.MathUtils.lerp(sunLight.intensity, flash, 0.3);
+      }
+
+      // 8. 炮弹与天气粒子更新
+      updateProjectiles(elapsed, dt);
+      updateWeatherParticles(elapsed, dt);
+
+      // 9. 镜头平滑过渡
+      if (camTransitioning) {
+        camera.position.lerp(cameraTargetPos, dt * 4.2);
+        controls.target.lerp(controlsTargetLook, dt * 4.2);
+        if (camera.position.distanceTo(cameraTargetPos) < 0.08) {
+          camTransitioning = false;
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+  <script src="../prompt-panel.js" data-id="ship-bottle-web"></script>
+</body>
+</html>

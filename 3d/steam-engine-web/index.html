@@ -1,0 +1,2171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>3D 工业蒸汽机工作原理原型 — 交互式机械仿真</title>
+  <style>
+    :root {
+      --bg-dark: #12100e;
+      --panel-bg: rgba(26, 22, 18, 0.82);
+      --brass: #d4a853;
+      --brass-light: #f3d289;
+      --copper: #c86d44;
+      --cream: #f7f1e3;
+      --steam-cyan: #72d6ff;
+      --steam-hot: #ff7b47;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 42%, #2a231d 0%, #14110f 70%, #090807 100%);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--cream);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角固定返回按钮（半透明奶油色圆角小按钮样式） */
+    .back-btn {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 30;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 15px;
+      background: rgba(249, 243, 229, 0.86);
+      color: #2c2219;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 250, 240, 0.96);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    }
+
+    .back-btn:active {
+      transform: translateY(0);
+    }
+
+    /* 顶部标题与遥测仪表栏 */
+    .hud-header {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      pointer-events: none;
+      text-align: center;
+      width: max-content;
+      max-width: 92vw;
+    }
+
+    .hud-title {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      color: var(--brass-light);
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .hud-subtitle {
+      font-size: 11.5px;
+      color: rgba(247, 241, 227, 0.72);
+      margin-top: 2px;
+      letter-spacing: 0.5px;
+    }
+
+    .telemetry-bar {
+      margin-top: 10px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      background: var(--panel-bg);
+      border: 1px solid rgba(212, 168, 83, 0.35);
+      border-radius: 12px;
+      padding: 7px 14px;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-width: 72px;
+      padding: 0 6px;
+      border-right: 1px solid rgba(212, 168, 83, 0.18);
+    }
+
+    .metric-item:last-child {
+      border-right: none;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: rgba(247, 241, 227, 0.6);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-val {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--brass-light);
+      font-variant-numeric: tabular-nums;
+      margin-top: 1px;
+    }
+
+    .metric-val.phase-hot {
+      color: #ff9466;
+    }
+
+    .metric-val.phase-cold {
+      color: #7ce0ff;
+    }
+
+    /* 右侧控制面板 */
+    .control-panel {
+      position: fixed;
+      top: 16px;
+      right: 16px;
+      z-index: 25;
+      width: 288px;
+      background: var(--panel-bg);
+      border: 1px solid rgba(212, 168, 83, 0.38);
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      transition: transform 0.3s ease, opacity 0.3s ease;
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid rgba(212, 168, 83, 0.25);
+      padding-bottom: 8px;
+      margin-bottom: 12px;
+    }
+
+    .panel-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--brass-light);
+      letter-spacing: 0.8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .panel-title::before {
+      content: "";
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--brass);
+      box-shadow: 0 0 8px var(--brass);
+    }
+
+    .control-group {
+      margin-bottom: 12px;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: rgba(247, 241, 227, 0.88);
+      margin-bottom: 5px;
+    }
+
+    .control-value {
+      color: var(--brass-light);
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #fff3c4, #d4a853 65%, #8c621d 100%);
+      border: 1.5px solid #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+      cursor: pointer;
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+      margin-bottom: 11px;
+    }
+
+    .ctrl-btn {
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--cream);
+      background: rgba(212, 168, 83, 0.14);
+      border: 1px solid rgba(212, 168, 83, 0.35);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .ctrl-btn:hover {
+      background: rgba(212, 168, 83, 0.28);
+      border-color: var(--brass-light);
+    }
+
+    .ctrl-btn.active {
+      background: linear-gradient(135deg, #d4a853 0%, #9e6b24 100%);
+      color: #1a140e;
+      border-color: #ffe5a3;
+      box-shadow: 0 0 12px rgba(212, 168, 83, 0.45);
+    }
+
+    .ctrl-btn.whistle-btn {
+      grid-column: span 2;
+      background: linear-gradient(135deg, rgba(200, 109, 68, 0.35), rgba(145, 58, 25, 0.45));
+      border-color: rgba(255, 148, 102, 0.55);
+      color: #ffd8c2;
+      padding: 8px 12px;
+    }
+
+    .ctrl-btn.whistle-btn:hover,
+    .ctrl-btn.whistle-btn.blowing {
+      background: linear-gradient(135deg, #e06d3b, #a83810);
+      color: #fff;
+      box-shadow: 0 0 16px rgba(255, 115, 64, 0.65);
+    }
+
+    .section-divider {
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(212, 168, 83, 0.85);
+      margin: 8px 0 6px;
+      letter-spacing: 0.6px;
+    }
+
+    .legend-box {
+      background: rgba(0, 0, 0, 0.32);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11.5px;
+      line-height: 1.55;
+      color: rgba(247, 241, 227, 0.8);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      margin-bottom: 3px;
+    }
+
+    .legend-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* 3D 空间部件悬浮标签 */
+    #labels-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      overflow: hidden;
+    }
+
+    .part-label {
+      position: absolute;
+      transform: translate(-50%, -100%);
+      background: rgba(20, 16, 13, 0.82);
+      border: 1px solid rgba(212, 168, 83, 0.55);
+      color: var(--cream);
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.5);
+      transition: opacity 0.2s ease;
+      pointer-events: auto;
+      cursor: pointer;
+    }
+
+    .part-label:hover {
+      background: rgba(212, 168, 83, 0.92);
+      color: #16120e;
+    }
+
+    .part-label::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      bottom: -5px;
+      transform: translateX(-50%);
+      border-width: 5px 4px 0 4px;
+      border-style: solid;
+      border-color: rgba(212, 168, 83, 0.65) transparent transparent transparent;
+    }
+
+    /* 底部操作提示 */
+    .bottom-hint {
+      position: fixed;
+      bottom: 14px;
+      left: 18px;
+      z-index: 15;
+      font-size: 12px;
+      color: rgba(247, 241, 227, 0.6);
+      background: rgba(18, 15, 12, 0.65);
+      padding: 6px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+      backdrop-filter: blur(6px);
+    }
+
+    /* 移动端响应式适配 */
+    @media (max-width: 768px) {
+      .hud-header {
+        top: 56px;
+      }
+      .hud-title {
+        font-size: 15px;
+      }
+      .hud-subtitle {
+        display: none;
+      }
+      .telemetry-bar {
+        padding: 5px 8px;
+        gap: 4px;
+      }
+      .metric-item {
+        min-width: 56px;
+        padding: 0 4px;
+      }
+      .metric-val {
+        font-size: 12px;
+      }
+      .control-panel {
+        top: auto;
+        bottom: 10px;
+        right: 10px;
+        left: 10px;
+        width: auto;
+        max-height: 44vh;
+        padding: 10px 12px;
+      }
+      .bottom-hint {
+        display: none;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <div class="hud-header">
+    <div class="hud-title">卧式双动往复式蒸汽机工作原型</div>
+    <div class="hud-subtitle">D型滑阀配气机构 · 曲柄滑块连杆 · 瓦特离心调速器 · 锅炉热力循环</div>
+    <div class="telemetry-bar">
+      <div class="metric-item">
+        <span class="metric-label">飞轮转速</span>
+        <span class="metric-val" id="val-rpm">60 RPM</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">锅炉压力</span>
+        <span class="metric-val" id="val-psi">115 PSI</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">输出功率</span>
+        <span class="metric-val" id="val-hp">42.5 HP</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">曲柄转角</span>
+        <span class="metric-val" id="val-angle">0°</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">工作冲程</span>
+        <span class="metric-val phase-hot" id="val-phase">左腔进气推进 →</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="labels-layer"></div>
+
+  <aside class="control-panel">
+    <div class="panel-header">
+      <span class="panel-title">蒸汽机总控台</span>
+      <span style="font-size: 11px; color: rgba(247,241,227,0.5);">REV 1885</span>
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>主蒸汽节流阀 (阀门开度)</span>
+        <span class="control-value" id="lbl-throttle">65%</span>
+      </div>
+      <input type="range" id="slider-throttle" min="0" max="100" value="65" />
+    </div>
+
+    <div class="control-group">
+      <div class="control-label">
+        <span>锅炉炉膛火力强度</span>
+        <span class="control-value" id="lbl-fire">80%</span>
+      </div>
+      <input type="range" id="slider-fire" min="20" max="100" value="80" />
+    </div>
+
+    <div class="section-divider">演示模式与透视</div>
+    <div class="btn-grid">
+      <button class="ctrl-btn active" id="btn-cutaway">🔍 气缸剖面透视</button>
+      <button class="ctrl-btn" id="btn-slowmo">⏱️ 慢动作教学</button>
+      <button class="ctrl-btn active" id="btn-labels">🏷️ 部件名称标签</button>
+      <button class="ctrl-btn" id="btn-audio">🔊 蒸汽音效: 关</button>
+      <button class="ctrl-btn whistle-btn" id="btn-whistle">📯 拉响黄铜蒸汽汽笛 (长按/点击)</button>
+    </div>
+
+    <div class="section-divider">快速观测机位</div>
+    <div class="btn-grid">
+      <button class="ctrl-btn" data-cam="overview">全景总览</button>
+      <button class="ctrl-btn" data-cam="cylinder">气缸与D型滑阀</button>
+      <button class="ctrl-btn" data-cam="governor">瓦特离心调速器</button>
+      <button class="ctrl-btn" data-cam="flywheel">曲柄与大飞轮</button>
+    </div>
+
+    <div class="legend-box">
+      <div class="legend-row">
+        <span class="legend-dot" style="background: #ff6b35; box-shadow: 0 0 6px #ff6b35;"></span>
+        <span><strong>高压新蒸汽 (进气做功)</strong>：由锅炉经D型滑阀进入气缸推动活塞</span>
+      </div>
+      <div class="legend-row">
+        <span class="legend-dot" style="background: #66d9ff; box-shadow: 0 0 6px #66d9ff;"></span>
+        <span><strong>做功后乏汽 (排气冲程)</strong>：经D型滑阀内凹槽排出至排气管</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="bottom-hint">🖱️ 左键拖动旋转视角 · 滚轮/双指缩放 · 右键平移 · 点击部件标签可聚焦</div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ==========================================
+    // 1. 场景、相机与渲染器初始化
+    // ==========================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.FogExp2(0x14110f, 0.028);
+
+    const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.1, 150);
+    camera.position.set(0.5, 5.6, 12.8);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.15;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(-0.2, 2.5, 0);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.495;
+    controls.minDistance = 3.2;
+    controls.maxDistance = 26;
+
+    // ==========================================
+    // 2. 程序化纹理生成器 (Canvas 2D -> Texture)
+    // ==========================================
+    function createMetalBumpTexture(baseColor, noiseIntensity = 18, streak = true) {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = baseColor;
+      ctx.fillRect(0, 0, 256, 256);
+
+      const imgData = ctx.getImageData(0, 0, 256, 256);
+      const data = imgData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const n = (Math.random() - 0.5) * noiseIntensity;
+        data[i] = Math.min(255, Math.max(0, data[i] + n));
+        data[i + 1] = Math.min(255, Math.max(0, data[i + 1] + n));
+        data[i + 2] = Math.min(255, Math.max(0, data[i + 2] + n));
+      }
+      ctx.putImageData(imgData, 0, 0);
+
+      if (streak) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 120; i++) {
+          const y = Math.random() * 256;
+          ctx.beginPath();
+          ctx.moveTo(0, y);
+          ctx.lineTo(256, y);
+          ctx.stroke();
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createRivetBoilerTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#363230';
+      ctx.fillRect(0, 0, 512, 256);
+
+      // 金属拉丝噪点
+      for (let i = 0; i < 4000; i++) {
+        ctx.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)';
+        ctx.fillRect(Math.random() * 512, Math.random() * 256, 6, 2);
+      }
+
+      // 钢板接缝与铆钉圆点
+      const cols = [64, 192, 320, 448];
+      cols.forEach((x) => {
+        ctx.strokeStyle = '#1b1918';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, 256);
+        ctx.stroke();
+
+        for (let y = 12; y < 256; y += 20) {
+          ctx.fillStyle = '#6e665f';
+          ctx.beginPath();
+          ctx.arc(x - 8, y, 3.2, 0, Math.PI * 2);
+          ctx.arc(x + 8, y, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      return tex;
+    }
+
+    function createPressureGaugeTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#f5ecd7';
+      ctx.beginPath();
+      ctx.arc(128, 128, 120, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#2b2118';
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.arc(128, 128, 110, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // 刻度线
+      for (let i = 0; i <= 30; i++) {
+        const ang = Math.PI * 0.75 + (i / 30) * (Math.PI * 1.5);
+        const isMajor = i % 5 === 0;
+        const r1 = isMajor ? 84 : 94;
+        const r2 = 105;
+        ctx.strokeStyle = i >= 24 ? '#c9302c' : '#2b2118';
+        ctx.lineWidth = isMajor ? 3.5 : 1.8;
+        ctx.beginPath();
+        ctx.moveTo(128 + Math.cos(ang) * r1, 128 + Math.sin(ang) * r1);
+        ctx.lineTo(128 + Math.cos(ang) * r2, 128 + Math.sin(ang) * r2);
+        ctx.stroke();
+
+        if (isMajor) {
+          const val = i * 5;
+          const tx = 128 + Math.cos(ang) * 66;
+          const ty = 128 + Math.sin(ang) * 66;
+          ctx.fillStyle = '#2b2118';
+          ctx.font = 'bold 16px Georgia';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(val.toString(), tx, ty);
+        }
+      }
+
+      ctx.fillStyle = '#3a2e21';
+      ctx.font = 'bold 15px Georgia';
+      ctx.textAlign = 'center';
+      ctx.fillText('STEAM PSI', 128, 172);
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createSteamSpriteTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 60);
+      grad.addColorStop(0, 'rgba(255, 252, 245, 0.75)');
+      grad.addColorStop(0.45, 'rgba(230, 238, 245, 0.35)');
+      grad.addColorStop(1, 'rgba(200, 215, 230, 0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 128, 128);
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createFloorGridTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#1c1815';
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.strokeStyle = 'rgba(212, 168, 83, 0.1)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, 512, 512);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+      ctx.lineWidth = 1;
+      for (let i = 64; i < 512; i += 64) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 512);
+        ctx.moveTo(0, i);
+        ctx.lineTo(512, i);
+        ctx.stroke();
+      }
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(16, 16);
+      return tex;
+    }
+
+    // ==========================================
+    // 3. 材质库定义
+    // ==========================================
+    const ironBump = createMetalBumpTexture('#33302e', 24, false);
+    const steelBump = createMetalBumpTexture('#b8bfc6', 14, true);
+    const brassBump = createMetalBumpTexture('#d8a94b', 12, true);
+    const boilerTex = createRivetBoilerTexture();
+
+    const materials = {
+      castIron: new THREE.MeshStandardMaterial({
+        color: 0x2c2927,
+        roughness: 0.62,
+        metalness: 0.78,
+        bumpMap: ironBump,
+        bumpScale: 0.015
+      }),
+      darkGreenIron: new THREE.MeshStandardMaterial({
+        color: 0x1e352f,
+        roughness: 0.48,
+        metalness: 0.65,
+        bumpMap: ironBump,
+        bumpScale: 0.01
+      }),
+      crimsonIron: new THREE.MeshStandardMaterial({
+        color: 0x7d231d,
+        roughness: 0.42,
+        metalness: 0.55
+      }),
+      polishedSteel: new THREE.MeshStandardMaterial({
+        color: 0xd8dfe6,
+        roughness: 0.18,
+        metalness: 0.94,
+        bumpMap: steelBump,
+        bumpScale: 0.004
+      }),
+      brass: new THREE.MeshStandardMaterial({
+        color: 0xdfb15b,
+        roughness: 0.22,
+        metalness: 0.92,
+        bumpMap: brassBump,
+        bumpScale: 0.005
+      }),
+      copper: new THREE.MeshStandardMaterial({
+        color: 0xc86d48,
+        roughness: 0.26,
+        metalness: 0.90,
+        bumpMap: brassBump,
+        bumpScale: 0.006
+      }),
+      boilerSteel: new THREE.MeshStandardMaterial({
+        color: 0x45403c,
+        map: boilerTex,
+        bumpMap: boilerTex,
+        bumpScale: 0.02,
+        roughness: 0.5,
+        metalness: 0.82
+      }),
+      cutEdgeRed: new THREE.MeshStandardMaterial({
+        color: 0xb8332a,
+        roughness: 0.5,
+        metalness: 0.3
+      }),
+      wood: new THREE.MeshStandardMaterial({
+        color: 0x4b2e1b,
+        roughness: 0.75,
+        metalness: 0.1
+      }),
+      glass: new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.32,
+        roughness: 0.08,
+        metalness: 0.1,
+        transmission: 0.6
+      })
+    };
+
+    // ==========================================
+    // 4. 灯光与车间环境搭建
+    // ==========================================
+    const ambientLight = new THREE.AmbientLight(0xffe9cf, 0.75);
+    scene.add(ambientLight);
+
+    const hemiLight = new THREE.HemisphereLight(0xfff5e4, 0x261f1a, 0.85);
+    hemiLight.position.set(0, 15, 0);
+    scene.add(hemiLight);
+
+    const mainDirLight = new THREE.DirectionalLight(0xfff2dd, 2.2);
+    mainDirLight.position.set(8, 14, 10);
+    mainDirLight.castShadow = true;
+    mainDirLight.shadow.mapSize.width = 2048;
+    mainDirLight.shadow.mapSize.height = 2048;
+    mainDirLight.shadow.camera.near = 2;
+    mainDirLight.shadow.camera.far = 35;
+    const d = 9.5;
+    mainDirLight.shadow.camera.left = -d;
+    mainDirLight.shadow.camera.right = d;
+    mainDirLight.shadow.camera.top = d;
+    mainDirLight.shadow.camera.bottom = -d;
+    mainDirLight.shadow.bias = -0.0005;
+    scene.add(mainDirLight);
+
+    const rimLight = new THREE.DirectionalLight(0x8ecaff, 0.95);
+    rimLight.position.set(-10, 8, -9);
+    scene.add(rimLight);
+
+    // 锅炉燃烧室动态火光
+    const fireLight = new THREE.PointLight(0xff5e1a, 3.2, 9);
+    fireLight.position.set(-2.3, 1.3, -2.0);
+    scene.add(fireLight);
+
+    // 车间地面与砖石基座
+    const floorMesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(70, 70),
+      new THREE.MeshStandardMaterial({
+        map: createFloorGridTexture(),
+        roughness: 0.85,
+        metalness: 0.2
+      })
+    );
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    const engineGroup = new THREE.Group();
+    scene.add(engineGroup);
+
+    // 辅助函数：快速设置阴影
+    function enableShadows(obj, cast = true, receive = true) {
+      obj.traverse((child) => {
+        if (child.isMesh) {
+          child.castShadow = cast;
+          child.receiveShadow = receive;
+        }
+      });
+    }
+
+    // ==========================================
+    // 5. 机器基座与框架 (Engine Bedplate & Base)
+    // ==========================================
+    const baseGroup = new THREE.Group();
+    engineGroup.add(baseGroup);
+
+    // 主铸铁底座台阶
+    const plinth = new THREE.Mesh(new THREE.BoxGeometry(11.4, 0.55, 6.2), materials.castIron);
+    plinth.position.set(0, 0.275, -0.8);
+    baseGroup.add(plinth);
+
+    // 装饰黄铜包边
+    const brassTrim = new THREE.Mesh(new THREE.BoxGeometry(11.5, 0.08, 6.3), materials.brass);
+    brassTrim.position.set(0, 0.56, -0.8);
+    baseGroup.add(brassTrim);
+
+    // 蒸汽机工作台床身 (墨绿色古典铸铁涂装)
+    const bedFrameLeft = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.65, 0.42), materials.darkGreenIron);
+    bedFrameLeft.position.set(-0.2, 0.9, -0.68);
+    baseGroup.add(bedFrameLeft);
+
+    const bedFrameRight = new THREE.Mesh(new THREE.BoxGeometry(9.6, 0.65, 0.42), materials.darkGreenIron);
+    bedFrameRight.position.set(-0.2, 0.9, 0.68);
+    baseGroup.add(bedFrameRight);
+
+    // 床身横梁连接
+    [-4.6, -2.4, -0.2, 2.0, 4.2].forEach((bx) => {
+      const crossBeam = new THREE.Mesh(new THREE.BoxGeometry(0.45, 0.58, 1.4), materials.castIron);
+      crossBeam.position.set(bx, 0.88, 0);
+      baseGroup.add(crossBeam);
+
+      // 地脚螺栓
+      [-0.68, 0.68].forEach((bz) => {
+        const bolt = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.16, 6), materials.brass);
+        bolt.position.set(bx, 1.28, bz);
+        baseGroup.add(bolt);
+      });
+    });
+
+    enableShadows(baseGroup);
+
+    // ==========================================
+    // 6. 机械运动学核心参数定义
+    // ==========================================
+    const MECH = {
+      axisY: 2.25,
+      crankX: 3.1,
+      crankR: 0.82,
+      conRodL: 3.35,
+      pistonRodL: 3.35,
+      cylCenterX: -3.55,
+      cylRadius: 0.72,
+      cylLength: 2.25,
+      eccentricZ: 0.92,
+      eccentricR: 0.23,
+      eccentricRodL: 3.9,
+      valveCenterX: -3.55
+    };
+
+    // ==========================================
+    // 7. 主气缸与蒸汽室 (支持剖面透视切换)
+    // ==========================================
+    const cylinderAssembly = new THREE.Group();
+    cylinderAssembly.position.set(MECH.cylCenterX, MECH.axisY, 0);
+    engineGroup.add(cylinderAssembly);
+
+    // 气缸鞍座支架
+    const cylSaddle = new THREE.Mesh(new THREE.BoxGeometry(1.9, 1.05, 1.45), materials.castIron);
+    cylSaddle.position.set(0, -0.95, 0);
+    cylinderAssembly.add(cylSaddle);
+
+    // 气缸后半壳 (常驻显示，旋转使开口朝向观察者正前方 +Z)
+    const cylBackGeo = new THREE.CylinderGeometry(
+      MECH.cylRadius + 0.14,
+      MECH.cylRadius + 0.14,
+      MECH.cylLength,
+      36,
+      1,
+      false,
+      Math.PI * 0.5,
+      Math.PI
+    );
+    cylBackGeo.rotateZ(Math.PI / 2);
+    const cylBackShell = new THREE.Mesh(cylBackGeo, materials.darkGreenIron);
+    cylinderAssembly.add(cylBackShell);
+
+    // 气缸内壁后半衬套 (抛光钢铁内胆)
+    const linerBackGeo = new THREE.CylinderGeometry(
+      MECH.cylRadius + 0.01,
+      MECH.cylRadius + 0.01,
+      MECH.cylLength - 0.06,
+      36,
+      1,
+      true,
+      Math.PI * 0.5,
+      Math.PI
+    );
+    linerBackGeo.rotateZ(Math.PI / 2);
+    const linerMaterial = materials.polishedSteel.clone();
+    linerMaterial.side = THREE.DoubleSide;
+    const cylBackLiner = new THREE.Mesh(linerBackGeo, linerMaterial);
+    cylinderAssembly.add(cylBackLiner);
+
+    // 气缸前半壳 (剖面模式下隐藏/半透明)
+    const cylFrontGroup = new THREE.Group();
+    cylinderAssembly.add(cylFrontGroup);
+
+    const cylFrontGeo = new THREE.CylinderGeometry(
+      MECH.cylRadius + 0.14,
+      MECH.cylRadius + 0.14,
+      MECH.cylLength,
+      36,
+      1,
+      false,
+      -Math.PI * 0.5,
+      Math.PI
+    );
+    cylFrontGeo.rotateZ(Math.PI / 2);
+    const cylFrontShell = new THREE.Mesh(cylFrontGeo, materials.darkGreenIron);
+    cylFrontGroup.add(cylFrontShell);
+
+    // 气缸外部黄铜保温箍带
+    [-0.85, 0, 0.85].forEach((offsetX) => {
+      const bandBack = new THREE.Mesh(
+        new THREE.CylinderGeometry(MECH.cylRadius + 0.16, MECH.cylRadius + 0.16, 0.1, 36, 1, false, Math.PI * 0.5, Math.PI).rotateZ(Math.PI / 2),
+        materials.brass
+      );
+      bandBack.position.x = offsetX;
+      cylinderAssembly.add(bandBack);
+
+      const bandFront = new THREE.Mesh(
+        new THREE.CylinderGeometry(MECH.cylRadius + 0.16, MECH.cylRadius + 0.16, 0.1, 36, 1, false, -Math.PI * 0.5, Math.PI).rotateZ(Math.PI / 2),
+        materials.brass
+      );
+      bandFront.position.x = offsetX;
+      cylFrontGroup.add(bandFront);
+    });
+
+    // 气缸左右端盖与填料函 (Stuffing Box)
+    const leftCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(MECH.cylRadius + 0.22, MECH.cylRadius + 0.22, 0.16, 32).rotateZ(Math.PI / 2),
+      materials.castIron
+    );
+    leftCap.position.x = -MECH.cylLength / 2 - 0.08;
+    cylinderAssembly.add(leftCap);
+
+    const rightCap = new THREE.Mesh(
+      new THREE.CylinderGeometry(MECH.cylRadius + 0.22, MECH.cylRadius + 0.22, 0.16, 32).rotateZ(Math.PI / 2),
+      materials.castIron
+    );
+    rightCap.position.x = MECH.cylLength / 2 + 0.08;
+    cylinderAssembly.add(rightCap);
+
+    // 右端填料函密封盖 (黄铜)
+    const gland = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.24, 0.28, 0.32, 24).rotateZ(Math.PI / 2),
+      materials.brass
+    );
+    gland.position.x = MECH.cylLength / 2 + 0.28;
+    cylinderAssembly.add(gland);
+
+    // 剖面红色切口指示边
+    const cutFaceTop = new THREE.Mesh(new THREE.BoxGeometry(MECH.cylLength, 0.13, 0.04), materials.cutEdgeRed);
+    cutFaceTop.position.set(0, MECH.cylRadius + 0.07, 0);
+    cylinderAssembly.add(cutFaceTop);
+
+    const cutFaceBottom = new THREE.Mesh(new THREE.BoxGeometry(MECH.cylLength, 0.13, 0.04), materials.cutEdgeRed);
+    cutFaceBottom.position.set(0, -(MECH.cylRadius + 0.07), 0);
+    cylinderAssembly.add(cutFaceBottom);
+
+    // 动态气缸左右腔室蒸汽可视化发光体
+    const leftSteamMat = new THREE.MeshBasicMaterial({
+      color: 0xff6b35,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false
+    });
+    const rightSteamMat = new THREE.MeshBasicMaterial({
+      color: 0x66d9ff,
+      transparent: true,
+      opacity: 0.45,
+      depthWrite: false
+    });
+
+    const steamChamberGeo = new THREE.CylinderGeometry(MECH.cylRadius - 0.02, MECH.cylRadius - 0.02, 1, 28);
+    steamChamberGeo.rotateZ(Math.PI / 2);
+
+    const leftSteamChamber = new THREE.Mesh(steamChamberGeo, leftSteamMat);
+    const rightSteamChamber = new THREE.Mesh(steamChamberGeo, rightSteamMat);
+    cylinderAssembly.add(leftSteamChamber, rightSteamChamber);
+
+    // ==========================================
+    // 8. 蒸汽配气室与 D 型滑阀机构 (Steam Chest & D-Slide Valve)
+    // ==========================================
+    // 将蒸汽室布置在气缸正上方偏前，让进排气通道一目了然
+    const steamChestGroup = new THREE.Group();
+    steamChestGroup.position.set(0, MECH.cylRadius + 0.36, 0);
+    cylinderAssembly.add(steamChestGroup);
+
+    // 配气室底板与进排气孔道底座
+    const portBlock = new THREE.Mesh(new THREE.BoxGeometry(1.95, 0.32, 0.78), materials.castIron);
+    portBlock.position.set(0, -0.16, 0);
+    steamChestGroup.add(portBlock);
+
+    // 左进气道、右进气道、中央排气口可视化槽
+    const portMatLeft = new THREE.MeshBasicMaterial({ color: 0xff6b35, transparent: true, opacity: 0.65 });
+    const portMatRight = new THREE.MeshBasicMaterial({ color: 0x66d9ff, transparent: true, opacity: 0.65 });
+    const portMatExhaust = new THREE.MeshBasicMaterial({ color: 0x55c5ff, transparent: true, opacity: 0.55 });
+
+    const leftPassage = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.36, 0.45), portMatLeft);
+    leftPassage.position.set(-0.46, -0.15, 0.05);
+    steamChestGroup.add(leftPassage);
+
+    const rightPassage = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.36, 0.45), portMatRight);
+    rightPassage.position.set(0.46, -0.15, 0.05);
+    steamChestGroup.add(rightPassage);
+
+    const centerExhaustPort = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.22, 0.48), portMatExhaust);
+    centerExhaustPort.position.set(0, -0.09, 0.05);
+    steamChestGroup.add(centerExhaustPort);
+
+    // 配气室后壁与顶盖
+    const chestBackWall = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.52, 0.12), materials.darkGreenIron);
+    chestBackWall.position.set(0, 0.24, -0.33);
+    steamChestGroup.add(chestBackWall);
+
+    const chestTopCover = new THREE.Mesh(new THREE.BoxGeometry(1.92, 0.1, 0.78), materials.brass);
+    chestTopCover.position.set(0, 0.52, 0);
+    steamChestGroup.add(chestTopCover);
+
+    // 配气室透明观察窗前盖 (可在剖面与封闭模式间切换)
+    const chestFrontCover = new THREE.Mesh(new THREE.BoxGeometry(1.85, 0.52, 0.08), materials.glass);
+    chestFrontCover.position.set(0, 0.24, 0.35);
+    steamChestGroup.add(chestFrontCover);
+
+    // D 型滑阀本体 (随偏心轮往复滑动)
+    const slideValveGroup = new THREE.Group();
+    slideValveGroup.position.set(0, 0.15, 0);
+    steamChestGroup.add(slideValveGroup);
+
+    // D型滑阀外框 (黄铜耐磨滑块)
+    const valveTopBlock = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.14, 0.52), materials.brass);
+    valveTopBlock.position.y = 0.09;
+    slideValveGroup.add(valveTopBlock);
+
+    const valveLeftFoot = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.52), materials.brass);
+    valveLeftFoot.position.set(-0.36, -0.06, 0);
+    slideValveGroup.add(valveLeftFoot);
+
+    const valveRightFoot = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.18, 0.52), materials.brass);
+    valveRightFoot.position.set(0.36, -0.06, 0);
+    slideValveGroup.add(valveRightFoot);
+
+    // D型滑阀内部排气凹腔发光体
+    const valveCavityMesh = new THREE.Mesh(
+      new THREE.BoxGeometry(0.46, 0.15, 0.48),
+      new THREE.MeshBasicMaterial({ color: 0x62d2ff, transparent: true, opacity: 0.5 })
+    );
+    valveCavityMesh.position.set(0, -0.06, 0);
+    slideValveGroup.add(valveCavityMesh);
+
+    enableShadows(cylinderAssembly);
+
+    // ==========================================
+    // 9. 活塞、活塞杆、十字头与导轨 (Piston & Crosshead)
+    // ==========================================
+    const pistonGroup = new THREE.Group();
+    pistonGroup.position.set(MECH.cylCenterX, MECH.axisY, 0);
+    engineGroup.add(pistonGroup);
+
+    // 活塞头主体
+    const pistonHead = new THREE.Mesh(
+      new THREE.CylinderGeometry(MECH.cylRadius - 0.015, MECH.cylRadius - 0.015, 0.36, 32).rotateZ(Math.PI / 2),
+      materials.polishedSteel
+    );
+    pistonGroup.add(pistonHead);
+
+    // 黄铜活塞环 (两道密封环)
+    [-0.1, 0.1].forEach((rx) => {
+      const ring = new THREE.Mesh(
+        new THREE.CylinderGeometry(MECH.cylRadius + 0.002, MECH.cylRadius + 0.002, 0.045, 32).rotateZ(Math.PI / 2),
+        materials.brass
+      );
+      ring.position.x = rx;
+      pistonGroup.add(ring);
+    });
+
+    // 活塞杆 (连接活塞与十字头)
+    const pistonRodMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, MECH.pistonRodL, 20).rotateZ(Math.PI / 2),
+      materials.polishedSteel
+    );
+    pistonRodMesh.position.x = MECH.pistonRodL / 2;
+    pistonGroup.add(pistonRodMesh);
+
+    // 十字头滑块组件 (位于 pistonGroup 右端)
+    const crossheadNode = new THREE.Group();
+    crossheadNode.position.x = MECH.pistonRodL;
+    pistonGroup.add(crossheadNode);
+
+    const crossheadBody = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.52, 0.42), materials.castIron);
+    crossheadNode.add(crossheadBody);
+
+    // 上下黄铜耐磨滑靴
+    const shoeTop = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), materials.brass);
+    shoeTop.position.y = 0.31;
+    crossheadNode.add(shoeTop);
+
+    const shoeBottom = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.48), materials.brass);
+    shoeBottom.position.y = -0.31;
+    crossheadNode.add(shoeBottom);
+
+    // 十字头销轴
+    const crossheadPin = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.11, 0.68, 20).rotateX(Math.PI / 2),
+      materials.polishedSteel
+    );
+    crossheadNode.add(crossheadPin);
+
+    enableShadows(pistonGroup);
+
+    // 十字头上下平行导轨架 (固定在床身上)
+    const guideBarsGroup = new THREE.Group();
+    guideBarsGroup.position.set(-0.2, MECH.axisY, 0);
+    engineGroup.add(guideBarsGroup);
+
+    const guideTop = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.14, 0.52), materials.polishedSteel);
+    guideTop.position.y = 0.43;
+    guideBarsGroup.add(guideTop);
+
+    const guideBottom = new THREE.Mesh(new THREE.BoxGeometry(2.55, 0.14, 0.52), materials.polishedSteel);
+    guideBottom.position.y = -0.43;
+    guideBarsGroup.add(guideBottom);
+
+    // 导轨支柱与顶置滴油润滑杯
+    [-1.15, 1.15].forEach((gx) => {
+      const pillar = new THREE.Mesh(new THREE.BoxGeometry(0.24, 1.15, 0.56), materials.castIron);
+      pillar.position.set(gx, -0.75, 0);
+      guideBarsGroup.add(pillar);
+
+      const oilCup = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.06, 0.18, 16), materials.brass);
+      oilCup.position.set(gx * 0.5, 0.59, 0);
+      guideBarsGroup.add(oilCup);
+    });
+    enableShadows(guideBarsGroup);
+
+    // ==========================================
+    // 10. 主连杆与滑阀连杆 (Connecting Rod & Valve Linkage)
+    // ==========================================
+    const conRodGroup = new THREE.Group();
+    engineGroup.add(conRodGroup);
+
+    // 鱼腹型抛光钢主连杆杆身 (原点在左端十字头销，长度 MECH.conRodL)
+    const rodShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.13, 0.095, MECH.conRodL - 0.35, 20).rotateZ(-Math.PI / 2),
+      materials.polishedSteel
+    );
+    rodShaft.position.x = MECH.conRodL / 2;
+    conRodGroup.add(rodShaft);
+
+    // 小头黄铜轴瓦 (左端)
+    const smallEndBearing = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.2, 0.2, 0.32, 20).rotateX(Math.PI / 2),
+      materials.brass
+    );
+    conRodGroup.add(smallEndBearing);
+
+    // 大头黄铜曲柄轴瓦 (右端)
+    const bigEndBearing = new THREE.Mesh(
+      new THREE.BoxGeometry(0.46, 0.44, 0.36),
+      materials.brass
+    );
+    bigEndBearing.position.x = MECH.conRodL;
+    conRodGroup.add(bigEndBearing);
+    enableShadows(conRodGroup);
+
+    // 滑阀推杆与偏心轮连杆组件 (连接偏心轮与上方D型滑阀摇臂)
+    // 采用经典摇臂轴传动：底部偏心杆推动摇臂下端，摇臂上端水平推拉D型滑阀杆
+    const rockerPivotX = -1.35;
+    const rockerPivotY = MECH.axisY + 0.62;
+    const rockerPivotZ = 0.58;
+
+    const rockerStand = new THREE.Mesh(new THREE.BoxGeometry(0.22, 1.9, 0.22), materials.castIron);
+    rockerStand.position.set(rockerPivotX, MECH.axisY - 0.1, rockerPivotZ + 0.18);
+    engineGroup.add(rockerStand);
+
+    const rockerArmGroup = new THREE.Group();
+    rockerArmGroup.position.set(rockerPivotX, rockerPivotY, rockerPivotZ);
+    engineGroup.add(rockerArmGroup);
+
+    const rockerHub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.16, 0.16, 0.25, 18).rotateX(Math.PI / 2),
+      materials.brass
+    );
+    rockerArmGroup.add(rockerHub);
+
+    const rockerBar = new THREE.Mesh(new THREE.BoxGeometry(0.14, 1.32, 0.1), materials.polishedSteel);
+    rockerArmGroup.add(rockerBar);
+
+    // 滑阀水平推杆 (连接摇臂上端与 D型滑阀)
+    const valvePushRod = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.055, 0.055, 2.25, 16).rotateZ(Math.PI / 2),
+      materials.polishedSteel
+    );
+    valvePushRod.position.set(MECH.cylCenterX, MECH.axisY + MECH.cylRadius + 0.51, 0);
+    engineGroup.add(valvePushRod);
+
+    // 偏心轮连杆 (连接曲轴偏心轮环与摇臂下端)
+    const eccentricStrapGroup = new THREE.Group();
+    engineGroup.add(eccentricStrapGroup);
+
+    const eccentricRing = new THREE.Mesh(
+      new THREE.TorusGeometry(0.36, 0.055, 14, 28),
+      materials.brass
+    );
+    eccentricStrapGroup.add(eccentricRing);
+
+    const eccentricRodMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.05, 0.065, 4.45, 14).rotateZ(Math.PI / 2),
+      materials.polishedSteel
+    );
+    eccentricRodMesh.position.x = -2.22;
+    eccentricStrapGroup.add(eccentricRodMesh);
+
+    // ==========================================
+    // 11. 曲轴、平衡曲柄盘与巨型铸铁飞轮 (Crankshaft & Flywheel)
+    // ==========================================
+    // 主轴承座 (前后两个双立柱轴承台)
+    [-0.95, 0.95].forEach((bz) => {
+      const pedestal = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.3, 0.42), materials.castIron);
+      pedestal.position.set(MECH.crankX, 1.55, bz);
+      engineGroup.add(pedestal);
+
+      const bearingCap = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.44, 20).rotateX(Math.PI / 2), materials.brass);
+      bearingCap.position.set(MECH.crankX, MECH.axisY, bz);
+      engineGroup.add(bearingCap);
+    });
+
+    const crankshaftGroup = new THREE.Group();
+    crankshaftGroup.position.set(MECH.crankX, MECH.axisY, 0);
+    engineGroup.add(crankshaftGroup);
+
+    // 主轴
+    const mainShaft = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.22, 2.8, 24).rotateX(Math.PI / 2),
+      materials.polishedSteel
+    );
+    mainShaft.position.z = -0.25;
+    crankshaftGroup.add(mainShaft);
+
+    // 圆盘式曲柄平衡块 (Crank Disc)
+    const crankDisc = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.12, 1.12, 0.22, 36).rotateX(Math.PI / 2),
+      materials.castIron
+    );
+    crankDisc.position.z = -0.28;
+    crankshaftGroup.add(crankDisc);
+
+    const crankRim = new THREE.Mesh(
+      new THREE.TorusGeometry(1.1, 0.06, 12, 36),
+      materials.polishedSteel
+    );
+    crankRim.position.z = -0.17;
+    crankshaftGroup.add(crankRim);
+
+    // 曲柄销 (Crankpin，在局部坐标 x = MECH.crankR, y = 0)
+    const crankPinMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.14, 0.14, 0.48, 20).rotateX(Math.PI / 2),
+      materials.polishedSteel
+    );
+    crankPinMesh.position.set(MECH.crankR, 0, -0.02);
+    crankshaftGroup.add(crankPinMesh);
+
+    // 偏心轮盘 (Eccentric Sheave，比主曲柄超前约 102 度)
+    const ECC_PHASE = Math.PI * 0.56;
+    const eccentricSheave = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.33, 0.33, 0.14, 28).rotateX(Math.PI / 2),
+      materials.castIron
+    );
+    eccentricSheave.position.set(
+      Math.cos(ECC_PHASE) * MECH.eccentricR,
+      Math.sin(ECC_PHASE) * MECH.eccentricR,
+      0.58
+    );
+    crankshaftGroup.add(eccentricSheave);
+
+    // 巨型古典六辐条铸铁飞轮 (位于后侧 z = -1.42)
+    const flywheelGroup = new THREE.Group();
+    flywheelGroup.position.z = -1.42;
+    crankshaftGroup.add(flywheelGroup);
+
+    const fwRadius = 2.08;
+    // 飞轮外圈厚重轮缘 (古典暗红侧面 + 抛光钢外圈)
+    const fwOuterRim = new THREE.Mesh(
+      new THREE.CylinderGeometry(fwRadius, fwRadius, 0.48, 48, 1, true).rotateX(Math.PI / 2),
+      materials.polishedSteel
+    );
+    flywheelGroup.add(fwOuterRim);
+
+    const fwInnerRim = new THREE.Mesh(
+      new THREE.CylinderGeometry(fwRadius - 0.24, fwRadius - 0.24, 0.48, 48, 1, true).rotateX(Math.PI / 2),
+      materials.crimsonIron
+    );
+    flywheelGroup.add(fwInnerRim);
+
+    const fwRingFront = new THREE.Mesh(
+      new THREE.RingGeometry(fwRadius - 0.24, fwRadius, 48),
+      materials.crimsonIron
+    );
+    fwRingFront.position.z = 0.24;
+    flywheelGroup.add(fwRingFront);
+
+    const fwRingBack = fwRingFront.clone();
+    fwRingBack.rotation.y = Math.PI;
+    fwRingBack.position.z = -0.24;
+    flywheelGroup.add(fwRingBack);
+
+    // 飞轮中心轮毂与 6 根弧形截面辐条
+    const fwHub = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.45, 0.45, 0.54, 24).rotateX(Math.PI / 2),
+      materials.brass
+    );
+    flywheelGroup.add(fwHub);
+
+    for (let i = 0; i < 6; i++) {
+      const ang = (i / 6) * Math.PI * 2;
+      const spoke = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.085, 0.13, fwRadius - 0.35, 14),
+        materials.crimsonIron
+      );
+      spoke.position.set(
+        Math.cos(ang) * (fwRadius * 0.48),
+        Math.sin(ang) * (fwRadius * 0.48),
+        0
+      );
+      spoke.rotation.z = ang - Math.PI / 2;
+      flywheelGroup.add(spoke);
+    }
+
+    // 调速器皮带主动轮
+    const beltPulley = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.38, 0.38, 0.22, 24).rotateX(Math.PI / 2),
+      materials.brass
+    );
+    beltPulley.position.z = -0.7;
+    crankshaftGroup.add(beltPulley);
+
+    enableShadows(crankshaftGroup);
+
+    // ==========================================
+    // 12. 瓦特离心飞球调速器 (Centrifugal Watt Governor)
+    // ==========================================
+    const govPos = new THREE.Vector3(0.45, 2.25, -0.7);
+    const governorBaseGroup = new THREE.Group();
+    governorBaseGroup.position.copy(govPos);
+    engineGroup.add(governorBaseGroup);
+
+    // 调速器立柱底座
+    const govColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.22, 1.8, 20), materials.castIron);
+    govColumn.position.y = -0.35;
+    governorBaseGroup.add(govColumn);
+
+    // 传动皮带连接曲轴皮带轮与调速器底部锥齿轮箱
+    const beltLength = MECH.crankX - govPos.x;
+    const beltTop = new THREE.Mesh(new THREE.BoxGeometry(beltLength, 0.03, 0.14), materials.wood);
+    beltTop.position.set(beltLength / 2, 0.26, 0);
+    governorBaseGroup.add(beltTop);
+
+    const beltBottom = new THREE.Mesh(new THREE.BoxGeometry(beltLength, 0.03, 0.14), materials.wood);
+    beltBottom.position.set(beltLength / 2, -0.26, 0);
+    governorBaseGroup.add(beltBottom);
+
+    // 旋转主轴组
+    const govSpinner = new THREE.Group();
+    govSpinner.position.y = 0.55;
+    governorBaseGroup.add(govSpinner);
+
+    const govSpindle = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 2.0, 16), materials.polishedSteel);
+    govSpindle.position.y = 0.9;
+    govSpinner.add(govSpindle);
+
+    const govTopCrown = new THREE.Mesh(new THREE.SphereGeometry(0.14, 18, 18), materials.brass);
+    govTopCrown.position.y = 1.88;
+    govSpinner.add(govTopCrown);
+
+    // 左右两个离心摆臂与黄铜飞球
+    const govLeftArm = new THREE.Group();
+    govLeftArm.position.y = 1.82;
+    govSpinner.add(govLeftArm);
+
+    const govRightArm = new THREE.Group();
+    govRightArm.position.y = 1.82;
+    govSpinner.add(govRightArm);
+
+    function buildFlyballArm(armGroup, sideSign) {
+      const upperLink = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 1.05, 12), materials.polishedSteel);
+      upperLink.position.set(sideSign * 0.22, -0.48, 0);
+      upperLink.rotation.z = sideSign * 0.42;
+      armGroup.add(upperLink);
+
+      const flyball = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 24), materials.brass);
+      flyball.position.set(sideSign * 0.45, -0.96, 0);
+      armGroup.add(flyball);
+    }
+    buildFlyballArm(govLeftArm, -1);
+    buildFlyballArm(govRightArm, 1);
+
+    // 随转速上下滑动的黄铜套筒 (Collar)
+    const govCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.24, 20), materials.brass);
+    govCollar.position.y = 0.75;
+    govSpinner.add(govCollar);
+
+    enableShadows(governorBaseGroup);
+
+    // ==========================================
+    // 13. 铆钉蒸汽锅炉、炉膛、压力表与铜汽笛 (Boiler, Gauge & Whistle)
+    // ==========================================
+    const boilerGroup = new THREE.Group();
+    boilerGroup.position.set(-1.85, 2.35, -2.35);
+    engineGroup.add(boilerGroup);
+
+    // 锅炉圆筒锅身 (后侧主蒸汽源)
+    const boilerDrum = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.18, 1.18, 4.4, 36).rotateZ(Math.PI / 2),
+      materials.boilerSteel
+    );
+    boilerGroup.add(boilerDrum);
+
+    // 锅炉左右封头
+    const domeLeft = new THREE.Mesh(
+      new THREE.SphereGeometry(1.18, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateZ(Math.PI / 2),
+      materials.castIron
+    );
+    domeLeft.position.x = -2.2;
+    boilerGroup.add(domeLeft);
+
+    const domeRight = new THREE.Mesh(
+      new THREE.SphereGeometry(1.18, 32, 16, 0, Math.PI * 2, 0, Math.PI * 0.5).rotateZ(-Math.PI / 2),
+      materials.castIron
+    );
+    domeRight.position.x = 2.2;
+    boilerGroup.add(domeRight);
+
+    // 锅炉黄铜箍带
+    [-1.6, -0.5, 0.6, 1.7].forEach((bx) => {
+      const strap = new THREE.Mesh(
+        new THREE.CylinderGeometry(1.2, 1.2, 0.09, 36).rotateZ(Math.PI / 2),
+        materials.brass
+      );
+      strap.position.x = bx;
+      boilerGroup.add(strap);
+    });
+
+    // 底部砖石炉膛与发光燃煤火床
+    const fireboxBrick = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.35, 1.95), materials.castIron);
+    fireboxBrick.position.y = -1.15;
+    boilerGroup.add(fireboxBrick);
+
+    const coalEmberMat = new THREE.MeshStandardMaterial({
+      color: 0xff3b00,
+      emissive: 0xff4800,
+      emissiveIntensity: 2.2,
+      roughness: 0.8
+    });
+    const fireboxOpening = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.55, 0.12), coalEmberMat);
+    fireboxOpening.position.set(-0.4, -1.2, 0.96);
+    boilerGroup.add(fireboxOpening);
+
+    // 炉门格栅
+    for (let i = -3; i <= 3; i++) {
+      const grateBar = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.58, 0.15), materials.castIron);
+      grateBar.position.set(-0.4 + i * 0.18, -1.2, 0.98);
+      boilerGroup.add(grateBar);
+    }
+
+    // 顶部集汽包 (Steam Dome)
+    const steamDome = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.55, 0.9, 28), materials.brass);
+    steamDome.position.set(0.2, 1.35, 0);
+    boilerGroup.add(steamDome);
+
+    const steamDomeCap = new THREE.Mesh(new THREE.SphereGeometry(0.52, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.brass);
+    steamDomeCap.position.set(0.2, 1.8, 0);
+    boilerGroup.add(steamDomeCap);
+
+    // 烟囱 (Chimney Stack)
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.34, 0.42, 2.2, 24), materials.castIron);
+    chimney.position.set(-1.6, 2.0, 0);
+    boilerGroup.add(chimney);
+
+    const chimneyCrown = new THREE.Mesh(new THREE.TorusGeometry(0.37, 0.06, 12, 24).rotateX(Math.PI / 2), materials.brass);
+    chimneyCrown.position.set(-1.6, 3.1, 0);
+    boilerGroup.add(chimneyCrown);
+
+    // 黄铜蒸汽汽笛 (Steam Whistle，安装在集汽包旁)
+    const whistleGroup = new THREE.Group();
+    whistleGroup.position.set(1.15, 1.25, 0.35);
+    boilerGroup.add(whistleGroup);
+
+    const whistlePipe = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.45, 16), materials.copper);
+    whistlePipe.position.y = 0.2;
+    whistleGroup.add(whistlePipe);
+
+    const whistleBell = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.5, 20), materials.brass);
+    whistleBell.position.y = 0.68;
+    whistleGroup.add(whistleBell);
+
+    const whistleCap = new THREE.Mesh(new THREE.SphereGeometry(0.14, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), materials.brass);
+    whistleCap.position.y = 0.93;
+    whistleGroup.add(whistleCap);
+
+    // 复古波登管蒸汽压力表 (Bourdon Pressure Gauge)
+    const gaugeGroup = new THREE.Group();
+    gaugeGroup.position.set(-0.65, 1.35, 0.85);
+    boilerGroup.add(gaugeGroup);
+
+    const gaugeCase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.38, 0.38, 0.14, 28).rotateX(Math.PI / 2),
+      materials.brass
+    );
+    gaugeGroup.add(gaugeCase);
+
+    const gaugeFace = new THREE.Mesh(
+      new THREE.CircleGeometry(0.33, 28),
+      new THREE.MeshBasicMaterial({ map: createPressureGaugeTexture() })
+    );
+    gaugeFace.position.z = 0.075;
+    gaugeGroup.add(gaugeFace);
+
+    // 压力表动态指针
+    const gaugeNeedle = new THREE.Group();
+    gaugeNeedle.position.z = 0.085;
+    gaugeGroup.add(gaugeNeedle);
+
+    const needleBar = new THREE.Mesh(
+      new THREE.BoxGeometry(0.025, 0.24, 0.01),
+      new THREE.MeshBasicMaterial({ color: 0x1a120b })
+    );
+    needleBar.position.y = 0.08;
+    gaugeNeedle.add(needleBar);
+
+    // 主蒸汽输送紫铜管道 (从集汽包通往气缸蒸汽室)
+    const pipeCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-1.65, 3.85, -2.35),
+      new THREE.Vector3(-1.65, 4.15, -0.8),
+      new THREE.Vector3(MECH.cylCenterX, 4.15, 0),
+      new THREE.Vector3(MECH.cylCenterX, MECH.axisY + MECH.cylRadius + 0.88, 0)
+    ]);
+    const mainSteamPipe = new THREE.Mesh(
+      new THREE.TubeGeometry(pipeCurve, 32, 0.12, 16, false),
+      materials.copper
+    );
+    engineGroup.add(mainSteamPipe);
+
+    // 红色节流手轮阀 (安装在进汽管垂直段)
+    const throttleWheel = new THREE.Mesh(
+      new THREE.TorusGeometry(0.24, 0.035, 12, 24).rotateX(Math.PI / 2),
+      materials.crimsonIron
+    );
+    throttleWheel.position.set(MECH.cylCenterX, 3.85, 0);
+    engineGroup.add(throttleWheel);
+
+    // 乏汽排气管 (从气缸蒸汽室侧面排出)
+    const exhaustPipeCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(MECH.cylCenterX - 0.65, MECH.axisY + MECH.cylRadius + 0.2, -0.35),
+      new THREE.Vector3(MECH.cylCenterX - 1.25, MECH.axisY + MECH.cylRadius + 0.2, -0.85),
+      new THREE.Vector3(MECH.cylCenterX - 1.25, 4.5, -0.85)
+    ]);
+    const exhaustPipeMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(exhaustPipeCurve, 20, 0.105, 14, false),
+      materials.brass
+    );
+    engineGroup.add(exhaustPipeMesh);
+
+    enableShadows(boilerGroup);
+
+    // ==========================================
+    // 14. 蒸汽粒子系统 (排气管冲程喷射、烟囱与汽笛)
+    // ==========================================
+    const steamSpriteTex = createSteamSpriteTexture();
+    const particlePool = [];
+    const MAX_PARTICLES = 110;
+    const particleGroup = new THREE.Group();
+    scene.add(particleGroup);
+
+    for (let i = 0; i < MAX_PARTICLES; i++) {
+      const mat = new THREE.SpriteMaterial({
+        map: steamSpriteTex,
+        color: 0xf2f7fa,
+        transparent: true,
+        opacity: 0,
+        depthWrite: false
+      });
+      const sprite = new THREE.Sprite(mat);
+      sprite.visible = false;
+      particleGroup.add(sprite);
+      particlePool.push({
+        sprite,
+        active: false,
+        age: 0,
+        maxAge: 1.5,
+        vel: new THREE.Vector3(),
+        startScale: 0.3,
+        endScale: 1.8
+      });
+    }
+
+    function spawnSteamParticle(origin, velocity, startScale = 0.28, endScale = 1.65, maxAge = 1.4, tint = 0xf2f7fa) {
+      const p = particlePool.find((item) => !item.active);
+      if (!p) return;
+      p.active = true;
+      p.age = 0;
+      p.maxAge = maxAge;
+      p.startScale = startScale;
+      p.endScale = endScale;
+      p.vel.copy(velocity);
+      p.sprite.position.copy(origin);
+      p.sprite.material.color.setHex(tint);
+      p.sprite.material.opacity = 0.65;
+      p.sprite.scale.setScalar(startScale);
+      p.sprite.visible = true;
+    }
+
+    function updateSteamParticles(dt) {
+      for (let i = 0; i < particlePool.length; i++) {
+        const p = particlePool[i];
+        if (!p.active) continue;
+        p.age += dt;
+        if (p.age >= p.maxAge) {
+          p.active = false;
+          p.sprite.visible = false;
+          continue;
+        }
+        const t = p.age / p.maxAge;
+        p.sprite.position.addScaledVector(p.vel, dt);
+        p.vel.x += (Math.random() - 0.5) * 0.4 * dt;
+        p.vel.z += (Math.random() - 0.5) * 0.4 * dt;
+        const scale = THREE.MathUtils.lerp(p.startScale, p.endScale, t);
+        p.sprite.scale.setScalar(scale);
+        p.sprite.material.opacity = Math.sin((1 - t) * Math.PI * 0.5) * 0.55;
+      }
+    }
+
+    // ==========================================
+    // 15. Web Audio API 程序化蒸汽音效与汽笛合成器
+    // ==========================================
+    class SteamSoundEngine {
+      constructor() {
+        this.ctx = null;
+        this.enabled = false;
+        this.whistleOsc1 = null;
+        this.whistleOsc2 = null;
+        this.whistleGain = null;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioCtx();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      // 活塞死点换向排汽“噗嗤”声 (Chug)
+      triggerChug(intensity = 0.6) {
+        if (!this.enabled || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const duration = 0.16;
+        const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          const env = Math.pow(1 - i / bufferSize, 1.8);
+          data[i] = (Math.random() * 2 - 1) * env;
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(520, now);
+        filter.Q.setValueAtTime(1.8, now);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(Math.min(0.35, intensity * 0.32), now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+        noise.start(now);
+      }
+
+      startWhistle() {
+        this.init();
+        if (this.whistleGain) return;
+        const now = this.ctx.currentTime;
+        this.whistleGain = this.ctx.createGain();
+        this.whistleGain.gain.setValueAtTime(0.01, now);
+        this.whistleGain.gain.linearRampToValueAtTime(0.22, now + 0.08);
+
+        // 双音复调黄铜蒸汽汽笛和弦
+        this.whistleOsc1 = this.ctx.createOscillator();
+        this.whistleOsc2 = this.ctx.createOscillator();
+        this.whistleOsc1.type = 'triangle';
+        this.whistleOsc2.type = 'sawtooth';
+        this.whistleOsc1.frequency.setValueAtTime(587.33, now); // D5
+        this.whistleOsc2.frequency.setValueAtTime(739.99, now); // F#5
+
+        const lowpass = this.ctx.createBiquadFilter();
+        lowpass.type = 'lowpass';
+        lowpass.frequency.setValueAtTime(1600, now);
+
+        this.whistleOsc1.connect(lowpass);
+        this.whistleOsc2.connect(lowpass);
+        lowpass.connect(this.whistleGain);
+        this.whistleGain.connect(this.ctx.destination);
+
+        this.whistleOsc1.start(now);
+        this.whistleOsc2.start(now);
+      }
+
+      stopWhistle() {
+        if (!this.whistleGain || !this.ctx) return;
+        const now = this.ctx.currentTime;
+        const gainNode = this.whistleGain;
+        const osc1 = this.whistleOsc1;
+        const osc2 = this.whistleOsc2;
+        this.whistleGain = null;
+        this.whistleOsc1 = null;
+        this.whistleOsc2 = null;
+
+        gainNode.gain.setValueAtTime(gainNode.gain.value, now);
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, now + 0.18);
+        setTimeout(() => {
+          try {
+            osc1.stop();
+            osc2.stop();
+          } catch (e) {}
+        }, 200);
+      }
+    }
+
+    const soundEngine = new SteamSoundEngine();
+
+    // ==========================================
+    // 16. 3D 空间部件悬浮标签系统
+    // ==========================================
+    const labelsLayer = document.getElementById('labels-layer');
+    const partAnnotations = [
+      { name: '双动气缸与活塞', pos: new THREE.Vector3(-3.55, 1.95, 0.65), camKey: 'cylinder' },
+      { name: 'D型滑阀配气室', pos: new THREE.Vector3(-3.55, 3.65, 0.35), camKey: 'cylinder' },
+      { name: '十字头与平行导轨', pos: new THREE.Vector3(-0.2, 3.05, 0.3), camKey: 'overview' },
+      { name: '主连杆机构', pos: new THREE.Vector3(1.4, 2.65, 0.2), camKey: 'overview' },
+      { name: '瓦特离心调速器', pos: new THREE.Vector3(0.45, 4.85, -0.7), camKey: 'governor' },
+      { name: '曲轴与铸铁飞轮', pos: new THREE.Vector3(3.1, 4.45, -1.4), camKey: 'flywheel' },
+      { name: '铆钉蒸汽锅炉', pos: new THREE.Vector3(-1.85, 4.35, -2.35), camKey: 'overview' }
+    ];
+
+    partAnnotations.forEach((item) => {
+      const el = document.createElement('div');
+      el.className = 'part-label';
+      el.textContent = item.name;
+      el.addEventListener('click', () => moveCameraToPreset(item.camKey));
+      labelsLayer.appendChild(el);
+      item.el = el;
+    });
+
+    let showLabels = true;
+    function updateLabelsProjection() {
+      if (!showLabels) return;
+      const halfW = window.innerWidth / 2;
+      const halfH = window.innerHeight / 2;
+      const tempV = new THREE.Vector3();
+
+      partAnnotations.forEach((item) => {
+        tempV.copy(item.pos).project(camera);
+        if (tempV.z > 1) {
+          item.el.style.opacity = '0';
+          return;
+        }
+        const x = tempV.x * halfW + halfW;
+        const y = -tempV.y * halfH + halfH;
+        item.el.style.left = `${x}px`;
+        item.el.style.top = `${y}px`;
+        item.el.style.opacity = '1';
+      });
+    }
+
+    // ==========================================
+    // 17. 状态控制与 UI 交互事件绑定
+    // ==========================================
+    const state = {
+      throttle: 0.65,
+      fireHeat: 0.80,
+      cutaway: true,
+      slowMo: false,
+      whistleBlowing: false,
+      crankAngle: 0,
+      currentRPM: 62,
+      boilerPSI: 115,
+      lastHalfCycle: 0
+    };
+
+    // 默认开启气缸剖面透视
+    cylFrontGroup.visible = false;
+
+    const sliderThrottle = document.getElementById('slider-throttle');
+    const lblThrottle = document.getElementById('lbl-throttle');
+    sliderThrottle.addEventListener('input', (e) => {
+      state.throttle = Number(e.target.value) / 100;
+      lblThrottle.textContent = `${e.target.value}%`;
+    });
+
+    const sliderFire = document.getElementById('slider-fire');
+    const lblFire = document.getElementById('lbl-fire');
+    sliderFire.addEventListener('input', (e) => {
+      state.fireHeat = Number(e.target.value) / 100;
+      lblFire.textContent = `${e.target.value}%`;
+    });
+
+    const btnCutaway = document.getElementById('btn-cutaway');
+    btnCutaway.addEventListener('click', () => {
+      state.cutaway = !state.cutaway;
+      cylFrontGroup.visible = !state.cutaway;
+      chestFrontCover.visible = !state.cutaway;
+      leftSteamChamber.visible = state.cutaway;
+      rightSteamChamber.visible = state.cutaway;
+      btnCutaway.classList.toggle('active', state.cutaway);
+    });
+    // 初始化时隐藏配气室玻璃前盖以获得更清晰的剖面视觉
+    chestFrontCover.visible = false;
+
+    const btnSlowMo = document.getElementById('btn-slowmo');
+    btnSlowMo.addEventListener('click', () => {
+      state.slowMo = !state.slowMo;
+      btnSlowMo.classList.toggle('active', state.slowMo);
+    });
+
+    const btnLabels = document.getElementById('btn-labels');
+    btnLabels.addEventListener('click', () => {
+      showLabels = !showLabels;
+      labelsLayer.style.display = showLabels ? 'block' : 'none';
+      btnLabels.classList.toggle('active', showLabels);
+    });
+
+    const btnAudio = document.getElementById('btn-audio');
+    btnAudio.addEventListener('click', () => {
+      soundEngine.init();
+      soundEngine.enabled = !soundEngine.enabled;
+      btnAudio.textContent = soundEngine.enabled ? '🔊 蒸汽音效: 开' : '🔊 蒸汽音效: 关';
+      btnAudio.classList.toggle('active', soundEngine.enabled);
+    });
+
+    const btnWhistle = document.getElementById('btn-whistle');
+    function startBlowingWhistle(e) {
+      if (e) e.preventDefault();
+      state.whistleBlowing = true;
+      btnWhistle.classList.add('blowing');
+      soundEngine.startWhistle();
+    }
+    function stopBlowingWhistle() {
+      if (!state.whistleBlowing) return;
+      state.whistleBlowing = false;
+      btnWhistle.classList.remove('blowing');
+      soundEngine.stopWhistle();
+    }
+    btnWhistle.addEventListener('mousedown', startBlowingWhistle);
+    btnWhistle.addEventListener('touchstart', startBlowingWhistle, { passive: false });
+    window.addEventListener('mouseup', stopBlowingWhistle);
+    window.addEventListener('touchend', stopBlowingWhistle);
+
+    // 视角平滑过渡系统
+    const camPresets = {
+      overview: { pos: new THREE.Vector3(0.5, 5.6, 12.8), target: new THREE.Vector3(-0.2, 2.5, 0) },
+      cylinder: { pos: new THREE.Vector3(-3.55, 3.1, 4.6), target: new THREE.Vector3(-3.55, 2.65, 0) },
+      governor: { pos: new THREE.Vector3(0.8, 4.4, 3.4), target: new THREE.Vector3(0.45, 3.6, -0.7) },
+      flywheel: { pos: new THREE.Vector3(5.6, 3.6, 4.5), target: new THREE.Vector3(3.1, 2.3, -0.6) }
+    };
+
+    let camTransition = null;
+    function moveCameraToPreset(key) {
+      const preset = camPresets[key];
+      if (!preset) return;
+      camTransition = {
+        startPos: camera.position.clone(),
+        endPos: preset.pos.clone(),
+        startTarget: controls.target.clone(),
+        endTarget: preset.target.clone(),
+        progress: 0
+      };
+    }
+
+    document.querySelectorAll('[data-cam]').forEach((btn) => {
+      btn.addEventListener('click', () => moveCameraToPreset(btn.dataset.cam));
+    });
+
+    // ==========================================
+    // 18. 实时机械运动学与热力学仿真主循环
+    // ==========================================
+    const elRpm = document.getElementById('val-rpm');
+    const elPsi = document.getElementById('val-psi');
+    const elHp = document.getElementById('val-hp');
+    const elAngle = document.getElementById('val-angle');
+    const elPhase = document.getElementById('val-phase');
+
+    const clock = new THREE.Clock();
+    let chimneyTimer = 0;
+
+    function updateSteamEngineSimulation(dt) {
+      // 1. 锅炉压力与转速动力学平滑过渡
+      const targetPSI = 45 + state.fireHeat * 95;
+      state.boilerPSI = THREE.MathUtils.lerp(state.boilerPSI, targetPSI, dt * 2.5);
+
+      const pressureFactor = state.boilerPSI / 120;
+      const targetRPM = state.throttle * 110 * pressureFactor;
+      state.currentRPM = THREE.MathUtils.lerp(state.currentRPM, targetRPM, dt * 3.0);
+
+      const timeScale = state.slowMo ? 0.16 : 1.0;
+      const omega = (state.currentRPM * Math.PI * 2) / 60;
+      state.crankAngle = (state.crankAngle + omega * dt * timeScale) % (Math.PI * 2);
+      const theta = state.crankAngle;
+
+      // 2. 曲轴与飞轮旋转
+      crankshaftGroup.rotation.z = theta;
+      throttleWheel.rotation.y = state.throttle * Math.PI * 4;
+
+      // 3. 曲柄滑块机构精确几何解算
+      // 曲柄销世界坐标 (X, Y)
+      const crankPinX = MECH.crankX + MECH.crankR * Math.cos(theta);
+      const crankPinY = MECH.axisY + MECH.crankR * Math.sin(theta);
+
+      // 十字头精确水平位置: x_c = x_crank + R*cos(θ) - sqrt(L^2 - R^2*sin^2(θ))
+      const sinTheta = Math.sin(theta);
+      const dyPin = MECH.crankR * sinTheta;
+      const rodHorizProj = Math.sqrt(MECH.conRodL * MECH.conRodL - dyPin * dyPin);
+      const crossheadX = crankPinX - rodHorizProj;
+
+      // 活塞精确位置
+      const pistonWorldX = crossheadX - MECH.pistonRodL;
+      pistonGroup.position.x = pistonWorldX;
+
+      // 主连杆位置与摆角
+      conRodGroup.position.set(crossheadX, MECH.axisY, 0);
+      const rodAngle = Math.atan2(crankPinY - MECH.axisY, crankPinX - crossheadX);
+      conRodGroup.rotation.z = rodAngle;
+
+      // 4. 偏心轮与 D 型滑阀配气机构解算 (超前主曲柄约 102 度)
+      const eccWorldAngle = theta + ECC_PHASE;
+      const eccCenterX = MECH.crankX + MECH.eccentricR * Math.cos(eccWorldAngle);
+      const eccCenterY = MECH.axisY + MECH.eccentricR * Math.sin(eccWorldAngle);
+
+      eccentricStrapGroup.position.set(eccCenterX, eccCenterY, 0.58);
+      // 摇臂摆动角与 D 型滑阀位移
+      const valveOffset = -MECH.eccentricR * Math.cos(eccWorldAngle);
+      slideValveGroup.position.x = valveOffset;
+      valvePushRod.position.x = MECH.cylCenterX + valveOffset;
+      rockerArmGroup.rotation.z = -valveOffset * 1.45;
+      eccentricStrapGroup.rotation.z = (eccCenterY - (rockerPivotY - 0.6)) * 0.22;
+
+      // 5. 气缸内部左右腔室动态蒸汽体积与进排气色彩可视化
+      const pistonLocalX = pistonWorldX - MECH.cylCenterX;
+      const cylInnerHalf = MECH.cylLength / 2 - 0.06;
+      const pistonHalfThick = 0.18;
+
+      const leftLen = Math.max(0.04, (pistonLocalX - pistonHalfThick) - (-cylInnerHalf));
+      leftSteamChamber.scale.set(1, leftLen, 1);
+      leftSteamChamber.position.x = -cylInnerHalf + leftLen / 2;
+
+      const rightLen = Math.max(0.04, cylInnerHalf - (pistonLocalX + pistonHalfThick));
+      rightSteamChamber.scale.set(1, rightLen, 1);
+      rightSteamChamber.position.x = cylInnerHalf - rightLen / 2;
+
+      // 判断活塞运动方向：sin(θ) < 0 时活塞向右运动 (左腔进气高压红橙，右腔排气青蓝)
+      const movingRight = sinTheta < 0;
+      const steamIntensity = Math.min(1, state.currentRPM / 25 + 0.15);
+
+      if (movingRight) {
+        leftSteamMat.color.setHex(0xff6b35);
+        leftSteamMat.opacity = 0.52 * steamIntensity;
+        rightSteamMat.color.setHex(0x66d9ff);
+        rightSteamMat.opacity = 0.36 * steamIntensity;
+        portMatLeft.color.setHex(0xff6b35);
+        portMatRight.color.setHex(0x66d9ff);
+      } else {
+        leftSteamMat.color.setHex(0x66d9ff);
+        leftSteamMat.opacity = 0.36 * steamIntensity;
+        rightSteamMat.color.setHex(0xff6b35);
+        rightSteamMat.opacity = 0.52 * steamIntensity;
+        portMatLeft.color.setHex(0x66d9ff);
+        portMatRight.color.setHex(0xff6b35);
+      }
+
+      // 6. 瓦特离心调速器飞球升力计算
+      govSpinner.rotation.y += omega * 2.1 * dt * timeScale;
+      const normSpeed = Math.min(1, state.currentRPM / 105);
+      const liftAngle = normSpeed * 0.52;
+      govLeftArm.rotation.z = -liftAngle;
+      govRightArm.rotation.z = liftAngle;
+      govCollar.position.y = 0.72 + normSpeed * 0.32;
+
+      // 7. 锅炉压力表指针与炉膛火光闪烁
+      const gaugeRatio = Math.min(1, state.boilerPSI / 150);
+      gaugeNeedle.rotation.z = THREE.MathUtils.degToRad(135 - gaugeRatio * 270);
+
+      const flicker = 0.88 + Math.sin(clock.elapsedTime * 17) * 0.08 + Math.cos(clock.elapsedTime * 29) * 0.06;
+      fireLight.intensity = 3.2 * state.fireHeat * flicker;
+      coalEmberMat.emissiveIntensity = 2.0 * state.fireHeat * flicker;
+
+      // 8. 活塞死点排汽喷射与音效触发
+      const currentHalfCycle = Math.floor((theta / Math.PI) % 2);
+      if (currentHalfCycle !== state.lastHalfCycle && state.currentRPM > 3) {
+        state.lastHalfCycle = currentHalfCycle;
+        soundEngine.triggerChug(state.currentRPM / 90);
+
+        // 排气管喷出白色乏汽团
+        for (let i = 0; i < 4; i++) {
+          spawnSteamParticle(
+            new THREE.Vector3(MECH.cylCenterX - 1.25, 4.55, -0.85),
+            new THREE.Vector3((Math.random() - 0.5) * 0.6, 2.2 + Math.random() * 1.2, (Math.random() - 0.5) * 0.6),
+            0.25,
+            1.45,
+            1.2,
+            0xeaf6ff
+          );
+        }
+      }
+
+      // 烟囱持续微弱烟雾与汽笛高能蒸汽喷射
+      chimneyTimer += dt;
+      if (chimneyTimer > 0.14) {
+        chimneyTimer = 0;
+        spawnSteamParticle(
+          new THREE.Vector3(-3.45, 5.5, -2.35),
+          new THREE.Vector3(0.2 + (Math.random() - 0.5) * 0.4, 1.3 + state.fireHeat * 0.9, (Math.random() - 0.5) * 0.4),
+          0.32,
+          1.9,
+          1.8,
+          0xd8d5d0
+        );
+      }
+
+      if (state.whistleBlowing) {
+        spawnSteamParticle(
+          new THREE.Vector3(-0.7, 4.35, -2.0),
+          new THREE.Vector3((Math.random() - 0.5) * 1.2, 4.2 + Math.random() * 1.5, (Math.random() - 0.5) * 1.2),
+          0.22,
+          1.3,
+          0.65,
+          0xffffff
+        );
+      }
+
+      // 9. 更新顶部遥测面板数值
+      elRpm.textContent = `${Math.round(state.currentRPM)} RPM`;
+      elPsi.textContent = `${Math.round(state.boilerPSI)} PSI`;
+      const hp = ((state.currentRPM * state.boilerPSI) / 165).toFixed(1);
+      elHp.textContent = `${hp} HP`;
+      elAngle.textContent = `${Math.round(THREE.MathUtils.radToDeg(theta))}°`;
+
+      if (state.currentRPM < 1) {
+        elPhase.textContent = '停机待命';
+        elPhase.className = 'metric-val';
+      } else if (movingRight) {
+        elPhase.textContent = '左腔进气推进 →';
+        elPhase.className = 'metric-val phase-hot';
+      } else {
+        elPhase.textContent = '← 右腔进气回推';
+        elPhase.className = 'metric-val phase-cold';
+      }
+    }
+
+    // ==========================================
+    // 19. 渲染循环与窗口自适应
+    // ==========================================
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+
+      if (camTransition) {
+        camTransition.progress += dt * 2.2;
+        const t = Math.min(1, camTransition.progress);
+        const ease = 1 - Math.pow(1 - t, 3);
+        camera.position.lerpVectors(camTransition.startPos, camTransition.endPos, ease);
+        controls.target.lerpVectors(camTransition.startTarget, camTransition.endTarget, ease);
+        if (t >= 1) camTransition = null;
+      }
+
+      controls.update();
+      updateSteamEngineSimulation(dt);
+      updateSteamParticles(dt);
+      updateLabelsProjection();
+      renderer.render(scene, camera);
+    }
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    animate();
+  </script>
+  <script src="../prompt-panel.js" data-id="steam-engine-web"></script>
+</body>
+</html>
