@@ -142,9 +142,146 @@
       ? String(currentScript.dataset.id).trim()
       : '';
 
+  var scriptSrc = (currentScript && currentScript.src) ? currentScript.src : window.location.href;
   var promptUrl = sceneId ? '../prompts/' + sceneId + '.txt' : '';
   var cachedPrompt = null;
   var fetchPromise = null;
+
+  var elPanel = null;
+  var elTitle = null;
+  var elCopyBtn = null;
+  var elCloseBtn = null;
+  var elToggleBtn = null;
+  var elPre = null;
+  var copyTimer = null;
+
+  function tr(key, fallbackZh) {
+    try {
+      if (window.I18N && typeof window.I18N.has === 'function' && window.I18N.has(key) && typeof window.I18N.t === 'function') {
+        return window.I18N.t(key);
+      }
+    } catch (e) {}
+    return fallbackZh !== undefined ? fallbackZh : key;
+  }
+
+  function relabel() {
+    try {
+      if (elPanel) {
+        elPanel.setAttribute('aria-label', tr('pp.title', '生成这个场景的提示词'));
+      }
+      if (elTitle) {
+        elTitle.textContent = tr('pp.title', '生成这个场景的提示词');
+      }
+      if (elCopyBtn && !copyTimer) {
+        elCopyBtn.textContent = tr('pp.copy', '复制');
+      }
+      if (elCloseBtn) {
+        elCloseBtn.textContent = tr('pp.close', '关闭');
+      }
+      if (elToggleBtn) {
+        elToggleBtn.textContent = tr('pp.toggle', '📜 提示词');
+      }
+      if (elPre) {
+        var curPre = elPre.textContent;
+        var loadingList = ['正在加载提示词…', 'Loading prompt…', tr('pp.loading', '正在加载提示词…')];
+        var failList = ['未能加载提示词文本。', 'Failed to load prompt.', tr('pp.loadFailed', '未能加载提示词文本。')];
+        var noIdList = ['未配置提示词 ID（data-id）。', 'Prompt ID (data-id) not configured.', tr('pp.noId', '未配置提示词 ID（data-id）。')];
+        if (loadingList.indexOf(curPre) !== -1) {
+          elPre.textContent = tr('pp.loading', '正在加载提示词…');
+        } else if (failList.indexOf(curPre) !== -1) {
+          elPre.textContent = tr('pp.loadFailed', '未能加载提示词文本。');
+        } else if (noIdList.indexOf(curPre) !== -1) {
+          elPre.textContent = tr('pp.noId', '未配置提示词 ID（data-id）。');
+        }
+      }
+
+      var isEn = Boolean(window.I18N && window.I18N.lang === 'en');
+      var backLinks = document.querySelectorAll('a[href="../"]');
+      for (var i = 0; i < backLinks.length; i++) {
+        var a = backLinks[i];
+        var origText = a.getAttribute('data-pp-orig-text');
+        if (origText === null) {
+          if (a.textContent.indexOf('3D 作品') === -1) {
+            continue;
+          }
+          var textNode = null;
+          for (var n = 0; n < a.childNodes.length; n++) {
+            if (a.childNodes[n].nodeType === 3 && a.childNodes[n].nodeValue && a.childNodes[n].nodeValue.indexOf('3D 作品') !== -1) {
+              textNode = a.childNodes[n];
+              break;
+            }
+          }
+          if (!textNode) continue;
+          origText = textNode.nodeValue;
+          a.setAttribute('data-pp-orig-text', origText);
+          if (a.hasAttribute('title')) {
+            a.setAttribute('data-pp-orig-title', a.getAttribute('title') || '');
+          }
+        }
+
+        var targetNode = null;
+        for (var m = 0; m < a.childNodes.length; m++) {
+          var node = a.childNodes[m];
+          if (node.nodeType === 3) {
+            targetNode = node;
+            if (node.nodeValue && (node.nodeValue.indexOf('3D 作品') !== -1 || node.nodeValue.indexOf('Gallery') !== -1)) {
+              break;
+            }
+          }
+        }
+        if (!targetNode) continue;
+
+        if (isEn) {
+          var hasBack = origText.indexOf('返回') !== -1 || origText.indexOf('回到') !== -1;
+          var hasArrow = origText.indexOf('←') !== -1;
+          var enText = hasBack ? tr('pp.back', '← Back to 3D Gallery') : tr('pp.backShort', '← 3D Gallery');
+          if (!hasArrow && enText.indexOf('←') === 0) {
+            enText = ' ' + enText.replace(/^←\s*/, '');
+          }
+          targetNode.nodeValue = enText;
+          if (a.hasAttribute('data-pp-orig-title')) {
+            a.setAttribute('title', tr('pp.backTitle', 'Back to the 3D gallery'));
+          }
+        } else {
+          targetNode.nodeValue = origText;
+          if (a.hasAttribute('data-pp-orig-title')) {
+            a.setAttribute('title', a.getAttribute('data-pp-orig-title'));
+          }
+        }
+      }
+    } catch (err) {}
+  }
+
+  function setupI18n() {
+    try {
+      if (typeof window.I18N === 'undefined') {
+        var base = new URL('i18n/', scriptSrc);
+        var files = ['i18n.js', 'zh.js', 'en.js'];
+        var head = document.head || document.getElementsByTagName('head')[0] || document.documentElement;
+        for (var fi = 0; fi < files.length; fi++) {
+          var s = document.createElement('script');
+          s.src = new URL(files[fi], base).href;
+          s.async = false;
+          if (fi === files.length - 1) {
+            s.onload = function () {
+              try {
+                if (window.I18N && window.I18N.onChange) {
+                  window.I18N.onChange(relabel);
+                }
+              } catch (e) {}
+              relabel();
+            };
+          }
+          head.appendChild(s);
+        }
+      } else {
+        if (window.I18N.onChange) {
+          window.I18N.onChange(relabel);
+        }
+        relabel();
+      }
+    } catch (err) {}
+  }
 
   function fetchPromptText() {
     if (cachedPrompt !== null) {
@@ -154,7 +291,7 @@
       return fetchPromise;
     }
     if (!promptUrl) {
-      cachedPrompt = '未配置提示词 ID（data-id）。';
+      cachedPrompt = tr('pp.noId', '未配置提示词 ID（data-id）。');
       return Promise.resolve(cachedPrompt);
     }
     fetchPromise = fetch(promptUrl)
@@ -392,14 +529,14 @@
 
     var panel = document.createElement('section');
     panel.className = 'pp-panel';
-    panel.setAttribute('aria-label', '生成这个场景的提示词');
+    panel.setAttribute('aria-label', tr('pp.title', '生成这个场景的提示词'));
 
     var header = document.createElement('div');
     header.className = 'pp-header';
 
     var title = document.createElement('h2');
     title.className = 'pp-title';
-    title.textContent = '生成这个场景的提示词';
+    title.textContent = tr('pp.title', '生成这个场景的提示词');
 
     var actions = document.createElement('div');
     actions.className = 'pp-actions';
@@ -407,12 +544,12 @@
     var copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.className = 'pp-btn pp-copy-btn';
-    copyBtn.textContent = '复制';
+    copyBtn.textContent = tr('pp.copy', '复制');
 
     var closeBtn = document.createElement('button');
     closeBtn.type = 'button';
     closeBtn.className = 'pp-btn pp-btn-secondary pp-close-btn';
-    closeBtn.textContent = '关闭';
+    closeBtn.textContent = tr('pp.close', '关闭');
 
     actions.appendChild(copyBtn);
     actions.appendChild(closeBtn);
@@ -424,7 +561,7 @@
 
     var pre = document.createElement('pre');
     pre.className = 'pp-pre';
-    pre.textContent = '正在加载提示词…';
+    pre.textContent = tr('pp.loading', '正在加载提示词…');
 
     body.appendChild(pre);
     panel.appendChild(header);
@@ -434,11 +571,18 @@
     toggleBtn.type = 'button';
     toggleBtn.className = 'pp-btn pp-toggle-btn';
     toggleBtn.setAttribute('aria-expanded', 'false');
-    toggleBtn.textContent = '📜 提示词';
+    toggleBtn.textContent = tr('pp.toggle', '📜 提示词');
 
     root.appendChild(panel);
     root.appendChild(toggleBtn);
     document.body.appendChild(root);
+
+    elPanel = panel;
+    elTitle = title;
+    elCopyBtn = copyBtn;
+    elCloseBtn = closeBtn;
+    elToggleBtn = toggleBtn;
+    elPre = pre;
 
     stopCanvasPropagation(panel);
     stopCanvasPropagation(toggleBtn);
@@ -449,7 +593,7 @@
         if (txt) {
           pre.textContent = txt;
         } else {
-          pre.textContent = '未能加载提示词文本。';
+          pre.textContent = tr('pp.loadFailed', '未能加载提示词文本。');
         }
         return txt;
       });
@@ -477,7 +621,6 @@
       setOpen(false);
     });
 
-    var copyTimer = null;
     copyBtn.addEventListener('click', async function (e) {
       e.stopPropagation();
       var txt = cachedPrompt !== null ? cachedPrompt : await ensureLoaded();
@@ -485,15 +628,22 @@
       if (copyTimer) {
         clearTimeout(copyTimer);
       }
-      copyBtn.textContent = ok ? '已复制' : '复制失败';
+      copyBtn.textContent = ok ? tr('pp.copied', '已复制') : tr('pp.copyFailed', '复制失败');
       copyTimer = setTimeout(function () {
-        copyBtn.textContent = '复制';
+        copyBtn.textContent = tr('pp.copy', '复制');
         copyTimer = null;
       }, 1500);
     });
 
     // Preload prompt quietly in the background
     ensureLoaded();
+
+    setupI18n();
+    relabel();
+  }
+
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    window.addEventListener('load', relabel);
   }
 
   if (document.readyState === 'loading') {

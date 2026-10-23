@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>▶ 合集播放 · 3D 作品</title>
+  <title data-i18n="collection.defaultPageTitle">▶ 合集播放 · 3D 作品</title>
+  <script src="../i18n/i18n.js"></script><script src="../i18n/zh.js"></script><script src="../i18n/en.js"></script>
   <style>
     :root {
       --ink: #3a2e24;
@@ -145,10 +146,30 @@
       .cat-title { font-size: 14px; }
       .open-link { display: none; }
       .seg button { padding: 6px 8px; font-size: 12.5px; min-height: 36px; }
+      .seg { max-width: 100%; overflow-x: auto; }
+      html[data-lang="en"] .seg button { padding: 6px 6px; font-size: 12px; }
       .controls { gap: 6px; padding: 6px 8px; }
       .item { width: 112px; }
       .item-title { font-size: 11.5px; }
       .counter { display: none; }
+    }
+    @media (max-width: 520px) {
+      .topbar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .top-left {
+        flex: 1 1 auto;
+      }
+      .top-right {
+        flex: 0 1 auto;
+        max-width: 100%;
+        overflow-x: auto;
+      }
+      .now {
+        flex: 1 1 100%;
+      }
     }
   </style>
 </head>
@@ -156,44 +177,45 @@
   <div class="player" id="player">
     <header class="topbar" id="topbar">
       <div class="top-left">
-        <a class="btn secondary" href="../" title="回到 3D 作品页">← 3D 作品</a>
+        <a class="btn secondary" href="../" title="回到 3D 作品页" data-i18n="collection.backToGallery" data-i18n-attr="title:collection.backToGalleryTitle">← 3D 作品</a>
+        <span data-i18n-switch="btn secondary"></span>
         <span class="cat-title" id="cat-title"></span>
       </div>
       <div class="now">
-        <div class="now-title" id="now-title">加载中…</div>
+        <div class="now-title" id="now-title" data-i18n="common.loading">加载中…</div>
         <div class="now-meta">
           <span class="badge" id="now-badge"></span>
           <span id="now-pos"></span>
-          <a class="open-link" id="open-link" href="#" target="_blank" rel="noopener">新窗口打开 ↗</a>
-          <a class="compare-link" id="compare-link" href="#">⚖️ 对比版本</a>
+          <a class="open-link" id="open-link" href="#" target="_blank" rel="noopener" data-i18n="collection.openNewWindow">新窗口打开 ↗</a>
+          <a class="compare-link" id="compare-link" href="#" data-i18n="collection.compareVersions">⚖️ 对比版本</a>
         </div>
       </div>
       <div class="top-right">
-        <div class="seg" id="mode-seg" role="group" aria-label="选择播放哪个模型的版本"></div>
+        <div class="seg" id="mode-seg" role="group" aria-label="选择播放哪个模型的版本" data-i18n-attr="aria-label:collection.modeAria"></div>
       </div>
     </header>
 
     <div class="stage">
-      <iframe id="frame" title="3D 场景" allow="fullscreen; autoplay; clipboard-write"></iframe>
-      <div class="loading is-hidden" id="loading"><span>加载中…</span></div>
-      <div class="empty" id="empty">这个合集在当前模式下还没有可播放的场景。</div>
-      <button type="button" class="btn show-ui" id="show-ui" title="显示界面">👁 显示界面</button>
+      <iframe id="frame" title="3D 场景" allow="fullscreen; autoplay; clipboard-write" data-i18n-attr="title:collection.stageFrameTitle"></iframe>
+      <div class="loading is-hidden" id="loading"><span data-i18n="common.loading">加载中…</span></div>
+      <div class="empty" id="empty" data-i18n="collection.empty">这个合集在当前模式下还没有可播放的场景。</div>
+      <button type="button" class="btn show-ui" id="show-ui" title="显示界面" data-i18n="collection.showUi" data-i18n-attr="title:collection.showUi">👁 显示界面</button>
     </div>
 
     <div class="bottom" id="bottom">
       <div class="controls">
-        <button type="button" class="btn secondary" id="prev" title="上一个（←）" aria-label="上一个">⏮</button>
-        <button type="button" class="btn" id="toggle" title="暂停 / 播放（空格）" aria-label="暂停或播放">⏸</button>
-        <button type="button" class="btn secondary" id="next" title="下一个（→）" aria-label="下一个">⏭</button>
-        <div class="progress" id="progress" title="每个场景播放 20 秒"><div class="progress-fill" id="progress-fill"></div></div>
+        <button type="button" class="btn secondary" id="prev" title="上一个（←）" aria-label="上一个" data-i18n-attr="title:collection.prevTitle;aria-label:collection.prev">⏮</button>
+        <button type="button" class="btn" id="toggle" title="暂停 / 播放（空格）" aria-label="暂停或播放" data-i18n-attr="title:collection.toggleTitle;aria-label:collection.toggleAria">⏸</button>
+        <button type="button" class="btn secondary" id="next" title="下一个（→）" aria-label="下一个" data-i18n-attr="title:collection.nextTitle;aria-label:collection.next">⏭</button>
+        <div class="progress" id="progress" title="每个场景播放 20 秒" data-i18n-attr="title:collection.progressTitle"><div class="progress-fill" id="progress-fill"></div></div>
         <div class="solo-note" id="solo-note">
-          <span>🔁 单独播放中</span>
-          <button type="button" class="btn secondary" id="resume">▶ 恢复合集轮播</button>
+          <span data-i18n="collection.soloing">🔁 单独播放中</span>
+          <button type="button" class="btn secondary" id="resume" data-i18n="collection.resumeCarouselBtn">▶ 恢复合集轮播</button>
         </div>
         <span class="counter" id="counter"></span>
-        <button type="button" class="btn secondary" id="hide-ui" title="隐藏界面" aria-label="隐藏界面">👁</button>
+        <button type="button" class="btn secondary" id="hide-ui" title="隐藏界面" aria-label="隐藏界面" data-i18n-attr="title:collection.hideUi;aria-label:collection.hideUi">👁</button>
       </div>
-      <div class="strip" id="strip" aria-label="场景列表"></div>
+      <div class="strip" id="strip" aria-label="场景列表" data-i18n-attr="aria-label:collection.stripAria"></div>
     </div>
   </div>
 
@@ -223,7 +245,7 @@
 
       const params = new URLSearchParams(location.search);
       const cat = CATS.find((c) => c.id === params.get('c')) || CATS[0];
-      if (!cat) { $('now-title').textContent = '没有可播放的合集'; return; }
+      if (!cat) { $('now-title').textContent = I18N.t('collection.noCollection'); return; }
 
       const state = {
         mode: 'both',
@@ -265,8 +287,8 @@
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.dataset.mode = m;
-          btn.textContent = mm.short;
-          btn.title = mm.badge;
+          btn.textContent = I18N.pick(mm, 'short');
+          btn.title = I18N.pick(mm, 'badge');
           btn.addEventListener('click', () => {
             if (!btn.disabled) setMode(btn.dataset.mode, true);
           });
@@ -276,8 +298,8 @@
           const bothBtn = document.createElement('button');
           bothBtn.type = 'button';
           bothBtn.dataset.mode = 'both';
-          bothBtn.textContent = '交替';
-          bothBtn.title = '每个场景的各个版本依次播放';
+          bothBtn.textContent = I18N.t('collection.alternate');
+          bothBtn.title = I18N.t('collection.alternateTooltip');
           bothBtn.addEventListener('click', () => {
             if (!bothBtn.disabled) setMode('both', true);
           });
@@ -291,9 +313,16 @@
           const ok = modeAvailable(m);
           b.disabled = !ok;
           b.classList.toggle('is-on', m === state.mode);
-          b.title = ok
-            ? (m === 'both' ? '每个场景的各个版本依次播放' : '只播放 ' + (MODELS[m] ? MODELS[m].badge : m) + ' 版')
-            : ((MODELS[m] ? MODELS[m].short : m) + ' 版还没生成');
+          if (m === 'both') {
+            b.textContent = I18N.t('collection.alternate');
+            b.title = I18N.t('collection.alternateTooltip');
+          } else {
+            const mm = MODELS[m] || { badge: m, short: m };
+            b.textContent = I18N.pick(mm, 'short');
+            b.title = ok
+              ? I18N.t('collection.onlyModel', { model: I18N.pick(mm, 'badge') })
+              : I18N.t('collection.modelNotReady', { model: I18N.pick(mm, 'short') });
+          }
         });
       }
 
@@ -311,10 +340,12 @@
         strip.innerHTML = '';
         state.list.forEach((it, i) => {
           const mm = MODELS[it.model] || { short: it.model, badgeClass: '' };
+          const sTitle = I18N.pick(it.scene, 'title');
+          const mShort = I18N.pick(mm, 'short');
           const b = document.createElement('button');
           b.type = 'button';
           b.className = 'item';
-          b.title = '单独播放：' + it.scene.title + ' · ' + mm.short;
+          b.title = I18N.t('collection.playSoloItem', { title: sTitle, model: mShort });
           const th = document.createElement('div');
           th.className = 'item-thumb';
           const img = document.createElement('img');
@@ -324,16 +355,32 @@
           img.addEventListener('error', () => img.classList.add('is-error'));
           const bd = document.createElement('span');
           bd.className = 'badge ' + (mm.badgeClass || '');
-          bd.textContent = mm.short;
+          bd.textContent = mShort;
           th.appendChild(img);
           th.appendChild(bd);
           const t = document.createElement('div');
           t.className = 'item-title';
-          t.textContent = it.scene.title;
+          t.textContent = sTitle;
           b.appendChild(th);
           b.appendChild(t);
           b.addEventListener('click', () => playSolo(i));
           strip.appendChild(b);
+        });
+      }
+
+      function updateStripTexts() {
+        const items = strip.querySelectorAll('.item');
+        items.forEach((b, i) => {
+          const it = state.list[i];
+          if (!it) return;
+          const mm = MODELS[it.model] || { short: it.model, badgeClass: '' };
+          const sTitle = I18N.pick(it.scene, 'title');
+          const mShort = I18N.pick(mm, 'short');
+          b.title = I18N.t('collection.playSoloItem', { title: sTitle, model: mShort });
+          const t = b.querySelector('.item-title');
+          if (t) t.textContent = sTitle;
+          const bd = b.querySelector('.badge');
+          if (bd) bd.textContent = mShort;
         });
       }
 
@@ -350,18 +397,22 @@
         const it = state.list[state.index];
         if (!it) return;
         const mm = MODELS[it.model] || { badge: it.model, badgeClass: '' };
-        $('now-title').textContent = it.scene.title;
+        const sTitle = I18N.pick(it.scene, 'title');
+        const cTitle = I18N.pick(cat, 'title');
+        $('now-title').textContent = sTitle;
         const badge = $('now-badge');
         badge.className = 'badge ' + (mm.badgeClass || '');
-        badge.textContent = mm.badge;
-        $('now-pos').textContent = '第 ' + (state.index + 1) + ' / ' + state.list.length + ' 个';
+        badge.textContent = I18N.pick(mm, 'badge');
+        $('now-pos').textContent = I18N.t('collection.pos', { current: state.index + 1, total: state.list.length });
         $('counter').textContent = (state.index + 1) + ' / ' + state.list.length;
         $('open-link').href = '../' + it.scene.id + getModelSuffix(it.model) + '/';
         $('compare-link').href = '../compare/?s=' + encodeURIComponent(it.scene.id) + '&c=' + encodeURIComponent(cat.id);
-        document.title = '▶ ' + it.scene.title + ' · ' + cat.title + ' 合集 · 3D 作品';
+        document.title = I18N.t('collection.scenePageTitle', { title: sTitle, cat: cTitle });
         player.classList.toggle('is-solo', state.solo);
         toggleBtn.textContent = (!state.solo && state.playing) ? '⏸' : '▶';
-        toggleBtn.title = state.solo ? '恢复合集轮播' : (state.playing ? '暂停（空格）' : '播放（空格）');
+        toggleBtn.title = state.solo
+          ? I18N.t('collection.resumeCarousel')
+          : (state.playing ? I18N.t('collection.pause') : I18N.t('collection.play'));
       }
 
       function load(i) {
@@ -476,8 +527,14 @@
       wake();
 
       // 初始化
-      $('cat-title').textContent = cat.emoji + ' ' + cat.title + ' 合集';
-      document.title = '▶ ' + cat.title + ' 合集 · 3D 作品';
+      function updateCatHeader() {
+        const cTitle = I18N.pick(cat, 'title');
+        $('cat-title').textContent = cat.emoji + ' ' + I18N.t('collection.catTitle', { cat: cTitle });
+        if (!state.list[state.index]) {
+          document.title = I18N.t('collection.pageTitle', { cat: cTitle });
+        }
+      }
+      updateCatHeader();
       renderModeButtons();
       const want = normMode(params.get('m') || 'both');
       const sid = params.get('s');
@@ -500,6 +557,14 @@
       } else {
         setMode(want, false);
       }
+
+      I18N.onChange(() => {
+        updateCatHeader();
+        updateInfo();
+        updateModeButtons();
+        updateStripTexts();
+      });
+
       requestAnimationFrame(tick);
     })();
   </script>

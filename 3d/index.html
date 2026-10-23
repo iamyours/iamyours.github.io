@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>🧊 3D 作品 · 团子去旅行</title>
+  <title data-i18n="gallery.pageTitle">🧊 3D 作品 · 团子去旅行</title>
+  <script src="i18n/i18n.js"></script><script src="i18n/zh.js"></script><script src="i18n/en.js"></script>
   <style>
     :root {
       --bg-outer: #dfe8cc;
@@ -493,16 +494,17 @@
 <body>
   <div class="gallery-shell">
     <header class="topbar">
-      <h1 class="topbar-title">🧊 3D 作品</h1>
-      <a class="btn btn-topbar" href="/">← 回到团子去旅行</a>
+      <h1 class="topbar-title" data-i18n="gallery.title">🧊 3D 作品</h1>
+      <a class="btn btn-topbar" href="/" data-i18n="gallery.backToSite" style="margin-left: auto;">← 回到团子去旅行</a>
+      <span data-i18n-switch="btn btn-topbar"></span>
     </header>
 
     <main class="gallery-main">
-      <p class="intro-banner">
+      <p class="intro-banner" data-i18n-html="gallery.intro">
         每个场景一张卡片，同一提示词由不同模型生成的版本点「<b>对比全部版本</b>」并排实时运行、每个版本可单独全屏；四个合集可「<b>▶ 播放合集</b>」连续播放；Gemini 网页版（4 Argon / 3.8 Flash）会陆续补上。
       </p>
 
-      <nav class="cat-nav" id="cat-nav" aria-label="分类导航"></nav>
+      <nav class="cat-nav" id="cat-nav" aria-label="分类导航" data-i18n-attr="aria-label:gallery.catNavAria"></nav>
 
       <div id="category-sections"></div>
     </main>
@@ -589,7 +591,7 @@
 
       async function computePromptDiff(scene, avail) {
         if (avail.length <= 1) {
-          return '各版本使用同一提示词';
+          return I18N.t('common.samePrompt');
         }
         const texts = await Promise.all(
           avail.map((m) => {
@@ -614,19 +616,19 @@
           }
           if (differs.length > 0) {
             diffEntries.push({
-              badge: (MODELS[m] && MODELS[m].badge) || m,
+              badge: (MODELS[m] && I18N.pick(MODELS[m], 'badge')) || m,
               lines: differs
             });
           }
         }
 
         if (diffEntries.length === 0) {
-          return '各版本使用同一提示词';
+          return I18N.t('common.samePrompt');
         }
 
-        let out = '各版本提示词差异：\n';
+        let out = I18N.t('common.promptDiffHeader') + '\n';
         diffEntries.forEach((entry) => {
-          out += '• ' + entry.badge + '：' + entry.lines.join('；') + '\n';
+          out += '• ' + entry.badge + I18N.t('common.colon') + entry.lines.join(I18N.t('common.semicolon')) + '\n';
         });
         return out.trim();
       }
@@ -645,7 +647,7 @@
         const thumbWrap = document.createElement('a');
         thumbWrap.className = 'thumb-wrap';
         thumbWrap.href = compareHref;
-        thumbWrap.title = '对比全部版本';
+        thumbWrap.title = I18N.t('gallery.compareAll');
         if (scene.gradient) {
           thumbWrap.style.background = scene.gradient;
         }
@@ -653,7 +655,7 @@
         const fallbackLabel = document.createElement('div');
         fallbackLabel.className = 'thumb-fallback-label';
         const fallbackTitle = document.createElement('span');
-        fallbackTitle.textContent = '🧊 ' + scene.title;
+        fallbackTitle.textContent = '🧊 ' + I18N.pick(scene, 'title');
         const fallbackId = document.createElement('span');
         fallbackId.className = 'thumb-id';
         fallbackId.textContent = scene.id;
@@ -663,7 +665,7 @@
         const img = document.createElement('img');
         img.className = 'scene-thumb';
         img.src = 'thumbs/' + scene.id + firstSuffix + '.jpg';
-        img.alt = scene.title;
+        img.alt = I18N.pick(scene, 'title');
         img.loading = 'lazy';
         img.addEventListener('error', () => {
           img.classList.add('is-error');
@@ -684,7 +686,7 @@
         const titleLink = document.createElement('a');
         titleLink.className = 'scene-title-link';
         titleLink.href = compareHref;
-        titleLink.textContent = scene.title;
+        titleLink.textContent = I18N.pick(scene, 'title');
         titleEl.appendChild(titleLink);
         head.appendChild(titleEl);
 
@@ -694,23 +696,23 @@
           srcLink.href = scene.source;
           srcLink.target = '_blank';
           srcLink.rel = 'noopener';
-          srcLink.textContent = '原帖 ↗';
+          srcLink.textContent = I18N.t('common.sourcePost');
           head.appendChild(srcLink);
         }
 
         const descEl = document.createElement('p');
         descEl.className = 'scene-desc';
-        descEl.textContent = scene.description;
+        descEl.textContent = I18N.pick(scene, 'description');
 
         // 可用版本徽章
         const badgesEl = document.createElement('div');
         badgesEl.className = 'scene-badges';
-        badgesEl.setAttribute('aria-label', '可用版本');
+        badgesEl.setAttribute('aria-label', I18N.t('gallery.availableVersions'));
         avail.forEach((m) => {
           const mm = MODELS[m];
           const b = document.createElement('span');
           b.className = 'model-badge' + (mm.badgeClass ? ' ' + mm.badgeClass : '');
-          b.textContent = mm.short;
+          b.textContent = I18N.pick(mm, 'short');
           badgesEl.appendChild(b);
         });
 
@@ -721,13 +723,13 @@
         const compareBtn = document.createElement('a');
         compareBtn.className = 'btn';
         compareBtn.href = compareHref;
-        compareBtn.textContent = '⚖️ 对比全部版本';
+        compareBtn.textContent = I18N.t('gallery.compareAllBtn');
 
         const togglePromptBtn = document.createElement('button');
         togglePromptBtn.type = 'button';
         togglePromptBtn.className = 'btn btn-secondary';
         togglePromptBtn.setAttribute('aria-expanded', 'false');
-        togglePromptBtn.textContent = '📜 查看提示词';
+        togglePromptBtn.textContent = I18N.t('gallery.viewPrompt');
 
         actionsEl.appendChild(compareBtn);
         actionsEl.appendChild(togglePromptBtn);
@@ -741,23 +743,23 @@
 
         const promptLabel = document.createElement('span');
         promptLabel.className = 'prompt-label';
-        promptLabel.textContent = '场景生成提示词';
+        promptLabel.textContent = I18N.t('gallery.promptLabel');
 
         const copyBtn = document.createElement('button');
         copyBtn.type = 'button';
         copyBtn.className = 'btn btn-copy';
-        copyBtn.textContent = '复制';
+        copyBtn.textContent = I18N.t('common.copy');
 
         promptToolbar.appendChild(promptLabel);
         promptToolbar.appendChild(copyBtn);
 
         const preEl = document.createElement('pre');
         preEl.className = 'prompt-pre';
-        preEl.textContent = '正在加载提示词…';
+        preEl.textContent = I18N.t('common.loadingPrompt');
 
         const diffBox = document.createElement('div');
         diffBox.className = 'prompt-diff-box';
-        diffBox.textContent = '正在对比各版本提示词…';
+        diffBox.textContent = I18N.t('common.diffingPrompt');
 
         promptSection.appendChild(promptToolbar);
         promptSection.appendChild(preEl);
@@ -768,7 +770,7 @@
           if (promptLoaded) return;
           promptLoaded = true;
           const firstText = await loadPromptText(scene.id + firstSuffix);
-          preEl.textContent = firstText || '未能加载提示词文本。';
+          preEl.textContent = firstText || I18N.t('common.loadPromptFailed');
           const diffResult = await computePromptDiff(scene, avail);
           diffBox.textContent = diffResult;
         }
@@ -789,9 +791,9 @@
           const firstText = promptCache.get(scene.id + firstSuffix) || '';
           const ok = await copyText(firstText);
           if (copyTimer) clearTimeout(copyTimer);
-          copyBtn.textContent = ok ? '已复制' : '复制失败';
+          copyBtn.textContent = ok ? I18N.t('common.copied') : I18N.t('common.copyFailed');
           copyTimer = setTimeout(() => {
-            copyBtn.textContent = '复制';
+            copyBtn.textContent = I18N.t('common.copy');
             copyTimer = null;
           }, 1500);
         });
@@ -817,17 +819,18 @@
           nav.innerHTML = '';
           const label = document.createElement('span');
           label.className = 'cat-nav-label';
-          label.textContent = '合集分类：';
+          label.textContent = I18N.t('gallery.categoriesLabel');
           nav.appendChild(label);
           CATS.forEach((cat) => {
             const a = document.createElement('a');
             a.className = 'btn btn-secondary';
             a.href = '#cat-' + cat.id;
-            a.textContent = cat.emoji + ' ' + cat.title;
+            a.textContent = cat.emoji + ' ' + I18N.pick(cat, 'title');
             nav.appendChild(a);
           });
         }
 
+        host.innerHTML = '';
         const frag = document.createDocumentFragment();
         CATS.forEach((cat) => {
           const section = document.createElement('section');
@@ -841,18 +844,18 @@
           titles.className = 'category-titles';
           const h = document.createElement('h2');
           h.className = 'category-title';
-          h.textContent = cat.emoji + ' ' + cat.title;
+          h.textContent = cat.emoji + ' ' + I18N.pick(cat, 'title');
           const d = document.createElement('p');
           d.className = 'category-desc';
           const activeScenes = (cat.scenes || []).filter((s) => s.models && s.models.length > 0);
-          d.textContent = cat.description + '（' + activeScenes.length + ' 个场景）';
+          d.textContent = I18N.pick(cat, 'description') + I18N.t('gallery.sceneCount', { n: activeScenes.length });
           titles.appendChild(h);
           titles.appendChild(d);
 
           const play = document.createElement('a');
           play.className = 'btn';
           play.href = 'collection/?c=' + encodeURIComponent(cat.id);
-          play.textContent = '▶ 播放合集';
+          play.textContent = I18N.t('gallery.playCollection');
 
           head.appendChild(titles);
           head.appendChild(play);
@@ -877,6 +880,10 @@
           }
         }
       }
+
+      I18N.onChange(() => {
+        renderApp();
+      });
 
       renderApp();
     })();

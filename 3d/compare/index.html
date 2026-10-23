@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>版本对比 · 3D 作品</title>
+  <title data-i18n="compare.pageTitle">版本对比 · 3D 作品</title>
+  <script src="../i18n/i18n.js"></script><script src="../i18n/zh.js"></script><script src="../i18n/en.js"></script>
   <style>
     :root {
       --bg-outer: #dfe8cc;
@@ -683,25 +684,26 @@
   <!-- 紧凑头部栏 -->
   <header class="topbar">
     <div class="topbar-left">
-      <a class="btn btn-topbar" id="back-gallery" href="../" aria-label="画廊" title="画廊">
+      <a class="btn btn-topbar" id="back-gallery" href="../" aria-label="画廊" title="画廊" data-i18n-attr="aria-label:compare.gallery;title:compare.gallery">
         <span class="btn-icon">←</span>
-        <span class="btn-text">画廊</span>
+        <span class="btn-text" data-i18n="compare.gallery">画廊</span>
       </a>
       <h1 class="topbar-title" id="bar-title">版本对比</h1>
     </div>
     <div class="topbar-actions">
-      <button type="button" class="btn btn-topbar" id="open-prompt-btn" aria-label="提示词" title="提示词">
+      <button type="button" class="btn btn-topbar" id="open-prompt-btn" aria-label="提示词" title="提示词" data-i18n-attr="aria-label:compare.prompt;title:compare.prompt">
         <span class="btn-icon">📜</span>
-        <span class="btn-text">提示词</span>
+        <span class="btn-text" data-i18n="compare.prompt">提示词</span>
       </button>
-      <a class="btn btn-topbar" id="play-collection" href="../collection/" aria-label="合集" title="合集">
+      <a class="btn btn-topbar" id="play-collection" href="../collection/" aria-label="合集" title="合集" data-i18n-attr="aria-label:compare.collection;title:compare.collection">
         <span class="btn-icon">▶</span>
-        <span class="btn-text">合集</span>
+        <span class="btn-text" data-i18n="compare.collection">合集</span>
       </a>
-      <a class="btn btn-topbar" id="source-link" href="#" target="_blank" rel="noopener" aria-label="原帖" title="原帖" style="display: none;">
+      <a class="btn btn-topbar" id="source-link" href="#" target="_blank" rel="noopener" aria-label="原帖" title="原帖" style="display: none;" data-i18n-attr="aria-label:compare.source;title:compare.source">
         <span class="btn-icon">🔗</span>
-        <span class="btn-text">原帖</span>
+        <span class="btn-text" data-i18n="compare.source">原帖</span>
       </a>
+      <span data-i18n-switch="btn btn-topbar"></span>
     </div>
   </header>
 
@@ -715,26 +717,26 @@
     <div class="prompt-drawer" id="prompt-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
       <div class="drawer-header">
         <div class="drawer-header-left">
-          <h2 class="drawer-title" id="drawer-title">📜 场景提示词</h2>
+          <h2 class="drawer-title" id="drawer-title" data-i18n="compare.drawerTitle">📜 场景提示词</h2>
         </div>
-        <button type="button" class="btn btn-close-drawer" id="close-drawer-btn" aria-label="关闭" title="关闭">✕</button>
+        <button type="button" class="btn btn-close-drawer" id="close-drawer-btn" aria-label="关闭" title="关闭" data-i18n-attr="aria-label:common.close;title:common.close">✕</button>
       </div>
       <div class="drawer-body">
         <div class="drawer-section">
-          <h3 class="drawer-section-title">场景说明</h3>
+          <h3 class="drawer-section-title" data-i18n="compare.sceneDescTitle">场景说明</h3>
           <div class="drawer-desc" id="drawer-desc"></div>
         </div>
 
         <div class="drawer-section">
           <div class="drawer-section-head">
-            <h3 class="drawer-section-title">基准提示词全文</h3>
-            <button type="button" class="btn btn-copy" id="drawer-copy-btn">复制</button>
+            <h3 class="drawer-section-title" data-i18n="compare.promptPreTitle">基准提示词全文</h3>
+            <button type="button" class="btn btn-copy" id="drawer-copy-btn" data-i18n="common.copy">复制</button>
           </div>
           <pre class="prompt-pre" id="drawer-prompt-pre">正在加载提示词…</pre>
         </div>
 
         <div class="drawer-section">
-          <h3 class="drawer-section-title">各版本提示词差异</h3>
+          <h3 class="drawer-section-title" data-i18n="compare.promptDiffTitle">各版本提示词差异</h3>
           <div class="prompt-diff-box" id="drawer-diff-box">正在对比各版本提示词…</div>
         </div>
       </div>
@@ -793,27 +795,40 @@
       const drawerCopyBtn = document.getElementById('drawer-copy-btn');
 
       if (!scene) {
-        document.title = '未找到场景 · 3D 作品';
+        document.title = I18N.t('compare.notFoundTitle');
         backLink.href = '../';
         playLink.style.display = 'none';
         openPromptBtn.style.display = 'none';
         sourceLink.style.display = 'none';
-        barTitle.textContent = '版本对比';
+        barTitle.textContent = I18N.t('compare.title');
         container.innerHTML =
           '<div class="empty-notice-wrap">' +
           '<div class="empty-notice">' +
-          '<p class="empty-notice-text">未找到该 3D 场景或该场景尚未上线。</p>' +
-          '<p><a class="btn" href="../">← 回到 3D 作品</a></p>' +
+          '<p class="empty-notice-text">' + I18N.t('compare.notFoundText') + '</p>' +
+          '<p><a class="btn" href="../">' + I18N.t('compare.backToGallery') + '</a></p>' +
           '</div>' +
           '</div>';
+        I18N.onChange(() => {
+          document.title = I18N.t('compare.notFoundTitle');
+          barTitle.textContent = I18N.t('compare.title');
+          const noticeP = container.querySelector('.empty-notice-text');
+          if (noticeP) noticeP.textContent = I18N.t('compare.notFoundText');
+          const backA = container.querySelector('.empty-notice a');
+          if (backA) backA.textContent = I18N.t('compare.backToGallery');
+        });
         return;
       }
 
       catId = catId || 'classic';
-      document.title = scene.title + ' · 版本对比';
+      function updateTitles() {
+        const sceneTitle = I18N.pick(scene, 'title');
+        const sceneDesc = I18N.pick(scene, 'description');
+        document.title = I18N.t('compare.pageTitleWithScene', { title: sceneTitle });
+        barTitle.textContent = sceneTitle;
+        barTitle.title = sceneTitle + (sceneDesc ? (' — ' + sceneDesc) : '');
+      }
+      updateTitles();
       backLink.href = '../#cat-' + encodeURIComponent(catId);
-      barTitle.textContent = scene.title;
-      barTitle.title = scene.title + (scene.description ? (' — ' + scene.description) : '');
       playLink.href = '../collection/?c=' + encodeURIComponent(catId) + '&s=' + encodeURIComponent(scene.id);
 
       if (scene.source) {
@@ -899,7 +914,7 @@
 
       async function computePromptDiff(sceneObj, availList) {
         if (availList.length <= 1) {
-          return '各版本使用同一提示词';
+          return I18N.t('common.samePrompt');
         }
         const texts = await Promise.all(
           availList.map((m) => {
@@ -924,30 +939,58 @@
           }
           if (differs.length > 0) {
             diffEntries.push({
-              badge: (MODELS[m] && MODELS[m].badge) || m,
+              badge: (MODELS[m] && I18N.pick(MODELS[m], 'badge')) || m,
               lines: differs
             });
           }
         }
 
         if (diffEntries.length === 0) {
-          return '各版本使用同一提示词';
+          return I18N.t('common.samePrompt');
         }
 
-        let out = '各版本提示词差异：\n';
+        let out = I18N.t('common.promptDiffHeader') + '\n';
         diffEntries.forEach((entry) => {
-          out += '• ' + entry.badge + '：' + entry.lines.join('；') + '\n';
+          out += '• ' + entry.badge + I18N.t('common.colon') + entry.lines.join(I18N.t('common.semicolon')) + '\n';
         });
         return out.trim();
       }
 
       let promptLoaded = false;
+      let promptLoadFailed = false;
+
+      function updateDrawerTexts() {
+        const sceneDesc = I18N.pick(scene, 'description');
+        drawerDesc.textContent = sceneDesc || I18N.t('compare.noDesc');
+        if (drawerCopyBtn && !copyTimer) {
+          drawerCopyBtn.textContent = I18N.t('common.copy');
+        }
+        if (promptLoaded) {
+          computePromptDiff(scene, avail).then((diffResult) => {
+            drawerDiffBox.textContent = diffResult;
+          });
+        } else {
+          drawerDiffBox.textContent = I18N.t('common.diffingPrompt');
+        }
+        if (!promptLoaded) {
+          drawerPromptPre.textContent = I18N.t('common.loadingPrompt');
+        } else if (promptLoadFailed) {
+          drawerPromptPre.textContent = I18N.t('common.loadPromptFailed');
+        }
+      }
+
       async function ensurePromptLoaded() {
-        drawerDesc.textContent = scene.description || '暂无说明';
+        drawerDesc.textContent = I18N.pick(scene, 'description') || I18N.t('compare.noDesc');
         if (promptLoaded) return;
         promptLoaded = true;
         const firstText = await loadPromptText(scene.id + firstSuffix);
-        drawerPromptPre.textContent = firstText || '未能加载提示词文本。';
+        if (firstText) {
+          promptLoadFailed = false;
+          drawerPromptPre.textContent = firstText;
+        } else {
+          promptLoadFailed = true;
+          drawerPromptPre.textContent = I18N.t('common.loadPromptFailed');
+        }
         const diffResult = await computePromptDiff(scene, avail);
         drawerDiffBox.textContent = diffResult;
       }
@@ -979,9 +1022,9 @@
         const firstText = promptCache.get(scene.id + firstSuffix) || drawerPromptPre.textContent || '';
         const ok = await copyText(firstText);
         if (copyTimer) clearTimeout(copyTimer);
-        drawerCopyBtn.textContent = ok ? '已复制' : '复制失败';
+        drawerCopyBtn.textContent = ok ? I18N.t('common.copied') : I18N.t('common.copyFailed');
         copyTimer = setTimeout(() => {
-          drawerCopyBtn.textContent = '复制';
+          drawerCopyBtn.textContent = I18N.t('common.copy');
           copyTimer = null;
         }, 1500);
       });
@@ -1245,7 +1288,7 @@
         iframe.loading = 'lazy';
         iframe.allow = 'fullscreen; autoplay';
         iframe.setAttribute('allowfullscreen', '');
-        iframe.title = scene.title + ' · ' + (mm.short || mm.badge || m);
+        iframe.title = I18N.pick(scene, 'title') + ' · ' + (I18N.pick(mm, 'short') || I18N.pick(mm, 'badge') || m);
         iframe.addEventListener('load', syncEmbedUi);
         interceptIframeLinks(iframe);
         tile.appendChild(iframe);
@@ -1253,13 +1296,14 @@
         // 左上角半透明小浮层
         const badgeOverlay = document.createElement('div');
         badgeOverlay.className = 'tile-badge-overlay';
-        if (mm.note) {
-          badgeOverlay.title = mm.note;
+        const note = I18N.pick(mm, 'note');
+        if (note) {
+          badgeOverlay.title = note;
         }
 
         const badge = document.createElement('span');
         badge.className = 'badge' + (mm.badgeClass ? ' ' + mm.badgeClass : '');
-        badge.textContent = mm.short || mm.badge || m;
+        badge.textContent = I18N.pick(mm, 'short') || I18N.pick(mm, 'badge') || m;
         badgeOverlay.appendChild(badge);
         tile.appendChild(badgeOverlay);
 
@@ -1273,27 +1317,27 @@
           chatA.href = scene.chats[m];
           chatA.target = '_blank';
           chatA.rel = 'noopener';
-          chatA.title = '对话记录';
-          chatA.setAttribute('aria-label', '对话记录');
+          chatA.title = I18N.t('compare.chatLog');
+          chatA.setAttribute('aria-label', I18N.t('compare.chatLog'));
           chatA.textContent = '💬';
           actionsOverlay.appendChild(chatA);
         }
 
         const openA = document.createElement('a');
-        openA.className = 'tile-icon-btn';
+        openA.className = 'tile-icon-btn tile-open-btn';
         openA.href = '../' + encodeURIComponent(scene.id) + suffix + '/';
         openA.target = '_blank';
         openA.rel = 'noopener';
-        openA.title = '单独打开';
-        openA.setAttribute('aria-label', '单独打开');
+        openA.title = I18N.t('compare.openSolo');
+        openA.setAttribute('aria-label', I18N.t('compare.openSolo'));
         openA.textContent = '↗';
         actionsOverlay.appendChild(openA);
 
         const fsBtn = document.createElement('button');
         fsBtn.type = 'button';
         fsBtn.className = 'tile-icon-btn tile-fs-btn';
-        fsBtn.title = '全屏';
-        fsBtn.setAttribute('aria-label', '全屏');
+        fsBtn.title = I18N.t('compare.fullscreen');
+        fsBtn.setAttribute('aria-label', I18N.t('compare.fullscreen'));
         fsBtn.textContent = '⛶';
         fsBtn.addEventListener('click', () => {
           requestTileFs(tile);
@@ -1303,8 +1347,8 @@
         const exitBtn = document.createElement('button');
         exitBtn.type = 'button';
         exitBtn.className = 'tile-icon-btn tile-exit-fs-btn';
-        exitBtn.title = '退出全屏';
-        exitBtn.setAttribute('aria-label', '退出全屏');
+        exitBtn.title = I18N.t('compare.exitFullscreen');
+        exitBtn.setAttribute('aria-label', I18N.t('compare.exitFullscreen'));
         exitBtn.textContent = '✕';
         exitBtn.style.display = 'none';
         exitBtn.addEventListener('click', () => {
@@ -1314,6 +1358,54 @@
 
         tile.appendChild(actionsOverlay);
         grid.appendChild(tile);
+      });
+
+      function updateTilesInPlace() {
+        avail.forEach((m) => {
+          const tile = document.getElementById('tile-' + m);
+          if (!tile) return;
+          const mm = MODELS[m] || {};
+          const iframe = tile.querySelector('iframe');
+          if (iframe) {
+            iframe.title = I18N.pick(scene, 'title') + ' · ' + (I18N.pick(mm, 'short') || I18N.pick(mm, 'badge') || m);
+          }
+          const badgeOverlay = tile.querySelector('.tile-badge-overlay');
+          if (badgeOverlay) {
+            const note = I18N.pick(mm, 'note');
+            if (note) badgeOverlay.title = note;
+            else badgeOverlay.removeAttribute('title');
+          }
+          const badge = tile.querySelector('.badge');
+          if (badge) {
+            badge.textContent = I18N.pick(mm, 'short') || I18N.pick(mm, 'badge') || m;
+          }
+          const chatA = tile.querySelector('.tile-chat-btn');
+          if (chatA) {
+            chatA.title = I18N.t('compare.chatLog');
+            chatA.setAttribute('aria-label', I18N.t('compare.chatLog'));
+          }
+          const openA = tile.querySelector('.tile-open-btn');
+          if (openA) {
+            openA.title = I18N.t('compare.openSolo');
+            openA.setAttribute('aria-label', I18N.t('compare.openSolo'));
+          }
+          const fsBtn = tile.querySelector('.tile-fs-btn');
+          if (fsBtn) {
+            fsBtn.title = I18N.t('compare.fullscreen');
+            fsBtn.setAttribute('aria-label', I18N.t('compare.fullscreen'));
+          }
+          const exitBtn = tile.querySelector('.tile-exit-fs-btn');
+          if (exitBtn) {
+            exitBtn.title = I18N.t('compare.exitFullscreen');
+            exitBtn.setAttribute('aria-label', I18N.t('compare.exitFullscreen'));
+          }
+        });
+      }
+
+      I18N.onChange(() => {
+        updateTitles();
+        updateDrawerTexts();
+        updateTilesInPlace();
       });
 
       container.appendChild(grid);
