@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>像素日式庭园 · 五重塔与飞龙</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body { background: #f3dcc8; font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif; }
+  canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+  .title {
+    position: fixed; top: 14px; right: 16px; z-index: 5; pointer-events: none; text-align: right;
+    color: #fff8ec; font-size: 20px; font-weight: 900; letter-spacing: 3px;
+    text-shadow: 0 2px 0 #7a3b2e, 0 0 12px rgba(122, 59, 46, .5);
+  }
+  .title small { display: block; font-size: 12px; letter-spacing: 2px; font-weight: 600; margin-top: 3px; }
+  .hint {
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 5;
+    padding: 6px 14px; border-radius: 999px; pointer-events: none; text-align: center;
+    background: rgba(255, 246, 225, 0.82); color: #3d2f22; font-size: 13px; font-weight: 600;
+    border: 2px solid #5a3b2e; max-width: 92vw; box-sizing: border-box;
+  }
+  .ctrl { position: fixed; right: 14px; bottom: 58px; z-index: 6; display: flex; flex-direction: column; gap: 8px; }
+  .ctrl button {
+    font: inherit; font-size: 13px; font-weight: 700; cursor: pointer;
+    padding: 7px 14px; border-radius: 999px; color: #3d2f22;
+    background: rgba(255, 246, 225, 0.88); border: 2px solid #5a3b2e;
+    box-shadow: 2px 2px 0 rgba(60, 30, 20, 0.4);
+  }
+  .ctrl button:active { transform: translate(1px, 1px); box-shadow: 1px 1px 0 rgba(60, 30, 20, 0.4); }
+  #tip {
+    position: fixed; z-index: 8; pointer-events: none; display: none;
+    padding: 4px 9px; border-radius: 8px; font-size: 12px; font-weight: 600;
+    background: rgba(45, 26, 20, 0.85); color: #fff3e0; white-space: nowrap;
+  }
+  .bubble {
+    position: fixed; z-index: 7; pointer-events: none; transform: translate(-50%, -100%);
+    padding: 4px 10px; border-radius: 12px; font-size: 13px; font-weight: 700; white-space: nowrap;
+    background: #fffaf0; color: #3d2a20; border: 2px solid #5a3b2e; box-shadow: 2px 2px 0 rgba(60, 30, 20, .35);
+  }
+  .bubble::after {
+    content: ""; position: absolute; left: 50%; bottom: -8px; margin-left: -6px;
+    border: 6px solid transparent; border-top-color: #5a3b2e; border-bottom: 0;
+  }
+  @media (max-width: 600px) {
+    .title { font-size: 15px; top: 18px; } .title small { font-size: 10px; }
+    .hint { font-size: 11px; border-radius: 14px; }
+    .ctrl { bottom: 78px; } .ctrl button { font-size: 12px; padding: 6px 11px; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:640px){.hint{bottom:64px}}</style>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div class="title">像素日式庭园<small>五重塔 · 小村民 · 飞龙</small></div>
+<div class="hint">拖动旋转 · 滚轮/双指缩放 · 点击村民、灯笼、樱花、锦鲤池、鹿威、五重塔与飞龙互动</div>
+<div class="ctrl">
+  <button id="btnNight">🌙 切换夜晚</button>
+  <button id="btnDragon">🐉 召唤龙神</button>
+</div>
+<div id="tip"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ================= 基础工具 ================= */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261021);
+const rr = (a, b) => a + (b - a) * rand();
+const pick = arr => arr[Math.floor(rand() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+function hash3(x, y, z) {
+  let h = Math.imul(x | 0, 374761393) ^ Math.imul(y | 0, 668265263) ^ Math.imul(z | 0, 1274126177);
+  h = Math.imul(h ^ (h >>> 13), 1103515245);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+function vnoise2(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), xf = x - xi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = zf * zf * (3 - 2 * zf);
+  const a = hash3(xi, 0, zi), b = hash3(xi + 1, 0, zi), c = hash3(xi, 0, zi + 1), d = hash3(xi + 1, 0, zi + 1);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+const pickH = (arr, x, y, z) => arr[Math.floor(hash3(x, y, z) * arr.length)];
+
+/* ================= 体素网格构建器（面剔除 + 顶点 AO） ================= */
+const KOFF = 512;
+const vkey = (x, y, z) => ((x + KOFF) * 1024 + (y + KOFF)) * 1024 + (z + KOFF);
+const AO_LV = [0.5, 0.67, 0.84, 1.0];
+const FACES = [];
+{
+  for (const [ax, s] of [[0, 1], [0, -1], [1, 1], [1, -1], [2, 1], [2, -1]]) {
+    const n = [0, 0, 0]; n[ax] = s;
+    const b = (ax + 1) % 3, c = (ax + 2) % 3;
+    const corners = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([u, v]) => {
+      const p = [0, 0, 0]; p[ax] = s > 0 ? 1 : 0; p[b] = u; p[c] = v;
+      return { p, du: u ? 1 : -1, dv: v ? 1 : -1 };
+    });
+    const e1 = [0, 1, 2].map(i => corners[1].p[i] - corners[0].p[i]);
+    const e2 = [0, 1, 2].map(i => corners[2].p[i] - corners[0].p[i]);
+    const cr = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    if (cr[0] * n[0] + cr[1] * n[1] + cr[2] * n[2] < 0) corners.reverse(); // 保证逆时针朝外
+    FACES.push({ n, b, c, corners });
+  }
+}
+class VoxelSet {
+  constructor() { this.m = new Map(); }
+  set(x, y, z, c) { this.m.set(vkey(x, y, z), c); }
+  get(x, y, z) { return this.m.get(vkey(x, y, z)); }
+  has(x, y, z) { return this.m.has(vkey(x, y, z)); }
+  del(x, y, z) { this.m.delete(vkey(x, y, z)); }
+  box(x0, y0, z0, x1, y1, z1, c) {
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++)
+      this.set(x, y, z, typeof c === 'function' ? c(x, y, z) : c);
+  }
+  build(jitter = 0.06) {
+    const pos = [], nor = [], col = [], idx = [];
+    const m = this.m, tc = new THREE.Color(), q = [0, 0, 0], aos = [3, 3, 3, 3];
+    const solid = () => m.has(vkey(q[0], q[1], q[2])) ? 1 : 0;
+    for (const [k, c] of m) {
+      const z = (k % 1024) - KOFF, t = Math.floor(k / 1024), y = (t % 1024) - KOFF, x = Math.floor(t / 1024) - KOFF;
+      tc.setHex(c);
+      const j = 1 + (hash3(x, y, z) - 0.5) * 2 * jitter;
+      for (const f of FACES) {
+        const nx = x + f.n[0], ny = y + f.n[1], nz = z + f.n[2];
+        if (m.has(vkey(nx, ny, nz))) continue;
+        const base = pos.length / 3;
+        for (let i = 0; i < 4; i++) {
+          const cr = f.corners[i];
+          pos.push(x + cr.p[0], y + cr.p[1], z + cr.p[2]);
+          nor.push(f.n[0], f.n[1], f.n[2]);
+          q[0] = nx; q[1] = ny; q[2] = nz; q[f.b] += cr.du; const s1 = solid();
+          q[0] = nx; q[1] = ny; q[2] = nz; q[f.c] += cr.dv; const s2 = solid();
+          q[0] = nx; q[1] = ny; q[2] = nz; q[f.b] += cr.du; q[f.c] += cr.dv; const s3 = solid();
+          const a = (s1 && s2) ? 0 : 3 - (s1 + s2 + s3);
+          aos[i] = a;
+          const br = AO_LV[a] * j;
+          col.push(tc.r * br, tc.g * br, tc.b * br);
+        }
+        if (aos[0] + aos[2] > aos[1] + aos[3]) idx.push(base + 1, base + 2, base + 3, base + 1, base + 3, base);
+        else idx.push(base, base + 1, base + 2, base, base + 2, base + 3);
+      }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx);
+    g.computeBoundingSphere();
+    return g;
+  }
+}
+const voxMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+const glowMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0xff9440, emissiveIntensity: 0.05 });
+// 构建网格：先平移再缩放
+function voxMesh(V, s = 1, t = [0, 0, 0], mat = voxMat, jitter = 0.06) {
+  const geo = V.build(jitter);
+  geo.translate(t[0], t[1], t[2]).scale(s, s, s);
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.castShadow = true; mesh.receiveShadow = true;
+  return mesh;
+}
+
+/* ================= 渲染器 / 场景 / 相机 ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.Fog(0xffe1c9, 170, 640);
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 4000);
+camera.position.set(64, 50, 80);
+if (camera.aspect < 0.8) camera.position.multiplyScalar(1.55);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 9, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.enablePan = false;
+controls.minDistance = 22;
+controls.maxDistance = 240;
+controls.maxPolarAngle = Math.PI * 0.53;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+controls.update();
+let idleTimer = 0;
+controls.addEventListener('start', () => { controls.autoRotate = false; idleTimer = 0; });
+
+// 天空渐变球
+const skyU = {
+  top: { value: new THREE.Color(0x5fa8f0) },
+  mid: { value: new THREE.Color(0xffe1c9) },
+  bot: { value: new THREE.Color(0xf6cfd8) }
+};
+const sky = new THREE.Mesh(new THREE.SphereGeometry(1800, 32, 16), new THREE.ShaderMaterial({
+  uniforms: skyU, side: THREE.BackSide, depthWrite: false, fog: false,
+  vertexShader: `
+    varying vec3 vP;
+    void main() { vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform vec3 top; uniform vec3 mid; uniform vec3 bot; varying vec3 vP;
+    void main() {
+      float h = vP.y;
+      vec3 c = h > 0.0 ? mix(mid, top, pow(clamp(h, 0.0, 1.0), 0.55)) : mix(mid, bot, pow(clamp(-h, 0.0, 1.0), 0.6));
+      gl_FragColor = vec4(c, 1.0);
+      #include <colorspace_fragment>
+    }`
+}));
+sky.renderOrder = -1;
+scene.add(sky);
+
+// 灯光
+const hemi = new THREE.HemisphereLight(0xdcecff, 0x8a7a5a, 1.0);
+scene.add(hemi);
+const SUN_DIR = new THREE.Vector3(0.55, 0.8, 0.35).normalize();
+const sun = new THREE.DirectionalLight(0xfff0dc, 2.3);
+sun.position.copy(SUN_DIR).multiplyScalar(120);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+{
+  const sc = sun.shadow.camera;
+  sc.left = -58; sc.right = 58; sc.top = 58; sc.bottom = -58; sc.near = 10; sc.far = 320;
+}
+sun.shadow.bias = -0.0004;
+sun.shadow.normalBias = 0.04;
+scene.add(sun);
+
+/* ================= 调色板 ================= */
+const C = {
+  grass: [0x7fb347, 0x8cc152, 0x74a83e, 0x86b94b], dirt: 0x8b6b4a, dirt2: 0x7a5b3d,
+  stone: [0x8d8478, 0x7d756a, 0x9a9185], rock: [0x8f8f8f, 0x7e7e80, 0xa3a3a3], moss: 0x5e8c3a,
+  sand: 0xcdb98e, pondFloor: 0x6c7a5c, deep: 0x4f5f4c,
+  pathA: 0xbdb5a4, pathB: 0xa79f8e, gravel: 0xe9e3d1, groove: 0xd0c7ae,
+  red: 0xc0392b, redDark: 0x962d22, black: 0x2b2626, wood: 0x5d4037, woodLight: 0x8d6e63, plank2: 0x7b5a4a,
+  white: 0xf3ede0, roof: 0x3f4b55, roof2: 0x36414a, roofEdge: 0x5a6873, gold: 0xd8a31a,
+  thatch: [0xc9a66b, 0xb8955a, 0xd4b27a], paper: 0xf7efd9, bark: 0x5d4037, bark2: 0x4e342e,
+  pine: [0x2e7d32, 0x1b5e20, 0x388e3c, 0x33691e]
+};
+
+/* ================= 世界布局函数 ================= */
+const HALF = 30;
+function inIsland(x, z) {
+  const ax = Math.abs(x + 0.5), az = Math.abs(z + 0.5), r = 7, e = HALF - 0.5 - r;
+  const dx = Math.max(0, ax - e), dz = Math.max(0, az - e);
+  return dx * dx + dz * dz <= r * r;
+}
+function hillH(x, z) {
+  if (x > -19 && z > -21) return 0;
+  const d = Math.hypot(x + 24.5, z + 24.5);
+  if (d >= 9) return 0;
+  return Math.round(4.5 * Math.pow(1 - d / 9, 0.8));
+}
+const POND = { cx: -11, cz: 8, rx: 9, rz: 6.5 };
+function pondDf(px, pz) {
+  const dx = (px - POND.cx) / POND.rx, dz = (pz - POND.cz) / POND.rz;
+  const a = Math.atan2(dz, dx);
+  const wob = 1 + 0.07 * Math.sin(a * 3 + 1) + 0.04 * Math.sin(a * 5 + 2);
+  return Math.sqrt(dx * dx + dz * dz) / wob;
+}
+const pondD = (x, z) => pondDf(x + 0.5, z + 0.5);
+const BX0 = -21, BX1 = -1, ARCH = 3.4;
+const bridgeTop = cx => Math.round(ARCH * Math.sin(Math.PI * (cx - BX0 + 0.5) / (BX1 - BX0 + 1)));
+const TEA = { x0: -18, x1: -10, z0: -20, z1: -12 };
+// 村民行走表面高度
+function surfY(x, z) {
+  const cx = Math.floor(x), cz = Math.floor(z);
+  if (cx >= 6 && cx <= 18 && cz >= -18 && cz <= -6) return 2;
+  if (cz === -5 && cx >= 10 && cx <= 14) return 1;
+  if (cx >= BX0 && cx <= BX1 && cz >= 7 && cz <= 9) return bridgeTop(cx);
+  if (cx >= TEA.x0 && cx <= TEA.x1 && cz >= TEA.z0 && cz <= TEA.z1 + 1) return 1;
+  return 0;
+}
+
+const G = new VoxelSet();   // 静态世界
+const GL = new VoxelSet();  // 夜间发光部件（障子、窗、提灯）
+const occ = new Set();
+const ck = (x, z) => (x + 512) * 2048 + (z + 512);
+const mark = (x, z) => occ.add(ck(x, z));
+const isOcc = (x, z) => occ.has(ck(x, z));
+function markRect(x0, z0, x1, z1) { for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) mark(x, z); }
+function freeRect(x0, z0, x1, z1) {
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) if (isOcc(x, z) || !inIsland(x, z)) return false;
+  return true;
+}
+
+/* ---------- 浮岛地形 ---------- */
+for (let x = -HALF; x < HALF; x++) for (let z = -HALF; z < HALF; z++) {
+  if (!inIsland(x, z)) continue;
+  const ed = HALF - 0.5 - Math.max(Math.abs(x + 0.5), Math.abs(z + 0.5));
+  const bottom = -4 - Math.floor(Math.min(ed, 13) * 0.9) - Math.floor(hash3(x, 7, z) * 2.5);
+  const top = -1 + hillH(x, z);
+  const gn = vnoise2(x * 0.15, z * 0.15);
+  for (let y = bottom; y <= top; y++) {
+    let c;
+    if (y === top) c = gn < 0.35 ? C.grass[2] : gn < 0.6 ? C.grass[0] : gn < 0.8 ? C.grass[1] : C.grass[3];
+    else if (y >= top - 2) c = (hash3(x, y, z) < 0.5) ? C.dirt : C.dirt2;
+    else c = C.stone[((Math.floor((y + vnoise2(x * 0.2, z * 0.2) * 3) / 2) % 3) + 3) % 3];
+    G.set(x, y, z, c);
+  }
+}
+
+/* ---------- 锦鲤池 ---------- */
+for (let x = -22; x <= 1; x++) for (let z = 0; z <= 16; z++) {
+  const d = pondD(x, z);
+  if (d >= 1) continue;
+  mark(x, z);
+  const depth = d < 0.45 ? 3 : d < 0.75 ? 2 : 1;
+  for (let y = -depth; y <= -1; y++) G.del(x, y, z);
+  const fc = d > 0.8 ? C.sand : d > 0.5 ? C.pondFloor : C.deep;
+  G.set(x, -1 - depth, z, hash3(x, 3, z) < 0.15 ? pickH(C.rock, x, 1, z) : fc);
+}
+
+/* ---------- 小径 ---------- */
+const PATHS = [
+  { x0: 11, x1: 13, z0: -4, z1: 29, main: true },
+  { x0: 0, x1: 10, z0: 7, z1: 9 },
+  { x0: -24, x1: -22, z0: -3, z1: 9 },
+  { x0: -24, x1: 13, z0: -3, z1: -1 },
+  { x0: -15, x1: -13, z0: -10, z1: -4 }
+];
+for (const p of PATHS) for (let x = p.x0; x <= p.x1; x++) for (let z = p.z0; z <= p.z1; z++) {
+  if (!inIsland(x, z)) continue;
+  mark(x, z);
+  let c;
+  if (p.main) c = ((Math.floor((z + 64) / 2) + Math.floor((x + 64) / 2)) % 2) ? C.pathA : C.pathB;
+  else c = hash3(x, 9, z) < 0.22 ? C.pathA : (hash3(x, 8, z) < 0.5 ? 0xd9d0bb : 0xcfc5ae);
+  G.set(x, -1, z, c);
+}
+
+/* ---------- 朱红太鼓桥 ---------- */
+for (let cx = BX0; cx <= BX1; cx++) {
+  const t = bridgeTop(cx);
+  for (let z = 6; z <= 10; z++) mark(cx, z);
+  for (let z = 7; z <= 9; z++) G.set(cx, t - 1, z, (cx & 1) ? C.woodLight : C.plank2);
+  for (const z of [6, 10]) {
+    G.set(cx, t - 1, z, C.red);
+    if (t - 2 >= -3) G.set(cx, t - 2, z, C.redDark);
+    G.set(cx, t + 1, z, C.red);
+    if ((cx - BX0) % 3 === 0 || cx === BX1) G.set(cx, t, z, C.red);
+  }
+}
+for (const z of [6, 10]) {
+  G.set(BX0, bridgeTop(BX0) + 2, z, C.gold);
+  G.set(BX1, bridgeTop(BX1) + 2, z, C.gold);
+  for (const px of [BX0 + 5, BX1 - 5]) for (let y = -3; y <= bridgeTop(px) - 2; y++) G.set(px, y, z, y < -1 ? C.black : C.red);
+}
+
+/* ---------- 池边石 ---------- */
+function boulder(V, cx, y0, cz, r, h) {
+  const R = Math.ceil(r);
+  for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+    const q = (dx * dx + dz * dz) / (r * r);
+    if (q > 1) continue;
+    const top = Math.max(1, Math.round(h * Math.sqrt(1 - q) + (hash3(cx + dx, 5, cz + dz) - 0.5) * 0.8));
+    for (let y = 0; y < top; y++) {
+      const isTop = y === top - 1;
+      V.set(cx + dx, y0 + y, cz + dz, isTop && hash3(cx + dx, y, cz + dz) < 0.45 ? C.moss : pickH(C.rock, cx + dx, y, cz + dz));
+    }
+  }
+}
+for (let x = -23; x <= 2; x++) for (let z = -1; z <= 17; z++) {
+  const d = pondD(x, z);
+  if (d < 1 || d >= 1.25 || isOcc(x, z) || !inIsland(x, z)) continue;
+  if (hash3(x, 11, z) < 0.42) {
+    G.set(x, 0, z, pickH(C.rock, x, 0, z));
+    if (hash3(x, 12, z) < 0.35) G.set(x, 1, z, hash3(x, 13, z) < 0.5 ? C.moss : pickH(C.rock, x, 1, z));
+    mark(x, z);
+  }
+}
+boulder(G, -7, -2, 12, 1.4, 2.6);
+boulder(G, -16, -3, 4, 1.6, 3.4);
+
+/* ---------- 五重塔石台与台阶 ---------- */
+for (let x = 6; x <= 18; x++) for (let z = -18; z <= -6; z++) {
+  mark(x, z);
+  const edge = x === 6 || x === 18 || z === -18 || z === -6;
+  G.set(x, 0, z, edge ? 0x8a8174 : 0x9a9182);
+  G.set(x, 1, z, edge ? 0x9c9384 : (((x + z) & 1) ? 0xb5ad9c : 0xa69e8d));
+}
+for (let x = 10; x <= 14; x++) { G.set(x, 0, -5, 0xa69e8d); mark(x, -5); }
+
+/* ---------- 枯山水 ---------- */
+{
+  const ZX0 = -26, ZX1 = -5, ZZ0 = 18, ZZ1 = 27;
+  const rocks = [[-20, 22, 2.6, 3], [-11, 24, 1.8, 2.2], [-8, 20, 1.2, 1.5]];
+  const inZ = (x, z) => x >= ZX0 && x <= ZX1 && z >= ZZ0 && z <= ZZ1 && inIsland(x, z);
+  for (let x = ZX0; x <= ZX1; x++) for (let z = ZZ0; z <= ZZ1; z++) {
+    if (!inZ(x, z)) continue;
+    mark(x, z);
+    const border = !inZ(x + 1, z) || !inZ(x - 1, z) || !inZ(x, z + 1) || !inZ(x, z - 1);
+    if (border) { G.set(x, 0, z, C.wood); G.set(x, -1, z, C.wood); continue; }
+    let best = 1e9, br = 0;
+    for (const [rx, rz, r] of rocks) { const d = Math.hypot(x - rx, z - rz) - r; if (d < best) { best = d; br = r; } }
+    let c;
+    if (best < 0.6) c = C.moss;
+    else if (best < 3.6) c = (Math.floor(best) % 2 === 0) ? C.groove : C.gravel;
+    else c = ((z & 1) === 0) ? C.groove : C.gravel;
+    G.set(x, -1, z, c);
+  }
+  for (const [rx, rz, r, h] of rocks) boulder(G, rx, 0, rz, r, h);
+}
+
+/* ---------- 鸟居 ---------- */
+{
+  const zc = 22;
+  for (const px of [9, 15]) { for (let y = 0; y <= 7; y++) G.set(px, y, zc, y === 0 ? C.black : C.red); mark(px, zc); }
+  for (let x = 8; x <= 16; x++) { G.set(x, 5, zc, C.red); G.set(x, 7, zc, C.red); }
+  G.set(12, 6, zc, C.gold);
+  for (let x = 7; x <= 17; x++) G.set(x, 8, zc, C.black);
+  G.set(7, 9, zc, C.black); G.set(17, 9, zc, C.black);
+}
+
+/* ---------- 茶室 ---------- */
+{
+  const { x0, x1, z0, z1 } = TEA;
+  markRect(x0 - 2, z0 - 2, x1 + 2, z1 + 1);
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1 + 1; z++) G.set(x, 0, z, (x & 1) ? C.woodLight : C.plank2);
+  for (let y = 1; y <= 4; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    const onX = x === x0 || x === x1, onZ = z === z0 || z === z1;
+    if (!onX && !onZ) continue;
+    const post = (onX && onZ) || (onZ && (x - x0) % 4 === 0) || (onX && (z - z0) % 4 === 0);
+    if (y === 4 || post) G.set(x, y, z, C.wood);
+    else if (z === z1 || x === x1) GL.set(x, y, z, C.paper);
+    else G.set(x, y, z, y === 1 ? 0x8a7a62 : 0xe9dcc0);
+  }
+  for (let k = 0; k <= 5; k++) {
+    const ax = x0 - 2 + k, bx = x1 + 2 - k, az = z0 - 2 + k, bz = z1 + 2 - k;
+    if (ax > bx || az > bz) break;
+    for (let x = ax; x <= bx; x++) for (let z = az; z <= bz; z++) {
+      const edge = x === ax || x === bx || z === az || z === bz;
+      G.set(x, 5 + k, z, k === 5 ? C.black : edge ? C.roofEdge : (((x + z) & 1) ? C.roof : C.roof2));
+    }
+  }
+}
+
+/* ---------- 民家（茅草屋） ---------- */
+const SMOKE_ORIGIN = new THREE.Vector3(22, 10, 15.5);
+{
+  const x0 = 18, x1 = 25, z0 = 12, z1 = 18;
+  markRect(x0 - 1, z0 - 1, x1 + 1, z1 + 1);
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) G.set(x, 0, z, 0x7b6f60);
+  for (let y = 1; y <= 3; y++) for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    const onX = x === x0 || x === x1, onZ = z === z0 || z === z1;
+    if (!onX && !onZ) continue;
+    const post = (onX && onZ) || (onZ && (x - x0) % 3 === 0) || (onX && (z - z0) % 3 === 0);
+    if (y === 3 || post) G.set(x, y, z, C.wood);
+    else if (x === x0 && z >= 14 && z <= 15 && y <= 2) G.set(x, y, z, 0x3e2723);
+    else if (y === 2 && (z === z1 || z === z0 || x === x1)) GL.set(x, y, z, C.paper);
+    else G.set(x, y, z, C.white);
+  }
+  for (let k = 0; k <= 5; k++) {
+    const ax = x0 - 1 + k, bx = x1 + 1 - k;
+    if (ax > bx) break;
+    for (let x = ax; x <= bx; x++) for (let z = z0 - 1; z <= z1 + 1; z++) {
+      const last = ax + 1 >= bx - 1;
+      G.set(x, 4 + k, z, last ? C.wood : (x === ax || x === bx) ? 0xa88550 : pickH(C.thatch, x, k, z));
+    }
+  }
+  for (const z of [z0 - 1, z1 + 1]) { G.set(21, 9, z, C.wood); G.set(22, 9, z, C.wood); G.set(20, 10, z, C.wood); G.set(23, 10, z, C.wood); }
+}
+
+/* ---------- 五重塔（独立网格，可交互） ---------- */
+const P = new VoxelSet();
+const PAGODA_C = { x: 12, z: -12 };
+let PAGODA_TOP = 0;
+{
+  const cx = PAGODA_C.x, cz = PAGODA_C.z;
+  const ws = [4, 4, 3, 3, 2], hs = [4, 3, 3, 3, 3];
+  let y = 2;
+  for (let i = 0; i < 5; i++) {
+    const w = ws[i], h = hs[i];
+    for (let yy = y; yy < y + h; yy++) for (let dx = -w; dx <= w; dx++) for (let dz = -w; dz <= w; dz++) {
+      const onX = Math.abs(dx) === w, onZ = Math.abs(dz) === w;
+      if (!onX && !onZ) continue;
+      const a = onX ? dz : dx;
+      const topRow = yy === y + h - 1;
+      let c = C.white;
+      if (Math.abs(a) === w || (w >= 3 && Math.abs(a) === 2) || topRow) c = C.red;
+      const center = Math.abs(a) <= (w >= 3 ? 1 : 0);
+      if (center && !topRow) {
+        if (i === 0) c = (yy - y < 3) ? 0x4a2f25 : C.red;
+        else if (yy === y + 1) { GL.set(cx + dx, yy, cz + dz, 0xffe7b0); continue; }
+      }
+      if (i === 0 && yy === y && c === C.white) c = 0x8a8174;
+      P.set(cx + dx, yy, cz + dz, c);
+    }
+    const yb = y + h;
+    for (let dx = -w - 1; dx <= w + 1; dx++) for (let dz = -w - 1; dz <= w + 1; dz++) {
+      const edge = Math.max(Math.abs(dx), Math.abs(dz)) === w + 1;
+      P.set(cx + dx, yb, cz + dz, edge ? (((dx + dz) & 1) ? C.gold : C.red) : C.redDark);
+    }
+    for (let k = 0; k <= 2; k++) {
+      const R = w + 3 - k, yy = yb + 1 + k;
+      for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) {
+        const edge = Math.max(Math.abs(dx), Math.abs(dz)) === R;
+        P.set(cx + dx, yy, cz + dz, edge ? C.roofEdge : (((Math.abs(dx) + Math.abs(dz)) & 1) ? C.roof : C.roof2));
+      }
+      if (k === 0) for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+        P.set(cx + sx * R, yy + 1, cz + sz * R, C.roofEdge);
+        P.set(cx + sx * R, yy - 1, cz + sz * R, C.gold); // 风铃
+      }
+    }
+    y = yb + 3;
+  }
+  // 相轮
+  P.box(cx - 1, y + 1, cz - 1, cx + 1, y + 1, cz + 1, C.roofEdge);
+  for (let k = 2; k <= 10; k++) P.set(cx, y + k, cz, C.gold);
+  for (const k of [3, 5, 7, 9]) for (let dx = -1; dx <= 1; dx++) for (let dz = -1; dz <= 1; dz++) P.set(cx + dx, y + k, cz + dz, C.gold);
+  P.set(cx, y + 11, cz, 0xffd54f); P.set(cx, y + 12, cz, 0xffe082);
+  PAGODA_TOP = y + 12;
+  // 正门提灯
+  for (const sx of [-3, 3]) {
+    GL.set(cx + sx, 6, cz + 6, C.black);
+    GL.set(cx + sx, 5, cz + 6, 0xd84315);
+    GL.set(cx + sx, 4, cz + 6, 0xd84315);
+    GL.set(cx + sx, 3, cz + 6, C.black);
+  }
+}
+
+/* ---------- 松树（并入静态世界） ---------- */
+function pine(x, z, h) {
+  const base = hillH(x, z);
+  for (let y = 0; y < h; y++) {
+    const px = Math.round(Math.sin(y * 0.45) * 1.3);
+    G.set(x + px, base + y, z, y % 3 ? C.bark : C.bark2);
+  }
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) G.set(x + dx, base, z + dz, C.bark2);
+  const levels = [Math.floor(h * 0.45), Math.floor(h * 0.68), Math.floor(h * 0.88), h];
+  levels.forEach((ly, i) => {
+    const sx = Math.round(Math.sin(ly * 0.45) * 1.3);
+    const off = i === 3 ? 0 : (i % 2 ? 2 : -2);
+    const pcx = x + sx + off, pcy = base + ly, pcz = z + (i % 2 ? -1 : 1) * (i === 3 ? 0 : 1);
+    for (let t = 0; t <= Math.abs(off); t++) G.set(x + sx + Math.sign(off) * t, pcy - 1, z, C.bark);
+    const rx = 3.6 - i * 0.55, ry = 1.25;
+    const R = Math.ceil(rx);
+    for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) for (let dy = -1; dy <= 1; dy++) {
+      if ((dx / rx) ** 2 + (dz / rx) ** 2 + (dy / ry) ** 2 > 1) continue;
+      G.set(pcx + dx, pcy + dy, pcz + dz, pickH(C.pine, pcx + dx, pcy + dy, pcz + dz));
+    }
+  });
+  markRect(x - 1, z - 1, x + 1, z + 1);
+}
+pine(3, -22, 10); pine(25, -10, 9); pine(-27, -13, 8); pine(-23, -23, 9); pine(1, 26, 8); pine(26, -1, 8);
+
+/* ---------- 预留装饰位置 ---------- */
+const SAKURA_POS = [[-1, 17], [-25, 14], [2, -9], [22, 5], [-4, -13], [22, 25], [3, 18]];
+const LANTERN_POS = [[9.2, 15.8], [15.8, 15.8], [9.2, 4.5], [15.8, 4.5], [2.5, 5.2], [-11.2, -6.5]];
+const SHISHI_POS = new THREE.Vector3(-2.6, 0, 2.4);
+const BAMBOO_RECT = [21, -27, 27, -19];
+for (const [x, z] of SAKURA_POS) markRect(x - 2, z - 2, x + 2, z + 2);
+for (const [x, z] of LANTERN_POS) markRect(Math.floor(x) - 1, Math.floor(z) - 1, Math.floor(x) + 1, Math.floor(z) + 1);
+markRect(Math.floor(SHISHI_POS.x) - 2, Math.floor(SHISHI_POS.z) - 2, Math.floor(SHISHI_POS.x) + 2, Math.floor(SHISHI_POS.z) + 2);
+markRect(BAMBOO_RECT[0], BAMBOO_RECT[1], BAMBOO_RECT[2], BAMBOO_RECT[3]);
+for (let x = BAMBOO_RECT[0]; x <= BAMBOO_RECT[2]; x++) for (let z = BAMBOO_RECT[1]; z <= BAMBOO_RECT[3]; z++)
+  if (G.has(x, -1, z)) G.set(x, -1, z, hash3(x, 2, z) < 0.5 ? 0x6e8c3a : 0x7a8f45);
+
+/* ---------- 杜鹃灌木 ---------- */
+{
+  const flowers = [0xff6f91, 0xffffff, 0xe84a5f, 0xff9ec4];
+  let placed = 0;
+  for (let t = 0; t < 600 && placed < 24; t++) {
+    const x = Math.floor(rr(-27, 27)), z = Math.floor(rr(-27, 27));
+    if (!freeRect(x - 2, z - 2, x + 2, z + 2) || hillH(x, z) > 0) continue;
+    const r = rr(1.3, 2.1), fc = pick(flowers), R = Math.ceil(r);
+    for (let dx = -R; dx <= R; dx++) for (let dz = -R; dz <= R; dz++) for (let dy = 0; dy <= R; dy++) {
+      const d = Math.sqrt(dx * dx + dz * dz + (dy * 1.3) ** 2);
+      if (d > r) continue;
+      const surf = d > r - 1;
+      G.set(x + dx, dy, z + dz, surf && hash3(x + dx, dy, z + dz) < 0.3 ? fc : pickH([0x4f8a2e, 0x5d9b36, 0x467d28], x + dx, dy, z + dz));
+    }
+    markRect(x - 1, z - 1, x + 1, z + 1);
+    placed++;
+  }
+}
+
+/* ================= 交互注册 ================= */
+const interactives = [];
+function makeInteractive(obj, label, onClick) {
+  obj.userData.ix = { label, onClick };
+  interactives.push(obj);
+}
+
+/* ================= 静态网格 ================= */
+const worldMesh = voxMesh(G);
+scene.add(worldMesh);
+const glowMesh = voxMesh(GL, 1, [0, 0, 0], glowMat, 0.03);
+scene.add(glowMesh);
+const pagodaMesh = voxMesh(P);
+scene.add(pagodaMesh);
+
+/* ================= 樱花树（可摇晃） ================= */
+const PINKS = [0xffc4da, 0xf9a8c6, 0xffd9e6, 0xf48fb1, 0xfff0f5, 0xffb3cf];
+function buildSakura(seed) {
+  const R = mulberry32(seed), V = new VoxelSet(), canopies = [];
+  const H = 5 + Math.floor(R() * 2);
+  for (let y = 0; y <= H; y++) V.set(0, y, 0, y % 2 ? C.bark : C.bark2);
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (R() < 0.75) V.set(dx, 0, dz, C.bark2);
+  const blob = (cx, cy, cz, r) => {
+    canopies.push({ p: new THREE.Vector3(cx, cy + 0.5, cz), r });
+    const Rr = Math.ceil(r);
+    for (let dx = -Rr; dx <= Rr; dx++) for (let dy = -Rr; dy <= Rr; dy++) for (let dz = -Rr; dz <= Rr; dz++) {
+      const d = Math.sqrt(dx * dx + (dy * 1.35) ** 2 + dz * dz);
+      if (d > r || (d > r - 1 && R() < 0.3)) continue;
+      const c = dy < -r * 0.35 ? (R() < 0.6 ? 0xf48fb1 : 0xf9a8c6) : PINKS[Math.floor(R() * PINKS.length)];
+      V.set(cx + dx, cy + dy, cz + dz, c);
+    }
+  };
+  const nb = 3 + Math.floor(R() * 2), a0 = R() * Math.PI * 2;
+  for (let b = 0; b < nb; b++) {
+    const ang = a0 + b / nb * Math.PI * 2 + (R() - 0.5) * 0.5;
+    const len = 3 + Math.floor(R() * 2);
+    let y = H - 1 - Math.floor(R() * 2), x = 0, z = 0;
+    for (let s = 1; s <= len; s++) {
+      x = Math.round(Math.cos(ang) * s); z = Math.round(Math.sin(ang) * s);
+      if (s % 2 === 0) y++;
+      V.set(x, y, z, C.bark);
+    }
+    blob(x, y + 1, z, 2.3 + R() * 1.1);
+  }
+  blob(0, H + 2, 0, 3.0 + R() * 0.6);
+  return { V, canopies };
+}
+const sakuras = [];
+SAKURA_POS.forEach(([x, z], i) => {
+  const { V, canopies } = buildSakura(1000 + i * 77);
+  const mesh = voxMesh(V, 1, [-0.5, 0, -0.5]);
+  mesh.position.set(x + 0.5, 0, z + 0.5);
+  scene.add(mesh);
+  const tree = { mesh, canopies: canopies.map(c => ({ p: c.p.clone().add(mesh.position), r: c.r })), shake: 0, phase: rand() * 6.28 };
+  sakuras.push(tree);
+  makeInteractive(mesh, '樱花树 · 点击摇落花瓣', () => {
+    tree.shake = 1;
+    for (let k = 0; k < 70; k++) spawnPetalFromTree(tree, true);
+    sfx.rustle();
+  });
+});
+
+/* ================= 竹林（随风摇曳） ================= */
+const bamboos = [];
+{
+  const used = new Set();
+  for (let t = 0; t < 300 && bamboos.length < 24; t++) {
+    const x = Math.floor(rr(BAMBOO_RECT[0], BAMBOO_RECT[2] + 1)), z = Math.floor(rr(BAMBOO_RECT[1], BAMBOO_RECT[3] + 1));
+    if (!inIsland(x, z) || used.has(ck(x, z))) continue;
+    used.add(ck(x, z));
+    const V = new VoxelSet(), H = Math.floor(rr(34, 50));
+    for (let y = 0; y < H; y++) V.set(0, y, 0, y % 7 === 0 ? 0xb5cf6a : (hash3(x, y, z) < 0.5 ? 0x6f9e3a : 0x7fae45));
+    for (let y = Math.floor(H * 0.55); y < H; y += 5) {
+      const a = rand() * Math.PI * 2, L = 3 + Math.floor(rand() * 3);
+      for (let s = 1; s <= L; s++) {
+        const lx = Math.round(Math.cos(a) * s), lz = Math.round(Math.sin(a) * s);
+        V.set(lx, y + (s > 2 ? 1 : 0), lz, s < 2 ? 0x6f9e3a : (s & 1 ? 0x5c9a32 : 0x4a8a2a));
+        if (s > 1) V.set(lx, y - 1 + (s > 2 ? 1 : 0), lz, 0x5c9a32);
+      }
+    }
+    V.set(0, H, 0, 0x5c9a32);
+    const mesh = voxMesh(V, 0.35, [-0.5, 0, -0.5], voxMat, 0.04);
+    mesh.position.set(x + 0.5, 0, z + 0.5);
+    scene.add(mesh);
+    bamboos.push({ mesh, phase: rand() * 6.28, amp: rr(0.02, 0.045) });
+  }
+}
+
+/* ================= 石灯笼（点击开关） ================= */
+const lanterns = [];
+{
+  const S = 0x9a9488, S2 = 0x858073, S3 = 0xaaa498;
+  const V = new VoxelSet();
+  V.box(-2, 0, -2, 1, 0, 1, S2);
+  V.box(-1, 1, -1, 0, 4, 0, S);
+  V.box(-2, 5, -2, 1, 5, 1, S3);
+  for (const [cx, cz] of [[-2, -2], [1, -2], [-2, 1], [1, 1]]) V.box(cx, 6, cz, cx, 8, cz, S);
+  V.box(-3, 9, -3, 2, 9, 2, S2);
+  for (const [cx, cz] of [[-3, -3], [2, -3], [-3, 2], [2, 2]]) V.set(cx, 10, cz, S2);
+  V.box(-2, 10, -2, 1, 10, 1, S);
+  V.box(-1, 11, -1, 0, 11, 0, S3);
+  const stoneGeo = V.build(0.08); stoneGeo.translate(0, 0, 0).scale(0.4, 0.4, 0.4);
+  const F = new VoxelSet(); F.box(-1, 6, -1, 0, 8, 0, 0xfff1c4);
+  const fireGeo = F.build(0); fireGeo.scale(0.4, 0.4, 0.4);
+  LANTERN_POS.forEach(([x, z]) => {
+    const g = new THREE.Group();
+    g.position.set(x, 0, z);
+    const stone = new THREE.Mesh(stoneGeo, voxMat); stone.castShadow = stone.receiveShadow = true;
+    const fireMat = new THREE.MeshLambertMaterial({ color: 0xfff1c4, emissive: 0xffa64d, emissiveIntensity: 0.3 });
+    const fire = new THREE.Mesh(fireGeo, fireMat);
+    const light = new THREE.PointLight(0xffb060, 0, 22, 2);
+    light.position.set(0, 2.9, 0);
+    g.add(stone, fire, light);
+    scene.add(g);
+    const L = { g, fireMat, light, on: true, k: 1, flick: rand() * 10 };
+    lanterns.push(L);
+    makeInteractive(g, '石灯笼 · 点击开关', () => { L.on = !L.on; sfx.chime(L.on ? 1320 : 880); });
+  });
+}
+
+/* ================= 池水（波纹可交互） ================= */
+const WATER_Y = -0.35;
+const wGeo = new THREE.PlaneGeometry(POND.rx * 2.5, POND.rz * 2.5, 54, 40);
+wGeo.rotateX(-Math.PI / 2);
+const wPos = wGeo.attributes.position;
+const waterMat = new THREE.MeshPhongMaterial({
+  color: 0x4fb0d6, specular: 0xbfe6ff, shininess: 80, transparent: true, opacity: 0.74, flatShading: true, depthWrite: false
+});
+const water = new THREE.Mesh(wGeo, waterMat);
+water.position.set(POND.cx, WATER_Y, POND.cz);
+water.receiveShadow = true;
+scene.add(water);
+const ripples = [];
+function addRipple(x, z, amp = 0.22) { ripples.push({ x, z, t: 0, amp }); if (ripples.length > 8) ripples.shift(); }
+function updateWater(dt, time) {
+  for (const r of ripples) r.t += dt;
+  while (ripples.length && ripples[0].t > 4) ripples.shift();
+  for (let i = 0; i < wPos.count; i++) {
+    const lx = wPos.getX(i), lz = wPos.getZ(i);
+    const wx = lx + POND.cx, wz = lz + POND.cz;
+    let h = Math.sin(wx * 0.7 + time * 1.3) * 0.035 + Math.sin(wz * 0.9 - time * 1.1) * 0.03;
+    for (const r of ripples) {
+      const d = Math.hypot(wx - r.x, wz - r.z), front = r.t * 4.5;
+      if (d > front) continue;
+      h += r.amp * Math.sin(d * 2.6 - r.t * 11) * Math.exp(-r.t * 1.1) * Math.exp(-(front - d) * 0.25);
+    }
+    wPos.setY(i, h);
+  }
+  wPos.needsUpdate = true;
+  wGeo.computeVertexNormals();
+}
+
+/* ================= 锦鲤 ================= */
+const koi = [];
+const koiFeed = { t: 0, x: 0, z: 0 };
+function randomPondPoint(maxD = 0.58) {
+  for (let i = 0; i < 50; i++) {
+    const x = POND.cx + rr(-POND.rx, POND.rx), z = POND.cz + rr(-POND.rz, POND.rz);
+    if (pondDf(x, z) < maxD) return new THREE.Vector2(x, z);
+  }
+  return new THREE.Vector2(POND.cx, POND.cz);
+}
+{
+  const schemes = [[0xffffff, 0xe64a19], [0xff7a1a, 0xffffff], [0xffffff, 0x222222], [0xffc107, 0xff7043], [0xe53935, 0xffffff], [0xfafafa, 0xff5722], [0xff8f00, 0x212121]];
+  schemes.forEach(([base, spot], i) => {
+    const V = new VoxelSet(), T = new VoxelSet();
+    for (let z = 0; z <= 6; z++) {
+      const hw = (z === 0 || z === 6) ? 0 : 1;
+      for (let x = -hw; x <= hw; x++) for (let y = 0; y <= (z === 0 ? 0 : 1); y++)
+        V.set(x, y, z, hash3(x + i * 13, y, z) < 0.35 ? spot : base);
+    }
+    V.set(-1, 1, 5, 0x111111); V.set(1, 1, 5, 0x111111);
+    V.set(-2, 0, 4, base); V.set(2, 0, 4, base);
+    T.set(0, 0, -1, base); T.set(0, 1, -1, base);
+    for (let x = -1; x <= 1; x++) T.set(x, 0, -2, spot);
+    T.set(-1, 1, -3, spot); T.set(1, 1, -3, spot); T.set(-1, 0, -3, base); T.set(1, 0, -3, base);
+    const g = new THREE.Group();
+    const body = voxMesh(V, 0.22, [-0.5, 0, 0], voxMat, 0.03);
+    const tail = voxMesh(T, 0.22, [-0.5, 0, 0], voxMat, 0.03);
+    g.add(body, tail);
+    const p = randomPondPoint();
+    g.position.set(p.x, -1.1, p.y);
+    scene.add(g);
+    koi.push({ g, tail, heading: rand() * 6.28, target: randomPondPoint(), speed: rr(1.2, 1.8), phase: rand() * 6.28 });
+  });
+}
+function updateKoi(dt, time) {
+  koiFeed.t = Math.max(0, koiFeed.t - dt);
+  for (const k of koi) {
+    const px = k.g.position.x, pz = k.g.position.z;
+    if (koiFeed.t > 0) k.target.set(koiFeed.x + Math.sin(k.phase) * 0.8, koiFeed.z + Math.cos(k.phase) * 0.8);
+    else if (Math.hypot(k.target.x - px, k.target.y - pz) < 1.2) k.target = randomPondPoint();
+    if (pondDf(px, pz) > 0.66) k.target.set(POND.cx, POND.cz);
+    const want = Math.atan2(k.target.x - px, k.target.y - pz);
+    let diff = want - k.heading;
+    diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    k.heading += clamp(diff, -2 * dt, 2 * dt);
+    const sp = k.speed * (koiFeed.t > 0 ? 1.9 : 1);
+    k.g.position.x += Math.sin(k.heading) * sp * dt;
+    k.g.position.z += Math.cos(k.heading) * sp * dt;
+    k.g.position.y = -1.1 + Math.sin(time * 1.5 + k.phase) * 0.08;
+    k.g.rotation.y = k.heading;
+    k.tail.rotation.y = Math.sin(time * (koiFeed.t > 0 ? 14 : 8) + k.phase) * 0.45;
+  }
+}
+
+/* ================= 睡莲 ================= */
+const lilies = [];
+{
+  const V = new VoxelSet(), VF = new VoxelSet();
+  for (let x = -3; x <= 3; x++) for (let z = -3; z <= 3; z++) {
+    if (x * x + z * z > 9.5 || (x >= 0 && z >= 0 && Math.abs(x - z) <= 1 && x + z > 1)) continue;
+    V.set(x, 0, z, hash3(x, 0, z) < 0.5 ? 0x4f8f3a : 0x5ea34a);
+  }
+  VF.box(-1, 0, -1, 1, 0, 1, 0xf8bbd0); VF.set(0, 1, 0, 0xffeb3b);
+  for (const [dx, dz] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) VF.set(dx, 1, dz, 0xf48fb1);
+  const padGeo = V.build(0.04); padGeo.translate(-0.5, 0, -0.5).scale(0.35, 0.12, 0.35);
+  const flGeo = VF.build(0.03); flGeo.translate(-0.5, 0, -0.5).scale(0.25, 0.25, 0.25);
+  for (let i = 0; i < 8; i++) {
+    let p;
+    for (let t = 0; t < 30; t++) { p = randomPondPoint(0.85); if (Math.abs(p.y - 8.5) > 2.6) break; }
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(padGeo, voxMat));
+    if (i % 2 === 0) { const f = new THREE.Mesh(flGeo, voxMat); f.position.y = 0.1; g.add(f); }
+    g.position.set(p.x, WATER_Y + 0.02, p.y);
+    g.rotation.y = rand() * 6.28;
+    scene.add(g);
+    lilies.push({ g, phase: rand() * 6.28 });
+  }
+}
+makeInteractive(water, '锦鲤池 · 点击投喂锦鲤', hit => {
+  addRipple(hit.x, hit.z, 0.3);
+  koiFeed.t = 5; koiFeed.x = hit.x; koiFeed.z = hit.z;
+  if (pondDf(hit.x, hit.z) > 0.6) {
+    const dx = hit.x - POND.cx, dz = hit.z - POND.cz;
+    koiFeed.x = POND.cx + dx * 0.55; koiFeed.z = POND.cz + dz * 0.55;
+  }
+  sfx.splash();
+});
+
+/* ================= 鹿威し（竹筒水器） ================= */
+const shishi = { t: 0, state: 0, angle: -0.35, cycle: 0 };
+{
+  const g = new THREE.Group();
+  g.position.copy(SHISHI_POS);
+  g.rotation.y = Math.atan2(POND.cx - SHISHI_POS.x, POND.cz - SHISHI_POS.z);
+  const postV = new VoxelSet();
+  for (const sx of [-2, 2]) postV.box(sx, 0, 0, sx, 5, 0, 0x8d6e47);
+  postV.box(-2, 6, 0, 2, 6, 0, 0x7a5c3a);
+  const posts = voxMesh(postV, 0.4, [-0.5, 0, -0.5]);
+  const tubeV = new VoxelSet();
+  for (let z = -5; z <= 5; z++) tubeV.set(0, 0, z, z === 5 ? 0x4e6b2a : (z % 3 === 0 ? 0xa5c46a : 0x86ad4a));
+  const tube = voxMesh(tubeV, 0.4, [-0.5, -0.5, -0.5]);
+  const pivot = new THREE.Group();
+  pivot.position.set(0, 2.2, 0);
+  pivot.add(tube);
+  const basin = new VoxelSet();
+  boulder(basin, 0, 0, 5, 1.6, 1.4);
+  const basinMesh = voxMesh(basin, 0.4, [-0.5, 0, -0.5]);
+  // 引水竹管与水流
+  const pipeV = new VoxelSet();
+  pipeV.box(3, 0, 8, 3, 10, 8, 0x7a9e3e);
+  pipeV.box(3, 10, 4, 3, 10, 7, 0x86ad4a);
+  pipeV.box(0, 10, 4, 2, 10, 4, 0x86ad4a);
+  const pipe = voxMesh(pipeV, 0.4, [-0.5, 0, -0.5]);
+  const stream = new THREE.Mesh(new THREE.BoxGeometry(0.1, 1.0, 0.1),
+    new THREE.MeshLambertMaterial({ color: 0x9fdcff, transparent: true, opacity: 0.7 }));
+  stream.position.set(0, 3.5, 1.75);
+  g.add(posts, pivot, basinMesh, pipe, stream);
+  scene.add(g);
+  shishi.g = g; shishi.pivot = pivot;
+  makeInteractive(g, '鹿威し · 点击敲响', () => { if (shishi.state === 0) shishi.t = 99; });
+}
+const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3();
+function updateShishi(dt) {
+  shishi.t += dt;
+  if (shishi.state === 0) {
+    shishi.angle = lerp(-0.35, -0.12, clamp(shishi.t / 7, 0, 1));
+    if (shishi.t > 7) { shishi.state = 1; shishi.t = 0; }
+  } else if (shishi.state === 1) {
+    shishi.angle = lerp(shishi.angle, 0.5, 1 - Math.exp(-dt * 18));
+    if (shishi.t > 0.6) {
+      shishi.state = 2; shishi.t = 0;
+      sfx.tock();
+      shishi.pivot.localToWorld(_v1.set(0, 0, 2.4));
+      addRipple(_v1.x, _v1.z, 0.15);
+    }
+  } else {
+    shishi.angle = lerp(shishi.angle, -0.35, 1 - Math.exp(-dt * 3));
+    if (shishi.t > 1.5) { shishi.state = 0; shishi.t = 0; }
+  }
+  shishi.pivot.rotation.x = shishi.angle;
+}
+
+/* ================= 小村民 ================= */
+const VS = 0.2;
+const SKIN = 0xf1c27d, HAIR = 0x1f1a17;
+function makeVillager(o) {
+  const g = new THREE.Group();
+  const body = new THREE.Group();
+  g.add(body);
+  const part = (V, x, y, z) => { const m = voxMesh(V, VS, [0, 0, 0], voxMat, 0.03); m.position.set(x * VS, y * VS, z * VS); return m; };
+  const legs = [];
+  for (const lx of [-2, 0]) {
+    const V = new VoxelSet();
+    V.box(lx, -3, -1, lx + 1, -2, 0, o.pants);
+    V.box(lx, -3, -1, lx + 1, -3, 0, 0x6d4c41);
+    V.box(lx, -1, -1, lx + 1, -1, 0, o.robe);
+    const m = part(V, 0, 3, 0); body.add(m); legs.push(m);
+  }
+  const T = new VoxelSet();
+  T.box(-2, 3, -1, 1, 7, 0, o.robe);
+  T.box(-2, 4, -1, 1, 4, 0, o.sash);
+  T.set(-1, 7, 0, 0xf5f5f5); T.set(0, 7, 0, 0xf5f5f5);
+  T.box(-2, 8, -2, 1, 11, 1, SKIN);
+  T.set(-2, 9, 1, 0x222222); T.set(1, 9, 1, 0x222222);
+  T.set(-1, 8, 1, 0xf0a0a0);
+  if (o.hat !== 'bald') {
+    T.box(-2, 11, -2, 1, 11, 1, HAIR);
+    T.box(-2, 8, -2, 1, 11, -2, HAIR);
+    T.box(-2, 10, -2, -2, 11, 1, HAIR); T.box(1, 10, -2, 1, 11, 1, HAIR);
+    T.box(-2, 11, 1, 1, 11, 1, HAIR);
+  }
+  if (o.hat === 'kasa') {
+    for (let x = -4; x <= 3; x++) for (let z = -4; z <= 3; z++) if (Math.abs(x + 0.5) + Math.abs(z + 0.5) < 7) T.set(x, 12, z, 0xd9b36c);
+    T.box(-3, 13, -3, 2, 13, 2, 0xcaa25e); T.box(-2, 14, -2, 1, 14, 1, 0xd9b36c); T.box(-1, 15, -1, 0, 15, 0, 0xb88d4a);
+  } else if (o.hat === 'bun') {
+    T.box(-1, 12, -1, 0, 13, 0, HAIR); T.set(1, 13, 0, o.sash);
+  } else if (o.hat === 'band') {
+    T.box(-2, 10, -2, 1, 10, 1, 0xf5f5f5); T.set(-2, 10, 1, 0xd32f2f);
+  }
+  const torso = part(T, 0, 0, 0);
+  body.add(torso);
+  const arms = [];
+  for (const ax of [-3, 2]) {
+    const V = new VoxelSet();
+    V.box(ax, -4, -1, ax, -1, 0, o.robe);
+    V.set(ax, -4, 0, SKIN); V.set(ax, -4, -1, SKIN);
+    if (o.broom && ax === 2) {
+      for (let z = 1; z <= 6; z++) V.set(2, -4 - Math.floor(z / 2), z, 0x8d6e47);
+      V.box(1, -8, 6, 3, -7, 7, 0xd9b36c);
+    }
+    const m = part(V, 0, 8, 0); body.add(m); arms.push(m);
+  }
+  g.traverse(c => { if (c.isMesh) c.castShadow = true; });
+  scene.add(g);
+  return { g, body, legs, arms, jump: 0, vy: 0, bubble: null, bubbleT: 0 };
+}
+function makeRoute(pts2) {
+  const pts = [], P = [...pts2, pts2[0]];
+  for (let i = 0; i < P.length - 1; i++) {
+    const [ax, az] = P[i], [bx, bz] = P[i + 1];
+    const n = Math.max(1, Math.ceil(Math.hypot(bx - ax, bz - az) / 0.5));
+    for (let k = 0; k < n; k++) { const x = lerp(ax, bx, k / n), z = lerp(az, bz, k / n); pts.push(new THREE.Vector3(x, surfY(x, z), z)); }
+  }
+  pts.push(pts[0].clone());
+  const cum = [0];
+  for (let i = 1; i < pts.length; i++) cum.push(cum[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z));
+  return { pts, cum, total: cum[cum.length - 1] };
+}
+const routeA = makeRoute([[12.5, -1.5], [-22.5, -1.5], [-22.5, 8.5], [12.5, 8.5]]);
+const routeB = makeRoute([[12.5, 27.5], [12.5, -6.5], [17.5, -6.5], [17.5, -16.5], [7.5, -16.5], [7.5, -6.5], [12.5, -6.5]]);
+const routeC = makeRoute([[-14.5, -10.2], [-14.5, -1.5], [4, -1.5], [-14.5, -1.5]]);
+const ROBES = [0x3f51b5, 0xc2185b, 0x00897b, 0x6d4c41, 0x7b1fa2, 0x1565c0, 0xef6c00, 0x558b2f, 0xad1457];
+const SASHES = [0xffc107, 0xf5f5f5, 0xd32f2f, 0x263238, 0xff8a65];
+const HATS = ['kasa', 'bun', 'band', 'kasa', 'bun', 'none'];
+const PHRASES = ['こんにちは！你好～', '今日はいい天気ですね', '龍神様が見ているよ 🐉', '桜がきれい～ 🌸', 'お茶でもどうぞ 🍵', 'ようこそ庭園へ！', '锦鲤会带来好运哦', '五重塔の鐘、聞いた？'];
+const villagers = [];
+function showBubble(v, text) {
+  if (!v.bubble) { v.bubble = document.createElement('div'); v.bubble.className = 'bubble'; document.body.appendChild(v.bubble); }
+  v.bubble.textContent = text;
+  v.bubble.style.display = 'block';
+  v.bubbleT = 2.8;
+}
+function addVillager(o, route, s0, mode = 'walk') {
+  const v = makeVillager(o);
+  Object.assign(v, { route, s: s0, idx: 0, speed: rr(1.6, 2.3), lane: rr(0.35, 0.75), mode, pause: 0, phase: rand() * 6.28, yaw: 0 });
+  villagers.push(v);
+  makeInteractive(v.g, mode === 'pray' ? '僧人 · 点击打招呼' : '村民 · 点击打招呼', () => {
+    if (v.jump <= 0) { v.vy = 7; v.jump = 0.001; }
+    showBubble(v, mode === 'pray' ? '南無阿弥陀仏… 🙏' : pick(PHRASES));
+    sfx.pop();
+  });
+  return v;
+}
+for (let i = 0; i < 4; i++) addVillager({ robe: ROBES[i], sash: pick(SASHES), pants: 0x37474f, hat: HATS[i] }, routeA, routeA.total * i / 4 + rr(0, 4));
+for (let i = 0; i < 3; i++) addVillager({ robe: ROBES[4 + i], sash: pick(SASHES), pants: 0x4e342e, hat: HATS[(i + 2) % HATS.length] }, routeB, routeB.total * i / 3);
+addVillager({ robe: ROBES[7], sash: 0xffc107, pants: 0x3e2723, hat: 'bun' }, routeC, 0);
+// 定点村民：僧人、扫地人、茶室客人
+const monk = addVillager({ robe: 0xf57c00, sash: 0x8d6e63, pants: 0xe65100, hat: 'bald' }, null, 0, 'pray');
+monk.g.position.set(16.2, 0, -3.6); monk.yaw = Math.PI;
+const sweeper = addVillager({ robe: 0x5d4037, sash: 0xf5f5f5, pants: 0x3e2723, hat: 'kasa', broom: true }, null, 0, 'sweep');
+sweeper.g.position.set(16.5, 0, 25.5); sweeper.yaw = -Math.PI / 2;
+const guest = addVillager({ robe: 0xd81b60, sash: 0xffd54f, pants: 0x4a148c, hat: 'bun' }, null, 0, 'sit');
+guest.g.position.set(-12.0, 0.65, -10.7); guest.yaw = 0;
+
+const _hp = new THREE.Vector3();
+function updateVillagers(dt, time) {
+  for (const v of villagers) {
+    let moving = false;
+    if (v.mode === 'walk') {
+      if (v.pause > 0) v.pause -= dt;
+      else {
+        if (rand() < dt * 0.04) v.pause = rr(1, 2.5);
+        moving = true;
+        const R = v.route;
+        v.s += v.speed * dt;
+        if (v.s >= R.total) { v.s -= R.total; v.idx = 0; }
+        while (v.idx < R.cum.length - 2 && R.cum[v.idx + 1] < v.s) v.idx++;
+        if (R.cum[v.idx] > v.s) v.idx = 0;
+        const a = R.pts[v.idx], b = R.pts[v.idx + 1];
+        const seg = R.cum[v.idx + 1] - R.cum[v.idx] || 1;
+        const t = clamp((v.s - R.cum[v.idx]) / seg, 0, 1);
+        const dx = b.x - a.x, dz = b.z - a.z, L = Math.hypot(dx, dz) || 1;
+        v.g.position.set(lerp(a.x, b.x, t) + dz / L * v.lane, lerp(a.y, b.y, t), lerp(a.z, b.z, t) - dx / L * v.lane);
+        let diff = Math.atan2(dx, dz) - v.yaw;
+        diff = Math.atan2(Math.sin(diff), Math.cos(diff));
+        v.yaw += diff * Math.min(1, dt * 10);
+      }
+    }
+    v.g.rotation.y = v.yaw;
+    const ph = time * 9 + v.phase;
+    if (moving) {
+      const sw = Math.sin(ph) * 0.65;
+      v.legs[0].rotation.x = sw; v.legs[1].rotation.x = -sw;
+      v.arms[0].rotation.x = -sw * 0.8; v.arms[1].rotation.x = sw * 0.8;
+      v.body.position.y = Math.abs(Math.cos(ph)) * 0.08;
+    } else if (v.mode === 'sweep') {
+      const sw = Math.sin(time * 3 + v.phase);
+      v.arms[1].rotation.set(-0.5 + sw * 0.3, 0, sw * 0.25);
+      v.arms[0].rotation.x = -0.4 + sw * 0.2;
+      v.body.rotation.y = sw * 0.2;
+      v.legs[0].rotation.x = v.legs[1].rotation.x = 0;
+    } else if (v.mode === 'pray') {
+      const bow = Math.max(0, Math.sin(time * 0.8 + v.phase)) * 0.35;
+      v.body.rotation.x = bow;
+      v.arms[0].rotation.set(-1.3, 0, -0.45); v.arms[1].rotation.set(-1.3, 0, 0.45);
+    } else if (v.mode === 'sit') {
+      v.legs[0].rotation.x = v.legs[1].rotation.x = -1.45;
+      v.arms[0].rotation.x = -0.6; v.arms[1].rotation.x = -0.9 + Math.sin(time * 1.2) * 0.25;
+    } else {
+      for (const l of v.legs) l.rotation.x *= 0.8;
+      for (const a of v.arms) a.rotation.x *= 0.8;
+      v.body.position.y = 0;
+    }
+    // 跳跃
+    if (v.jump > 0) {
+      v.vy -= 22 * dt; v.jump += v.vy * dt;
+      if (v.jump <= 0) { v.jump = 0; v.vy = 0; }
+      v.body.position.y += v.jump;
+    }
+    if (v.bubbleT > 0) {
+      v.bubbleT -= dt;
+      _hp.set(0, 4.2 + v.jump, 0); v.g.localToWorld(_hp); _hp.project(camera);
+      if (v.bubbleT <= 0 || _hp.z > 1) v.bubble.style.display = 'none';
+      else {
+        v.bubble.style.display = 'block';
+        v.bubble.style.left = ((_hp.x + 1) / 2 * window.innerWidth) + 'px';
+        v.bubble.style.top = ((1 - _hp.y) / 2 * window.innerHeight) + 'px';
+      }
+    }
+  }
+}
+
+/* ================= 飞龙 ================= */
+const JADE = 0x2a9d8f, JADE2 = 0x21867a, BELLY = 0xf2cc5b, BELLY2 = 0xd9ad45, FIN = 0xe76f51, FIN2 = 0xf4a261, IVORY = 0xf1e3c6;
+const DS = 0.55, DRAGON_N = 46, DU = 0.034;
+function buildSeg(withLegs) {
+  const V = new VoxelSet();
+  for (let x = -2; x <= 2; x++) for (let y = -2; y <= 2; y++) for (let z = -1; z <= 1; z++) {
+    if (Math.abs(x) === 2 && Math.abs(y) === 2) continue;
+    let c = ((y + (z & 1)) & 1) ? JADE : JADE2;
+    if (y === -2) c = z === 0 ? BELLY2 : BELLY;
+    V.set(x, y, z, c);
+  }
+  V.set(0, 3, 0, FIN); V.set(0, 3, -1, FIN); V.set(0, 4, -1, FIN2);
+  if (withLegs) for (const s of [-1, 1]) {
+    V.set(s * 3, -1, 0, JADE); V.set(s * 3, -2, 0, JADE2); V.set(s * 4, -3, 0, JADE);
+    V.set(s * 4, -4, 1, C.gold); V.set(s * 5, -4, 0, C.gold); V.set(s * 4, -4, -1, C.gold);
+  }
+  const g = V.build(0.05); g.translate(-0.5, -0.5, -0.5).scale(DS, DS, DS);
+  return g;
+}
+const segGeo = buildSeg(false), legGeo = buildSeg(true);
+const dragonGroup = new THREE.Group();
+scene.add(dragonGroup);
+const segs = [];
+for (let i = 0; i < DRAGON_N; i++) {
+  const m = new THREE.Mesh(i === 7 || i === 24 ? legGeo : segGeo, voxMat);
+  m.castShadow = true;
+  const k = i / DRAGON_N;
+  m.scale.setScalar((i < 3 ? 0.9 + 0.035 * i : 1) * (1 - 0.72 * smoothstep(0.45, 1, k)));
+  dragonGroup.add(m);
+  segs.push(m);
+}
+{
+  const V = new VoxelSet();
+  for (let z = 1; z <= 7; z++) { const s = Math.min(z, 8 - z); for (let y = -s; y <= s + 1; y++) V.set(0, y, -z, (y + z) & 1 ? FIN : FIN2); }
+  for (const sx of [-1, 1]) for (let z = 2; z <= 5; z++) V.set(sx, 0, -z, FIN);
+  const g = V.build(0.05); g.translate(-0.5, -0.5, -0.5).scale(DS, DS, DS);
+  segs[DRAGON_N - 1].add(new THREE.Mesh(g, voxMat));
+}
+// 龙头
+const head = new THREE.Group();
+dragonGroup.add(head);
+let jaw;
+const mouthMarker = new THREE.Object3D();
+{
+  const V = new VoxelSet(), J = new VoxelSet();
+  V.box(-3, -2, 0, 3, 2, 5, (x, y, z) => y === -2 ? BELLY : ((x + y + z) & 1 ? JADE : JADE2));
+  V.box(-2, -1, 6, 2, 1, 9, (x, y, z) => ((x + y + z) & 1 ? JADE : JADE2));
+  V.box(-1, 0, 10, 1, 1, 10, JADE2);
+  V.set(-1, 1, 10, 0x111111); V.set(1, 1, 10, 0x111111);
+  for (const s of [-1, 1]) {
+    V.set(s * 2, -2, 8, 0xffffff); V.set(s * 2, -2, 6, 0xffffff);
+    V.box(Math.min(s * 2, s * 3), 3, 3, Math.max(s * 2, s * 3), 3, 5, FIN);
+    V.set(s * 4, 1, 3, 0xffe14d); V.set(s * 4, 2, 3, 0xffe14d); V.set(s * 4, 1, 4, 0x111111);
+    for (const [hx, hy, hz] of [[2, 3, 1], [2, 4, 0], [2, 5, -1], [3, 6, -2], [3, 7, -3], [3, 8, -4], [3, 5, 0], [4, 6, 0]]) V.set(s * hx, hy, hz, IVORY);
+    for (const [wx, wy, wz] of [[3, 0, 9], [4, 0, 9], [5, -1, 8], [6, -1, 7], [7, -2, 6], [8, -2, 5], [9, -3, 4], [9, -4, 3]]) V.set(s * wx, wy, wz, IVORY);
+    for (let z = -2; z <= 2; z++) for (let y = 1; y <= 4; y++) if (hash3(s, y, z) < 0.7) V.set(s * (3 + (y > 2 ? 1 : 0)), y, z, (y + z) & 1 ? FIN : FIN2);
+  }
+  for (let z = -2; z <= 2; z++) { V.set(0, 3, z, FIN); if (z < 1) V.set(0, 4, z, FIN2); }
+  const hg = V.build(0.05); hg.translate(-0.5, -0.5, -0.5).scale(DS, DS, DS);
+  const hm = new THREE.Mesh(hg, voxMat); hm.castShadow = true;
+  head.add(hm);
+  J.box(-2, -4, 1, 2, -3, 9, (x, y, z) => y === -4 ? BELLY : JADE2);
+  J.box(-1, -3, 2, 1, -3, 8, 0xb71c1c);
+  J.set(-2, -2, 7, 0xffffff); J.set(2, -2, 7, 0xffffff); J.set(-2, -2, 4, 0xffffff); J.set(2, -2, 4, 0xffffff);
+  J.box(0, -6, 2, 0, -5, 5, FIN2);
+  // 下颚以后上角为转轴，便于张嘴
+  const jg = J.build(0.05); jg.translate(-0.5, 2, -1).scale(DS, DS, DS);
+  jaw = new THREE.Mesh(jg, voxMat); jaw.castShadow = true;
+  jaw.position.set(0, -2.5 * DS, 0.5 * DS);
+  head.add(jaw);
+  mouthMarker.position.set(0, -1.2 * DS, 10.5 * DS);
+  head.add(mouthMarker);
+}
+// 龙珠
+const glowTex = (() => {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 64;
+  const g = cv.getContext('2d'), gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.35, 'rgba(255,255,255,0.5)'); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 64, 64);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+})();
+const pearl = new THREE.Mesh(new THREE.IcosahedronGeometry(1.0, 1),
+  new THREE.MeshLambertMaterial({ color: 0xdff4ff, emissive: 0x9fd8ff, emissiveIntensity: 0.9, flatShading: true }));
+const pearlHalo = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xaee2ff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.8 }));
+pearlHalo.scale.setScalar(6);
+pearl.add(pearlHalo);
+scene.add(pearl);
+
+const dragon = { u: 0, boost: 0, mode: 0, k: 0, roar: 0 };
+function pathFree(u, o) {
+  return o.set(
+    Math.cos(u) * 42 + Math.cos(2 * u + 0.6) * 9 + Math.sin(u * 9) * 1.2,
+    30 + Math.sin(2 * u) * 7 + Math.sin(5 * u + 1) * 2.5 + Math.sin(u * 13) * 0.9,
+    Math.sin(u) * 36 + Math.sin(3 * u) * 6 + Math.cos(u * 8) * 1.2);
+}
+function pathTemple(u, o) {
+  const a = u * 2.2;
+  return o.set(PAGODA_C.x + 0.5 + Math.cos(a) * 15, 25 + Math.sin(u * 3) * 9 + Math.sin(u * 11) * 0.8, PAGODA_C.z + 0.5 + Math.sin(a) * 15);
+}
+const _pa = new THREE.Vector3(), _pb = new THREE.Vector3();
+function dragonPath(u, o) {
+  pathFree(u, o);
+  if (dragon.k > 0.001) { pathTemple(u, _pb); o.lerp(_pb, dragon.k); }
+  return o;
+}
+function roar() {
+  dragon.roar = 2.2; dragon.boost = 4;
+  sfx.roar();
+}
+segs.forEach(s => makeInteractive(s, '龙神 · 点击咆哮', roar));
+makeInteractive(head, '龙神 · 点击咆哮', roar);
+makeInteractive(pearl, '龙珠 · 点击让龙神咆哮', roar);
+
+/* ================= 粒子：龙焰 / 花瓣 / 炊烟 / 萤火虫 ================= */
+const FIRE_N = 160;
+const fireMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.6, 0.6, 0.6), new THREE.MeshBasicMaterial({ color: 0xffffff }), FIRE_N);
+fireMesh.frustumCulled = false;
+scene.add(fireMesh);
+const fire = Array.from({ length: FIRE_N }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), life: 0, max: 1 }));
+let fireHead = 0;
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _s = new THREE.Vector3(), _col = new THREE.Color();
+const ZERO_M = new THREE.Matrix4().makeScale(0, 0, 0);
+for (let i = 0; i < FIRE_N; i++) { fireMesh.setMatrixAt(i, ZERO_M); fireMesh.setColorAt(i, _col.setHex(0xffaa00)); }
+
+const PETAL_N = 420;
+const petalMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.06, 0.24), new THREE.MeshLambertMaterial({ color: 0xffffff }), PETAL_N);
+petalMesh.frustumCulled = false;
+scene.add(petalMesh);
+const petals = Array.from({ length: PETAL_N }, () => ({ p: new THREE.Vector3(), v: new THREE.Vector3(), r: new THREE.Vector3(), w: new THREE.Vector3(), life: 0, landed: 0 }));
+for (let i = 0; i < PETAL_N; i++) { petalMesh.setMatrixAt(i, ZERO_M); petalMesh.setColorAt(i, _col.setHex(pick(PINKS))); }
+let petalHead = 0;
+function spawnPetalFromTree(tree, burst) {
+  const pt = petals[petalHead]; petalHead = (petalHead + 1) % PETAL_N;
+  const c = pick(tree.canopies);
+  pt.p.set(c.p.x + rr(-c.r, c.r), c.p.y + rr(-c.r * 0.6, c.r * 0.5), c.p.z + rr(-c.r, c.r));
+  if (burst) pt.v.set(rr(-3, 3), rr(0.5, 3.5), rr(-3, 3)); else pt.v.set(rr(-0.3, 0.3), rr(-0.4, 0), rr(-0.3, 0.3));
+  pt.r.set(rr(0, 6.28), rr(0, 6.28), rr(0, 6.28));
+  pt.w.set(rr(-4, 4), rr(-4, 4), rr(-4, 4));
+  pt.life = 1; pt.landed = 0;
+}
+function groundAt(x, z) {
+  const cx = Math.floor(x), cz = Math.floor(z);
+  if (!inIsland(cx, cz)) return -40;
+  if (pondD(cx, cz) < 1 && !(cx >= BX0 && cx <= BX1 && cz >= 6 && cz <= 10)) return WATER_Y + 0.05;
+  return surfY(x, z) + 0.04;
+}
+let petalAcc = 0;
+function updatePetals(dt, time) {
+  petalAcc += dt * 34;
+  while (petalAcc > 1) { petalAcc--; spawnPetalFromTree(pick(sakuras), false); }
+  for (let i = 0; i < PETAL_N; i++) {
+    const pt = petals[i];
+    if (pt.life <= 0) { petalMesh.setMatrixAt(i, ZERO_M); continue; }
+    if (pt.landed > 0) {
+      pt.landed -= dt;
+      if (pt.landed <= 0) pt.life = 0;
+      else if (pt.p.y < 0) pt.p.x += dt * 0.15; // 水面漂流
+    } else {
+      pt.v.y += (-1.1 - pt.v.y) * dt * 2;
+      pt.v.x += (Math.sin(time * 1.3 + i) * 0.8 + 0.35 - pt.v.x) * dt * 1.5;
+      pt.v.z += (Math.cos(time * 1.1 + i * 0.7) * 0.6 - pt.v.z) * dt * 1.5;
+      pt.p.addScaledVector(pt.v, dt);
+      pt.r.addScaledVector(pt.w, dt);
+      const gy = groundAt(pt.p.x, pt.p.z);
+      if (pt.p.y < gy) {
+        if (gy < -30) { pt.life = 0; continue; }
+        pt.p.y = gy; pt.landed = rr(3, 7); pt.r.set(0, pt.r.y, 0);
+      }
+    }
+    const sc = pt.landed > 0 ? Math.min(1, pt.landed) : 1;
+    _m4.compose(pt.p, _q.setFromEuler(_e.set(pt.r.x, pt.r.y, pt.r.z)), _s.set(sc, sc, sc));
+    petalMesh.setMatrixAt(i, _m4);
+  }
+  petalMesh.instanceMatrix.needsUpdate = true;
+}
+function updateFire(dt) {
+  if (dragon.roar > 0) {
+    const n = Math.ceil(dt * 110);
+    mouthMarker.getWorldPosition(_v1);
+    _v2.set(0, 0, 1).applyQuaternion(head.quaternion);
+    for (let k = 0; k < n; k++) {
+      const f = fire[fireHead]; fireHead = (fireHead + 1) % FIRE_N;
+      f.p.copy(_v1);
+      f.v.copy(_v2).multiplyScalar(rr(12, 18)).add(_v3.set(rr(-2.5, 2.5), rr(-2.5, 2.5), rr(-2.5, 2.5)));
+      f.life = f.max = rr(0.6, 1.0);
+    }
+  }
+  for (let i = 0; i < FIRE_N; i++) {
+    const f = fire[i];
+    if (f.life <= 0) { fireMesh.setMatrixAt(i, ZERO_M); continue; }
+    f.life -= dt;
+    f.p.addScaledVector(f.v, dt);
+    f.v.multiplyScalar(1 - dt * 1.5); f.v.y += dt * 3;
+    const t = 1 - f.life / f.max;
+    const sc = (t < 0.3 ? 0.4 + t * 3.5 : 1.45 * (1 - (t - 0.3) / 0.7)) * 1.2;
+    _col.setHex(t < 0.25 ? 0xfff176 : t < 0.55 ? 0xffa726 : 0xe64a19);
+    fireMesh.setColorAt(i, _col);
+    _m4.compose(f.p, _q.setFromEuler(_e.set(t * 4, t * 3, 0)), _s.set(sc, sc, sc));
+    fireMesh.setMatrixAt(i, _m4);
+  }
+  fireMesh.instanceMatrix.needsUpdate = true;
+  if (fireMesh.instanceColor) fireMesh.instanceColor.needsUpdate = true;
+}
+// 民家炊烟
+const SMOKE_N = 16;
+const smokeMesh = new THREE.InstancedMesh(new THREE.BoxGeometry(0.8, 0.8, 0.8), new THREE.MeshLambertMaterial({ color: 0xe8e4df }), SMOKE_N);
+smokeMesh.frustumCulled = false;
+scene.add(smokeMesh);
+const smoke = Array.from({ length: SMOKE_N }, (_, i) => ({ t: i / SMOKE_N * 6, seed: rand() * 6.28 }));
+function updateSmoke(dt) {
+  for (let i = 0; i < SMOKE_N; i++) {
+    const s = smoke[i];
+    s.t = (s.t + dt) % 6;
+    const k = s.t / 6;
+    _v1.set(SMOKE_ORIGIN.x + Math.sin(s.seed + s.t) * 0.6 + k * 4, SMOKE_ORIGIN.y + s.t * 1.3, SMOKE_ORIGIN.z + Math.cos(s.seed + s.t * 0.7) * 0.6);
+    const sc = (0.4 + k * 1.6) * (1 - smoothstep(0.7, 1, k));
+    _m4.compose(_v1, _q.setFromEuler(_e.set(s.seed, s.t * 0.4, 0)), _s.set(sc, sc, sc));
+    smokeMesh.setMatrixAt(i, _m4);
+  }
+  smokeMesh.instanceMatrix.needsUpdate = true;
+}
+// 萤火虫
+const FF_N = 140;
+const ffGeo = new THREE.BufferGeometry();
+const ffPos = new Float32Array(FF_N * 3), ffCol = new Float32Array(FF_N * 3);
+const ffBase = [];
+for (let i = 0; i < FF_N; i++) {
+  const zone = i % 3;
+  let x, z;
+  if (zone === 0) { const p = randomPondPoint(1.3); x = p.x; z = p.y; }
+  else if (zone === 1) { x = rr(BAMBOO_RECT[0], BAMBOO_RECT[2]); z = rr(BAMBOO_RECT[1], BAMBOO_RECT[3]); }
+  else { x = rr(-24, 26); z = rr(-24, 26); }
+  ffBase.push({ x, y: rr(0.6, 4.5), z, ph: rand() * 6.28, sp: rr(0.4, 1.0) });
+}
+ffGeo.setAttribute('position', new THREE.BufferAttribute(ffPos, 3));
+ffGeo.setAttribute('color', new THREE.BufferAttribute(ffCol, 3));
+const ffMat = new THREE.PointsMaterial({ size: 0.9, map: glowTex, vertexColors: true, transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending });
+const fireflies = new THREE.Points(ffGeo, ffMat);
+fireflies.frustumCulled = false;
+scene.add(fireflies);
+function updateFireflies(time) {
+  if (ffMat.opacity < 0.01) { fireflies.visible = false; return; }
+  fireflies.visible = true;
+  for (let i = 0; i < FF_N; i++) {
+    const b = ffBase[i], t = time * b.sp + b.ph;
+    ffPos[i * 3] = b.x + Math.sin(t) * 1.5;
+    ffPos[i * 3 + 1] = b.y + Math.sin(t * 1.7) * 0.6;
+    ffPos[i * 3 + 2] = b.z + Math.cos(t * 0.8) * 1.5;
+    const f = Math.max(0, Math.sin(time * 3 * b.sp + b.ph * 3)) ** 2;
+    ffCol[i * 3] = 0.85 * f; ffCol[i * 3 + 1] = 1.0 * f; ffCol[i * 3 + 2] = 0.35 * f;
+  }
+  ffGeo.attributes.position.needsUpdate = true;
+  ffGeo.attributes.color.needsUpdate = true;
+}
+
+/* ================= 远景：云海 / 富士山 / 星空 / 日月 ================= */
+const clouds = [];
+{
+  const geos = [];
+  for (let v = 0; v < 4; v++) {
+    const V = new VoxelSet(), R = mulberry32(500 + v);
+    const n = 3 + Math.floor(R() * 3);
+    for (let b = 0; b < n; b++) {
+      const cx = Math.floor((b - n / 2) * 2.5 + R() * 2), cz = Math.floor(R() * 4 - 2), rx = 2 + R() * 2, ry = 1 + R() * 1.2;
+      for (let x = -5; x <= 5; x++) for (let y = -2; y <= 3; y++) for (let z = -4; z <= 4; z++)
+        if ((x / rx) ** 2 + (y / ry) ** 2 + (z / rx) ** 2 <= 1) V.set(cx + x, y, cz + z, y < 0 ? 0xe9eef6 : 0xffffff);
+    }
+    const g = V.build(0.02); g.scale(3, 3, 3); geos.push(g);
+  }
+  const cloudMat = new THREE.MeshLambertMaterial({ vertexColors: true });
+  for (let i = 0; i < 16; i++) {
+    const low = i < 9;
+    const m = new THREE.Mesh(geos[i % 4], cloudMat);
+    const r = low ? rr(45, 130) : rr(70, 150), a = rand() * 6.28;
+    const pivot = new THREE.Object3D();
+    m.position.set(Math.cos(a) * r, low ? rr(-34, -20) : rr(52, 75), Math.sin(a) * r);
+    m.rotation.y = rand() * 6.28;
+    const sc = low ? rr(1, 1.6) : rr(0.6, 1.1);
+    m.scale.set(sc, sc * 0.8, sc);
+    pivot.add(m); scene.add(pivot);
+    clouds.push({ pivot, speed: rr(0.004, 0.012) * (low ? 1 : -1) });
+  }
+}
+{
+  // 富士山
+  const V = new VoxelSet();
+  for (let x = -22; x <= 22; x++) for (let z = -22; z <= 22; z++) {
+    const r = Math.hypot(x, z);
+    if (r > 22) continue;
+    const h = Math.round(14 * Math.pow(1 - r / 22, 1.25) + vnoise2(x * 0.4, z * 0.4) * 1.2);
+    const snowLine = 9.5 + vnoise2(x * 0.7 + 9, z * 0.7) * 2;
+    for (let y = 0; y <= h; y++) V.set(x, y, z, y > snowLine ? 0xf5f7fa : y > 5 ? 0x5a6f8a : 0x4a5d75);
+  }
+  const fuji = voxMesh(V, 4, [0, 0, 0], new THREE.MeshLambertMaterial({ vertexColors: true }), 0.04);
+  fuji.castShadow = fuji.receiveShadow = false;
+  fuji.position.set(-70, -42, -290);
+  scene.add(fuji);
+}
+const stars = (() => {
+  const N = 1200, pos = new Float32Array(N * 3), v = new THREE.Vector3();
+  for (let i = 0; i < N; i++) {
+    v.set(rr(-1, 1), rr(0.05, 1), rr(-1, 1)).normalize().multiplyScalar(1500);
+    pos.set([v.x, v.y, v.z], i * 3);
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const p = new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff6d0, size: 2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false, depthWrite: false }));
+  scene.add(p); return p;
+})();
+function discTex(inner, outer) {
+  const cv = document.createElement('canvas'); cv.width = cv.height = 128;
+  const g = cv.getContext('2d'), gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, inner); gr.addColorStop(0.42, inner); gr.addColorStop(0.5, outer); gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+const sunSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: discTex('#fff6dc', 'rgba(255,214,150,0.45)'), fog: false, transparent: true, depthWrite: false }));
+sunSprite.scale.setScalar(160);
+const moonSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: discTex('#f1f4ff', 'rgba(170,190,255,0.35)'), fog: false, transparent: true, depthWrite: false, opacity: 0 }));
+moonSprite.scale.setScalar(110);
+scene.add(sunSprite, moonSprite);
+
+/* ================= 程序化音效（首次交互后启用） ================= */
+let actx = null, master = null;
+function ensureAudio() {
+  if (!actx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try {
+      actx = new AC();
+      master = actx.createGain(); master.gain.value = 0.5; master.connect(actx.destination);
+    } catch (e) { actx = null; return; }
+  }
+  if (actx.state === 'suspended') actx.resume().catch(() => {});
+}
+function tone(freq, dur, type = 'sine', vol = 0.3, freqEnd = null, delay = 0) {
+  if (!actx) return;
+  const t0 = actx.currentTime + delay;
+  const o = actx.createOscillator(), g = actx.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t0);
+  if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.exponentialRampToValueAtTime(vol, t0 + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  o.connect(g); g.connect(master);
+  o.start(t0); o.stop(t0 + dur + 0.05);
+}
+let noiseBuf = null;
+function noise(dur, type, freq, vol, q = 1, freqEnd = null) {
+  if (!actx) return;
+  if (!noiseBuf) {
+    noiseBuf = actx.createBuffer(1, actx.sampleRate * 2, actx.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const t0 = actx.currentTime;
+  const src = actx.createBufferSource(); src.buffer = noiseBuf;
+  const f = actx.createBiquadFilter(); f.type = type; f.frequency.setValueAtTime(freq, t0); f.Q.value = q;
+  if (freqEnd) f.frequency.exponentialRampToValueAtTime(freqEnd, t0 + dur);
+  const g = actx.createGain();
+  g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(vol, t0 + 0.03); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+  src.connect(f); f.connect(g); g.connect(master);
+  src.start(t0); src.stop(t0 + dur + 0.05);
+}
+const sfx = {
+  bell() { [[110, 0.35], [221, 0.18], [303, 0.12], [596, 0.06], [982, 0.035]].forEach(([f, v]) => tone(f, 5.5, 'sine', v)); tone(55, 4, 'sine', 0.15); },
+  tock() { tone(820, 0.09, 'triangle', 0.35, 420); tone(260, 0.14, 'sine', 0.25, 180); },
+  roar() { noise(1.8, 'lowpass', 900, 0.5, 2, 180); tone(95, 1.6, 'sawtooth', 0.12, 48); tone(140, 1.2, 'square', 0.05, 70); },
+  pop() { tone(620, 0.16, 'sine', 0.25, 980); },
+  chime(f) { tone(f, 0.6, 'sine', 0.18); tone(f * 2.01, 0.4, 'sine', 0.06); },
+  splash() { noise(0.5, 'highpass', 1200, 0.25, 0.7); tone(380, 0.18, 'sine', 0.12, 160); },
+  rustle() { noise(0.7, 'bandpass', 2600, 0.22, 0.8, 1400); }
+};
+
+/* ================= 五重塔交互：钟声 + 声波环 ================= */
+const rings = [];
+const ringMat = new THREE.MeshBasicMaterial({ color: 0xffe2a8, transparent: true, opacity: 0.6, side: THREE.DoubleSide, depthWrite: false });
+let glowPulse = 0;
+makeInteractive(pagodaMesh, '五重塔 · 点击敲钟', () => {
+  sfx.bell();
+  glowPulse = 1.6;
+  for (let k = 0; k < 3; k++) {
+    const m = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.15, 48), ringMat.clone());
+    m.rotation.x = -Math.PI / 2;
+    m.position.set(PAGODA_C.x + 0.5, PAGODA_TOP - 4 - k * 6, PAGODA_C.z + 0.5);
+    scene.add(m);
+    rings.push({ m, t: -k * 0.25 });
+  }
+  for (const tr of sakuras) for (let k = 0; k < 12; k++) spawnPetalFromTree(tr, true);
+  villagers.forEach((v, i) => { if (i % 3 === 0) showBubble(v, 'ゴーン… 🔔'); });
+});
+function updateRings(dt) {
+  for (let i = rings.length - 1; i >= 0; i--) {
+    const r = rings[i];
+    r.t += dt;
+    if (r.t < 0) { r.m.visible = false; continue; }
+    r.m.visible = true;
+    const s = 1 + r.t * 16;
+    r.m.scale.set(s, s, s);
+    r.m.material.opacity = 0.6 * (1 - r.t / 1.8);
+    if (r.t > 1.8) { scene.remove(r.m); r.m.geometry.dispose(); r.m.material.dispose(); rings.splice(i, 1); }
+  }
+}
+
+/* ================= 昼夜切换 ================= */
+let nightTarget = 0, night = 0;
+const btnNight = document.getElementById('btnNight');
+const btnDragon = document.getElementById('btnDragon');
+function toggleNight() {
+  nightTarget = nightTarget ? 0 : 1;
+  btnNight.textContent = nightTarget ? '☀️ 切换白天' : '🌙 切换夜晚';
+}
+function toggleDragon() {
+  dragon.mode = dragon.mode ? 0 : 1;
+  btnDragon.textContent = dragon.mode ? '🐉 龙神归天' : '🐉 召唤龙神';
+  if (dragon.mode) { ensureAudio(); roar(); }
+}
+btnNight.addEventListener('click', () => { ensureAudio(); toggleNight(); });
+btnDragon.addEventListener('click', toggleDragon);
+window.addEventListener('keydown', e => {
+  if (e.key === 'n' || e.key === 'N') toggleNight();
+  if (e.key === 'd' || e.key === 'D') toggleDragon();
+});
+const DAY = {
+  top: new THREE.Color(0x5fa8f0), mid: new THREE.Color(0xffe1c9), bot: new THREE.Color(0xf6cfd8),
+  hemiSky: new THREE.Color(0xdcecff), hemiGround: new THREE.Color(0x8a7a5a), sun: new THREE.Color(0xfff0dc)
+};
+const NIGHT = {
+  top: new THREE.Color(0x060a22), mid: new THREE.Color(0x2b2a55), bot: new THREE.Color(0x14132b),
+  hemiSky: new THREE.Color(0x4a5aa0), hemiGround: new THREE.Color(0x1a1a2a), sun: new THREE.Color(0x9fb4ff)
+};
+function applyNight(n) {
+  skyU.top.value.copy(DAY.top).lerp(NIGHT.top, n);
+  skyU.mid.value.copy(DAY.mid).lerp(NIGHT.mid, n);
+  skyU.bot.value.copy(DAY.bot).lerp(NIGHT.bot, n);
+  scene.fog.color.copy(skyU.mid.value);
+  hemi.color.copy(DAY.hemiSky).lerp(NIGHT.hemiSky, n);
+  hemi.groundColor.copy(DAY.hemiGround).lerp(NIGHT.hemiGround, n);
+  hemi.intensity = lerp(1.0, 0.35, n);
+  sun.color.copy(DAY.sun).lerp(NIGHT.sun, n);
+  sun.intensity = lerp(2.3, 0.45, n);
+  stars.material.opacity = n;
+  sunSprite.material.opacity = 1 - n;
+  moonSprite.material.opacity = n;
+  ffMat.opacity = n;
+  waterMat.color.setHex(0x4fb0d6).lerp(_col.setHex(0x1d3d66), n);
+}
+
+/* ================= 拾取 / 悬停 / 点击 ================= */
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+const tip = document.getElementById('tip');
+let hoverDirty = false, hoverX = 0, hoverY = 0, downX = 0, downY = 0, downT = 0, isMouse = true;
+function pickAt(cx, cy) {
+  pointer.set(cx / window.innerWidth * 2 - 1, -(cy / window.innerHeight) * 2 + 1);
+  raycaster.setFromCamera(pointer, camera);
+  const hits = raycaster.intersectObjects(interactives, true);
+  for (const h of hits) {
+    let o = h.object;
+    while (o && !o.userData.ix) o = o.parent;
+    // 水面平面延伸到草地下方，只认池内命中
+    if (o === water && pondDf(h.point.x, h.point.z) > 1.02) continue;
+    if (o) return { ix: o.userData.ix, point: h.point };
+  }
+  return null;
+}
+renderer.domElement.addEventListener('pointerdown', e => {
+  ensureAudio();
+  downX = e.clientX; downY = e.clientY; downT = performance.now();
+  isMouse = e.pointerType === 'mouse';
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (Math.hypot(e.clientX - downX, e.clientY - downY) > 6 || performance.now() - downT > 600) return;
+  const r = pickAt(e.clientX, e.clientY);
+  if (r) r.ix.onClick(r.point);
+});
+renderer.domElement.addEventListener('pointermove', e => {
+  isMouse = e.pointerType === 'mouse';
+  hoverX = e.clientX; hoverY = e.clientY; hoverDirty = true;
+});
+renderer.domElement.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+let hoverFrame = 0;
+function updateHover() {
+  if (!hoverDirty || !isMouse || (hoverFrame++ % 3)) return;
+  hoverDirty = false;
+  const r = pickAt(hoverX, hoverY);
+  if (r) {
+    tip.textContent = r.ix.label;
+    tip.style.display = 'block';
+    tip.style.left = (hoverX + 14) + 'px';
+    tip.style.top = (hoverY + 12) + 'px';
+    renderer.domElement.style.cursor = 'pointer';
+  } else {
+    tip.style.display = 'none';
+    renderer.domElement.style.cursor = 'grab';
+  }
+}
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+function updateDragon(dt, time) {
+  dragon.k += ((dragon.mode ? 1 : 0) - dragon.k) * Math.min(1, dt * 0.6);
+  dragon.boost = Math.max(0, dragon.boost - dt);
+  dragon.roar = Math.max(0, dragon.roar - dt);
+  dragon.u += dt * 0.042 * (1 + Math.min(1, dragon.boost) * 1.6);
+  const u = dragon.u;
+  dragonPath(u, _pa); head.position.copy(_pa);
+  dragonPath(u + 0.012, _pb); head.lookAt(_pb);
+  for (let i = 0; i < DRAGON_N; i++) {
+    dragonPath(u - (i + 1) * DU, _pa);
+    dragonPath(u - i * DU, _pb);
+    segs[i].position.copy(_pa);
+    segs[i].lookAt(_pb);
+  }
+  const open = dragon.roar > 0 ? 0.65 : 0.06 + Math.sin(time * 1.7) * 0.05;
+  jaw.rotation.x += (open - jaw.rotation.x) * Math.min(1, dt * 10);
+  dragonPath(u + 0.075, _pa);
+  pearl.position.copy(_pa).add(_v3.set(0, Math.sin(time * 2.2) * 0.8, 0));
+  pearl.rotation.y += dt * 1.5;
+  pearl.material.emissiveIntensity = 0.8 + (dragon.roar > 0 ? 1.2 : 0) + Math.sin(time * 4) * 0.15;
+}
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  // 昼夜过渡
+  night += (nightTarget - night) * Math.min(1, dt * 1.5);
+  applyNight(night);
+  glowPulse = Math.max(0, glowPulse - dt);
+  glowMat.emissiveIntensity = 0.04 + night * 1.25 + glowPulse * 0.8;
+  for (const L of lanterns) {
+    L.k += ((L.on ? 1 : 0) - L.k) * Math.min(1, dt * 6);
+    const fl = 0.9 + Math.sin(time * 9 + L.flick) * 0.05 + Math.sin(time * 23 + L.flick * 2) * 0.05;
+    L.fireMat.emissiveIntensity = L.k * (0.25 + night * 1.6) * fl;
+    L.light.intensity = L.k * night * 32 * fl;
+  }
+
+  updateDragon(dt, time);
+  updateFire(dt);
+  updateVillagers(dt, time);
+  updateKoi(dt, time);
+  updateWater(dt, time);
+  updateShishi(dt);
+  updatePetals(dt, time);
+  updateSmoke(dt);
+  updateFireflies(time);
+  updateRings(dt);
+  for (const l of lilies) l.g.position.y = WATER_Y + 0.02 + Math.sin(time * 1.4 + l.phase) * 0.03;
+  for (const t of sakuras) {
+    t.shake = Math.max(0, t.shake - dt * 0.9);
+    t.mesh.rotation.z = Math.sin(time * 0.8 + t.phase) * 0.008 + Math.sin(time * 26) * 0.05 * t.shake;
+    t.mesh.rotation.x = Math.cos(time * 0.7 + t.phase) * 0.006 + Math.cos(time * 23) * 0.04 * t.shake;
+  }
+  for (const b of bamboos) {
+    b.mesh.rotation.z = Math.sin(time * 1.2 + b.phase) * b.amp;
+    b.mesh.rotation.x = Math.cos(time * 0.9 + b.phase * 1.3) * b.amp * 0.6;
+  }
+  for (const c of clouds) c.pivot.rotation.y += c.speed * dt;
+
+  // 天空元素跟随相机
+  sky.position.copy(camera.position);
+  stars.position.copy(camera.position);
+  sunSprite.position.copy(camera.position).addScaledVector(SUN_DIR, 1400);
+  moonSprite.position.copy(sunSprite.position);
+
+  // 闲置后恢复自动旋转
+  if (!controls.autoRotate) { idleTimer += dt; if (idleTimer > 10) controls.autoRotate = true; }
+  controls.update();
+  updateHover();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+<script src="../prompt-panel.js" data-id="jp-garden-kiro-opus"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+请用 Three.js 创建可运行的北京天坛祈年殿 WebGL 场景。所有建筑几何、纹理和动画必须由代码在运行时程序化生成，禁止加载外部模型。
+建筑还原：三层不同尺寸与高度的蓝色琉璃瓦圆顶、鎏金宝顶、红色圆柱、圆形殿身、蓝绿金色彩绘、斗拱及门窗。屋顶使用曲线轮廓（LatheGeometry 等旋转体）表现舒展、微翘的屋檐，不能用简单圆锥代替。白色汉白玉三层圆形台基，配中央石阶、栏杆和立柱；整体比例协调。用 Canvas 程序化生成瓦片纹理和彩绘，重复构件（柱子、栏杆、斗拱）使用 InstancedMesh。
+场景与交互：北京蓝天、广场地面与少量绿树；DirectionalLight 搭配 HemisphereLight，开启阴影和 ACES 电影色调映射。支持 OrbitControls 旋转、缩放，以及一个可开关的「自动环绕」按钮。
+一个按钮切换「爆炸 / 重组」：屋顶、宝顶、柱子、斗拱、墙体门窗、栏杆和台基按层次平滑散开，再准确恢复原位。动画由代码驱动，有错峰节奏，避免瞬移。
+
+【通用技术要求】
+- 输出一个可直接在现代浏览器打开的完整单文件 HTML，写入当前目录的 index.html。页面语言 zh-CN，标题用中文。
+- 使用 Three.js r160，通过 importmap 从 CDN 固定版本加载："three": "https://unpkg.com/three@0.160.0/build/three.module.js"，"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"。除此之外不引用任何外部资源。
+- 所有几何体、材质、贴图都用代码程序化生成（可用 Canvas/Shader 生成贴图），不要加载 glb/gltf/obj/fbx、图片或 SVG。
+- 使用 OrbitControls 支持拖动旋转、滚轮/双指缩放（第一人称玩法的场景除外，按场景说明）。
+- 画布全屏、响应式适配窗口大小变化和手机屏幕，devicePixelRatio 最多取 2，目标稳定 60FPS。
+- 页面左上角放一个固定的链接「← 返回 3D 作品」，href="../"，半透明奶油色圆角小按钮样式。
+- 在 </body> 前加上这一行（原样保留，用于展示提示词）：<script src="../prompt-panel.js" data-id="temple-kiro-opus"></script>
+- 控制台不能有报错。不要问我任何问题，直接构建。

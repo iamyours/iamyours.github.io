@@ -1,0 +1,11 @@
+设计并创建一个非常创意、精致且详细的体素艺术场景，描绘一个王国。让这个场景令人印象深刻且多样化，并使用多彩的体素。王国中央应该有一座带护城河的城堡。使用 WebGL 和任何必要的库来实现这一点，但要确保我可以将所有内容粘贴到一个单一的 HTML 文件中，并在 Chrome 中打开
+
+【通用技术要求】
+- 直接输出一个可在现代浏览器打开的完整单文件 HTML 代码（一个代码块，从 <!DOCTYPE html> 到 </html>，不要省略任何部分）。页面语言 zh-CN，标题用中文。
+- 使用 Three.js r160，通过 importmap 从 CDN 固定版本加载："three": "https://unpkg.com/three@0.160.0/build/three.module.js"，"three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"。除此之外不引用任何外部资源。
+- 所有几何体、材质、贴图都用代码程序化生成（可用 Canvas/Shader 生成贴图），不要加载 glb/gltf/obj/fbx、图片或 SVG。
+- 使用 OrbitControls 支持拖动旋转、滚轮/双指缩放（第一人称玩法的场景除外，按场景说明）。
+- 画布全屏、响应式适配窗口大小变化和手机屏幕，devicePixelRatio 最多取 2，目标稳定 60FPS。
+- 页面左上角放一个固定的链接「← 返回 3D 作品」，href="../"，半透明奶油色圆角小按钮样式。
+- 在 </body> 前加上这一行（原样保留，用于展示提示词）：<script src="../prompt-panel.js" data-id="kingdom-kiro-opus"></script>
+- 控制台不能有报错。不要问我任何问题，直接构建。

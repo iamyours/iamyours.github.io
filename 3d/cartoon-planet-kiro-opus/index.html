@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>卡通漫画星球 · 生机盎然的小世界</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    background: radial-gradient(circle at 50% 45%, #4a47b8 0%, #2a2477 45%, #120f3a 100%);
+    font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  /* 漫画网点背景 */
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none;
+    background-image: radial-gradient(rgba(255,255,255,0.09) 1.3px, transparent 1.7px);
+    background-size: 14px 14px;
+  }
+  canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+  .title {
+    position: fixed; top: 14px; right: 16px; z-index: 5; pointer-events: none;
+    color: #fff6e1; font-size: 20px; font-weight: 900; letter-spacing: 2px;
+    text-shadow: 2px 2px 0 #2a1f3d, -1px -1px 0 #2a1f3d, 1px -1px 0 #2a1f3d, -1px 1px 0 #2a1f3d;
+  }
+  .hint {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
+    padding: 6px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap;
+    background: rgba(255, 246, 225, 0.8); color: #3d2f22; font-size: 13px; font-weight: 600;
+    border: 2px solid #2a1f3d;
+  }
+  @media (max-width: 600px) { .title { font-size: 15px; top: 18px; } .hint { font-size: 12px; } }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:640px){.hint{bottom:64px}}</style>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div class="title">漫画小星球</div>
+<div class="hint">拖动旋转 · 滚轮 / 双指缩放查看细节</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ================= 基础工具 ================= */
+// 可复现的伪随机数
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261022);
+const rr = (a, b) => a + (b - a) * rand();
+const pick = arr => arr[Math.floor(rand() * arr.length)];
+const smoothstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+
+// 3D 值噪声
+const perm = new Uint8Array(512);
+{
+  const p = [...Array(256).keys()];
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+}
+const h3 = (i, j, k) => perm[(i & 255) + perm[(j & 255) + perm[k & 255]]] / 255;
+function vnoise(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z);
+  const xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const l = (a, b, t) => a + (b - a) * t;
+  const x00 = l(h3(xi, yi, zi), h3(xi + 1, yi, zi), u);
+  const x10 = l(h3(xi, yi + 1, zi), h3(xi + 1, yi + 1, zi), u);
+  const x01 = l(h3(xi, yi, zi + 1), h3(xi + 1, yi, zi + 1), u);
+  const x11 = l(h3(xi, yi + 1, zi + 1), h3(xi + 1, yi + 1, zi + 1), u);
+  return l(l(x00, x10, v), l(x01, x11, v), w) * 2 - 1;
+}
+function fbm(x, y, z) {
+  let s = 0, a = 0.5, f = 1, n = 0;
+  for (let o = 0; o < 5; o++) { s += a * vnoise(x * f + o * 17.3, y * f - o * 7.1, z * f + o * 3.7); n += a; a *= 0.5; f *= 2.03; }
+  return s / n;
+}
+function randomDir(out) {
+  const z = rr(-1, 1), phi = rr(0, Math.PI * 2), r = Math.sqrt(1 - z * z);
+  return out.set(r * Math.cos(phi), z, r * Math.sin(phi));
+}
+function basisOf(c) {
+  const a = Math.abs(c.y) < 0.9 ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(1, 0, 0);
+  const u = new THREE.Vector3().crossVectors(a, c).normalize();
+  const v = new THREE.Vector3().crossVectors(c, u).normalize();
+  return { u, v };
+}
+// 以城市中心 c 为极点，按角距离 ang、方位角 th 求球面方向
+function dirOnCity(c, u, v, ang, th, out) {
+  const s = Math.sin(ang);
+  return out.copy(c).multiplyScalar(Math.cos(ang))
+    .addScaledVector(u, Math.cos(th) * s).addScaledVector(v, Math.sin(th) * s).normalize();
+}
+
+/* ================= 渲染器 / 场景 ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 0);
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 3000);
+camera.position.set(-8, 10, 33);
+if (camera.aspect < 0.8) camera.position.setLength(50);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 12.8;
+controls.maxDistance = 90;
+controls.rotateSpeed = 0.6;
+controls.zoomSpeed = 0.9;
+
+// 灯光
+const sunDir = new THREE.Vector3(30, 18, 22).normalize();
+const sun = new THREE.DirectionalLight(0xfff1d6, 2.7);
+sun.position.copy(sunDir).multiplyScalar(50);
+scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x5a4a7a, 1.15));
+
+// 卡通分层渐变贴图
+const gradTex = new THREE.DataTexture(new Uint8Array([90, 170, 255]), 3, 1, THREE.RedFormat);
+gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter;
+gradTex.needsUpdate = true;
+const toon = (p = {}) => new THREE.MeshToonMaterial({ gradientMap: gradTex, ...p });
+const outlineMat = new THREE.MeshBasicMaterial({ color: 0x1c1233, side: THREE.BackSide });
+// 为网格添加描边外壳（几何体需以原点为中心）
+function addOutline(mesh, s = 1.1) {
+  const o = new THREE.Mesh(mesh.geometry, outlineMat);
+  o.scale.setScalar(s);
+  mesh.add(o);
+  return mesh;
+}
+const UP = new THREE.Vector3(0, 1, 0);
+function placeOnSurface(obj, dir, r, yaw = 0) {
+  obj.position.copy(dir).multiplyScalar(r);
+  obj.quaternion.setFromUnitVectors(UP, dir);
+  obj.rotateY(yaw);
+}
+
+/* ================= 地形函数 ================= */
+const R = 10;
+const CITY_N = 0.2;
+const ROAD_ANG = 0.15, ROAD_W = 0.03;
+const cities = [];
+
+// 标定噪声分布，保证陆地/海洋比例稳定
+let fMean = 0, fStd = 1;
+{
+  const v = new THREE.Vector3(), arr = [];
+  for (let i = 0; i < 2000; i++) { randomDir(v); arr.push(fbm(v.x * 1.7, v.y * 1.7, v.z * 1.7)); }
+  fMean = arr.reduce((a, b) => a + b, 0) / arr.length;
+  fStd = Math.sqrt(arr.reduce((a, b) => a + (b - fMean) ** 2, 0) / arr.length) || 1;
+}
+const baseN = (x, y, z) => (fbm(x * 1.7, y * 1.7, z * 1.7) - fMean) / fStd * 0.4 + 0.05;
+
+function landN(x, y, z) {
+  let n = baseN(x, y, z);
+  for (const c of cities) {
+    const d = x * c.x + y * c.y + z * c.z;
+    if (d > Math.cos(0.34)) {
+      const w = 1 - smoothstep(0.22, 0.34, Math.acos(Math.min(1, d)));
+      n += (CITY_N - n) * w; // 城市区域压平
+    }
+  }
+  return n;
+}
+function radiusOf(n) {
+  if (n < 0) return R - 0.03 + Math.max(n, -1);
+  const m = Math.min(Math.max(0, n - 0.5), 0.45);
+  return R + 0.06 + Math.min(n, 1) * 0.6 + m * 5;
+}
+const CITY_R = radiusOf(CITY_N);
+function minCityAng(x, y, z) {
+  let best = -1;
+  for (const c of cities) best = Math.max(best, x * c.x + y * c.y + z * c.z);
+  return Math.acos(Math.min(1, best));
+}
+
+// 选城市位置
+{
+  const v = new THREE.Vector3();
+  for (let t = 0; t < 6000 && cities.length < 6; t++) {
+    randomDir(v);
+    const n = baseN(v.x, v.y, v.z);
+    if (n < 0.12 || n > 0.4) continue;
+    if (cities.some(c => c.dot(v) > Math.cos(1.0))) continue;
+    cities.push(v.clone());
+  }
+}
+
+/* ================= 星球 ================= */
+const tilt = new THREE.Group();
+tilt.rotation.z = 0.25;
+scene.add(tilt);
+const planet = new THREE.Group();
+tilt.add(planet);
+
+{
+  const geo = new THREE.IcosahedronGeometry(1, 40);
+  const pos = geo.attributes.position;
+  const vn = new Float32Array(pos.count);
+  const cache = new Map();
+  for (let i = 0; i < pos.count; i++) {
+    let x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+    const key = Math.round(x * 1e5) + ',' + Math.round(y * 1e5) + ',' + Math.round(z * 1e5);
+    let n = cache.get(key);
+    if (n === undefined) { n = landN(x, y, z); cache.set(key, n); }
+    vn[i] = n;
+    const r = radiusOf(n);
+    pos.setXYZ(i, x * r, y * r, z * r);
+  }
+  // 按面着色，形成低多边形漫画色块
+  const colors = new Float32Array(pos.count * 3);
+  const col = new THREE.Color();
+  for (let i = 0; i < pos.count; i += 3) {
+    const n = (vn[i] + vn[i + 1] + vn[i + 2]) / 3;
+    let cx = pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2);
+    let cy = pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2);
+    let cz = pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2);
+    const l = Math.hypot(cx, cy, cz); cx /= l; cy /= l; cz /= l;
+    const ca = minCityAng(cx, cy, cz);
+    const dn = vnoise(cx * 9, cy * 9, cz * 9);
+    let hex;
+    if (ca < 0.25) hex = 0xe8dcc4;
+    else if (ca < 0.3) hex = 0x9be15d;
+    else if (n < -0.35) hex = 0x1e5f9c;
+    else if (n < -0.08) hex = 0x2a8fbf;
+    else if (n < 0) hex = 0x9ff0e0;
+    else if (n < 0.07) hex = 0xf7d98b;
+    else if (n < 0.3) hex = dn > 0.1 ? 0x6fcf4a : 0x88de56;
+    else if (n < 0.5) hex = dn > 0 ? 0x3e9e3c : 0x4fb044;
+    else if (n < 0.66) hex = dn > 0 ? 0xb07b52 : 0x9a6b48;
+    else if (n < 0.8) hex = 0x948aa0;
+    else hex = 0xffffff;
+    col.setHex(hex);
+    for (let k = 0; k < 3; k++) colors.set([col.r, col.g, col.b], (i + k) * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  geo.computeVertexNormals();
+  const terrain = new THREE.Mesh(geo, toon({ vertexColors: true }));
+  planet.add(terrain);
+  const tOut = new THREE.Mesh(geo, outlineMat);
+  tOut.scale.setScalar(1.012);
+  planet.add(tOut);
+
+  // 海洋
+  const oceanGeo = new THREE.SphereGeometry(R, 128, 96);
+  const ocean = new THREE.Mesh(oceanGeo, toon({ color: 0x2bb5f0, transparent: true, opacity: 0.82 }));
+  planet.add(ocean);
+  const oOut = new THREE.Mesh(oceanGeo, outlineMat);
+  oOut.scale.setScalar(1.012);
+  planet.add(oOut);
+}
+
+// 大气光晕（分层色带，漫画感）
+{
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uColor: { value: new THREE.Color(0x8fdcff) } },
+    vertexShader: `
+      varying vec3 vN; varying vec3 vV;
+      void main(){
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        vN = normalize(normalMatrix * normal);
+        vV = normalize(-mv.xyz);
+        gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      uniform vec3 uColor; varying vec3 vN; varying vec3 vV;
+      void main(){
+        float d = clamp(-dot(normalize(vN), normalize(vV)), 0.0, 1.0);
+        float a = pow(d, 2.2) * 1.3;
+        a = floor(a * 5.0) / 5.0;
+        gl_FragColor = vec4(uColor * a, a);
+      }`,
+    side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false
+  });
+  const atmo = new THREE.Mesh(new THREE.SphereGeometry(R * 1.22, 64, 48), mat);
+  atmo.renderOrder = 2;
+  scene.add(atmo);
+}
+
+/* ================= 树木 ================= */
+{
+  const crownGeo = new THREE.ConeGeometry(0.16, 0.45, 6).translate(0, 0.42, 0);
+  const crownOutGeo = new THREE.ConeGeometry(0.19, 0.52, 6).translate(0, 0.42, 0);
+  const trunkGeo = new THREE.CylinderGeometry(0.035, 0.045, 0.24, 5).translate(0, 0.12, 0);
+  const N = 700;
+  const crowns = new THREE.InstancedMesh(crownGeo, toon(), N);
+  const crownOut = new THREE.InstancedMesh(crownOutGeo, outlineMat, N);
+  const trunks = new THREE.InstancedMesh(trunkGeo, toon({ color: 0x8a5a3b }), N);
+  const greens = [0x2f9e44, 0x40c057, 0x37b24d, 0x2b8a3e, 0x82c91e, 0x51cf66];
+  const v = new THREE.Vector3(), q = new THREE.Quaternion(), qy = new THREE.Quaternion(), s = new THREE.Vector3(), m = new THREE.Matrix4(), col = new THREE.Color();
+  let count = 0;
+  for (let t = 0; t < 40000 && count < N; t++) {
+    randomDir(v);
+    const n = landN(v.x, v.y, v.z);
+    if (n < 0.08 || n > 0.56) continue;
+    if (minCityAng(v.x, v.y, v.z) < 0.32) continue;
+    if (vnoise(v.x * 5, v.y * 5, v.z * 5) < -0.15) continue; // 成片森林
+    const r = radiusOf(n) - 0.06;
+    q.setFromUnitVectors(UP, v).multiply(qy.setFromAxisAngle(UP, rand() * 6.28));
+    const sc = rr(0.7, 1.35);
+    m.compose(v.clone().multiplyScalar(r), q, s.set(sc, sc * rr(0.9, 1.3), sc));
+    crowns.setMatrixAt(count, m); crownOut.setMatrixAt(count, m); trunks.setMatrixAt(count, m);
+    crowns.setColorAt(count, col.setHex(n > 0.4 ? 0x2b8a3e : pick(greens)));
+    count++;
+  }
+  crowns.count = crownOut.count = trunks.count = count;
+  planet.add(crowns, crownOut, trunks);
+}
+
+/* ================= 城市：建筑 / 道路 / 地标 ================= */
+function makeWindowTex() {
+  const cv = document.createElement('canvas'); cv.width = 64; cv.height = 128;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, 64, 128);
+  for (let r = 0; r < 6; r++) for (let c = 0; c < 3; c++) {
+    g.fillStyle = '#3d4a7a'; g.fillRect(8 + c * 18, 10 + r * 19, 12, 12);
+    g.fillStyle = '#cdeeff'; g.fillRect(9 + c * 18, 11 + r * 19, 4, 4);
+  }
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function makeRoadTex() {
+  const cv = document.createElement('canvas'); cv.width = 128; cv.height = 32;
+  const g = cv.getContext('2d');
+  g.fillStyle = '#4b4b5e'; g.fillRect(0, 0, 128, 32);
+  g.fillStyle = '#f2f2f2'; g.fillRect(0, 2, 128, 2); g.fillRect(0, 28, 128, 2);
+  g.fillStyle = '#ffd23f'; g.fillRect(0, 15, 48, 3); g.fillRect(64, 15, 48, 3);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = THREE.RepeatWrapping;
+  return t;
+}
+const roadMat = toon({ map: makeRoadTex(), side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+const cityInfo = [];
+{
+  const bGeo = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
+  // 顶面和底面 UV 指向贴图白边，避免出现窗户
+  const uv = bGeo.attributes.uv;
+  for (let i = 8; i < 16; i++) uv.setXY(i, 0.02, 0.02);
+  const bOutGeo = new THREE.BoxGeometry(1.08, 1.04, 1.08).translate(0, 0.5, 0);
+  const roofGeo = new THREE.ConeGeometry(0.75, 1, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0);
+  const roofOutGeo = new THREE.ConeGeometry(0.85, 1.12, 4).rotateY(Math.PI / 4).translate(0, 0.5, 0);
+  const palette = [0xff6b6b, 0xffd93d, 0x6bcbff, 0xc38bff, 0xff9f43, 0x4ade80, 0xf472b6, 0xfff1c9, 0x93c5fd, 0x5eead4];
+  const roofPal = [0xe8483f, 0xd9480f, 0x7048e8, 0x1c7ed6, 0xc2255c];
+  const bMats = [], bCols = [], rMats = [], rCols = [];
+  const m = new THREE.Matrix4(), s = new THREE.Vector3();
+
+  cities.forEach(c => {
+    const { u, v } = basisOf(c);
+    cityInfo.push({ c, u, v });
+    const placed = [];
+    let tries = 0;
+    while (placed.length < 46 && tries < 1200) {
+      tries++;
+      const ang = 0.035 + Math.sqrt(rand()) * 0.185;
+      const th = rand() * Math.PI * 2;
+      const centerF = 1 - ang / 0.22;
+      const tall = rand() < 0.2 + centerF * 0.6;
+      const w = tall ? rr(0.2, 0.32) : rr(0.18, 0.28);
+      const d = tall ? w * rr(0.8, 1.2) : rr(0.18, 0.3);
+      const h = tall ? rr(0.55, 0.95) + centerF * rr(0.4, 1.5) : rr(0.2, 0.36);
+      const rad = Math.max(w, d) * 0.72;
+      if (Math.abs(ang - ROAD_ANG) < ROAD_W / 2 + rad / R + 0.004) continue;
+      const dir = dirOnCity(c, u, v, ang, th, new THREE.Vector3());
+      const p = dir.clone().multiplyScalar(CITY_R - 0.03);
+      if (placed.some(o => o.p.distanceTo(p) < o.rad + rad + 0.04)) continue;
+      placed.push({ p, rad });
+      // 让建筑朝向城市中心，形成规整街区感
+      const fwd = c.clone().addScaledVector(dir, -dir.dot(c));
+      if (fwd.lengthSq() < 1e-8) fwd.copy(u);
+      fwd.normalize();
+      const right = new THREE.Vector3().crossVectors(dir, fwd);
+      m.makeBasis(right, dir, fwd).scale(s.set(w, h, d)).setPosition(p);
+      bMats.push(m.clone()); bCols.push(pick(palette));
+      if (!tall) {
+        m.makeBasis(right, dir, fwd).scale(s.set(w, Math.min(w, d) * 0.55, d))
+          .setPosition(p.clone().addScaledVector(dir, h));
+        rMats.push(m.clone()); rCols.push(pick(roofPal));
+      }
+    }
+
+    // 环形道路
+    const seg = 160, pos = [], uvs = [], idx = [], dd = new THREE.Vector3();
+    for (let i = 0; i <= seg; i++) {
+      const th = i / seg * Math.PI * 2;
+      for (let k = 0; k < 2; k++) {
+        dirOnCity(c, u, v, ROAD_ANG + (k ? 1 : -1) * ROAD_W / 2, th, dd);
+        const r = CITY_R + 0.02;
+        pos.push(dd.x * r, dd.y * r, dd.z * r);
+        uvs.push(i / seg * 36, k);
+      }
+    }
+    for (let i = 0; i < seg; i++) { const a = i * 2; idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3); }
+    const rg = new THREE.BufferGeometry();
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    rg.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    rg.setIndex(idx);
+    rg.computeVertexNormals();
+    planet.add(new THREE.Mesh(rg, roadMat));
+
+    // 城市中心地标塔
+    const tower = new THREE.Group();
+    const pole = addOutline(new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.09, 1.6, 8), toon({ color: 0xff6b6b })), 1.15);
+    pole.position.y = 0.8;
+    const pod = addOutline(new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 10), toon({ color: 0xfff1c9 })), 1.12);
+    pod.position.y = 1.35;
+    const tip = addOutline(new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.4, 6), toon({ color: 0xffd93d })), 1.2);
+    tip.position.y = 1.75;
+    tower.add(pole, pod, tip);
+    placeOnSurface(tower, c, CITY_R - 0.03);
+    planet.add(tower);
+  });
+
+  const build = (geo, outGeo, mat, mats, cols) => {
+    const im = new THREE.InstancedMesh(geo, mat, mats.length);
+    const om = new THREE.InstancedMesh(outGeo, outlineMat, mats.length);
+    const col = new THREE.Color();
+    mats.forEach((mm, i) => { im.setMatrixAt(i, mm); om.setMatrixAt(i, mm); im.setColorAt(i, col.setHex(cols[i])); });
+    planet.add(im, om);
+  };
+  if (bMats.length) build(bGeo, bOutGeo, toon({ map: makeWindowTex() }), bMats, bCols);
+  if (rMats.length) build(roofGeo, roofOutGeo, toon(), rMats, rCols);
+}
+
+/* ================= 汽车 ================= */
+const carBodyGeo = new THREE.BoxGeometry(0.12, 0.06, 0.24);
+const carCabGeo = new THREE.BoxGeometry(0.1, 0.05, 0.12);
+const wheelGeo = new THREE.BoxGeometry(0.03, 0.045, 0.045);
+const cabMat = toon({ color: 0xdff6ff });
+const wheelMat = new THREE.MeshBasicMaterial({ color: 0x222222 });
+const carColors = [0xff4d4d, 0xffd43b, 0x4dabf7, 0x69db7c, 0xf783ac, 0xff922b, 0xffffff, 0x9775fa];
+const carMats = carColors.map(c => toon({ color: c }));
+function makeCar() {
+  const g = new THREE.Group();
+  const body = addOutline(new THREE.Mesh(carBodyGeo, pick(carMats)), 1.12);
+  body.position.y = 0.055;
+  const cab = addOutline(new THREE.Mesh(carCabGeo, cabMat), 1.12);
+  cab.position.set(0, 0.105, -0.02);
+  g.add(body, cab);
+  for (const [x, z] of [[-0.06, 0.08], [0.06, 0.08], [-0.06, -0.08], [0.06, -0.08]]) {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.position.set(x, 0.022, z);
+    g.add(w);
+  }
+  return g;
+}
+const cars = [];
+cityInfo.forEach(ci => {
+  for (let lane = 0; lane < 2; lane++) {
+    const dirSign = lane ? 1 : -1;
+    const ang = ROAD_ANG + (lane ? 0.0075 : -0.0075);
+    const speed = rr(0.4, 0.6);
+    const n = 3;
+    const off = rand() * 6.28;
+    for (let k = 0; k < n; k++) {
+      const car = makeCar();
+      planet.add(car);
+      cars.push({ obj: car, ...ci, ang, sign: dirSign, speed, t: off + k / n * Math.PI * 2 + rr(-0.3, 0.3) });
+    }
+  }
+});
+const _d = new THREE.Vector3(), _T = new THREE.Vector3(), _Rt = new THREE.Vector3(), _m = new THREE.Matrix4();
+function updateCar(cs, dt) {
+  cs.t += cs.speed * cs.sign * dt;
+  const ct = Math.cos(cs.t), st = Math.sin(cs.t);
+  dirOnCity(cs.c, cs.u, cs.v, cs.ang, cs.t, _d);
+  _T.copy(cs.u).multiplyScalar(-st).addScaledVector(cs.v, ct).multiplyScalar(cs.sign);
+  _Rt.crossVectors(_d, _T);
+  _m.makeBasis(_Rt, _d, _T);
+  cs.obj.quaternion.setFromRotationMatrix(_m);
+  cs.obj.position.copy(_d).multiplyScalar(CITY_R + 0.025);
+}
+
+/* ================= 飞机 + 尾迹 ================= */
+const puffGeo = new THREE.IcosahedronGeometry(1, 0);
+puffGeo.computeVertexNormals();
+const trailMat = toon({ color: 0xffffff });
+const TRAIL_N = 40;
+function makePlane(color) {
+  const g = new THREE.Group();
+  const mainMat = toon({ color }), whiteMat = toon({ color: 0xffffff });
+  const fus = addOutline(new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.06, 0.8, 10).rotateX(Math.PI / 2), whiteMat), 1.1);
+  const nose = addOutline(new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8), mainMat), 1.12);
+  nose.position.z = 0.4;
+  const wing = addOutline(new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.03, 0.2), mainMat), 1.06);
+  wing.position.set(0, -0.01, 0.05);
+  const tailW = addOutline(new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.03, 0.12), mainMat), 1.08);
+  tailW.position.set(0, 0, -0.35);
+  const fin = addOutline(new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.2, 0.14), mainMat), 1.08);
+  fin.position.set(0, 0.1, -0.35);
+  const cockpit = new THREE.Mesh(new THREE.SphereGeometry(0.06, 10, 8), toon({ color: 0x4dabf7 }));
+  cockpit.position.set(0, 0.06, 0.22);
+  const prop = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.035, 0.015), new THREE.MeshBasicMaterial({ color: 0x333333 }));
+  prop.position.z = 0.49;
+  g.add(fus, nose, wing, tailW, fin, cockpit, prop);
+  g.scale.setScalar(1.2);
+  return { g, prop };
+}
+const planes = [];
+[0xff4d4d, 0xffd43b, 0x4dabf7, 0x9775fa, 0x69db7c].forEach(color => {
+  const { g, prop } = makePlane(color);
+  planet.add(g);
+  const a = randomDir(new THREE.Vector3());
+  const b = randomDir(new THREE.Vector3()).cross(a).normalize();
+  const trail = new THREE.InstancedMesh(puffGeo, trailMat, TRAIL_N);
+  trail.frustumCulled = false;
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  for (let i = 0; i < TRAIL_N; i++) trail.setMatrixAt(i, zero);
+  planet.add(trail);
+  planes.push({
+    g, prop, a, b, trail, t: rand() * 6.28, speed: rr(0.13, 0.2), alt: rr(R + 4.0, R + 4.6), phase: rand() * 6.28,
+    hist: Array.from({ length: TRAIL_N }, () => new THREE.Vector3()), head: 0, filled: 0, timer: 0
+  });
+});
+const _tm = new THREE.Matrix4();
+function updatePlane(p, dt, time) {
+  p.t += p.speed * dt;
+  const ct = Math.cos(p.t), st = Math.sin(p.t);
+  _d.copy(p.a).multiplyScalar(ct).addScaledVector(p.b, st);
+  _T.copy(p.a).multiplyScalar(-st).addScaledVector(p.b, ct);
+  _Rt.crossVectors(_d, _T);
+  _m.makeBasis(_Rt, _d, _T);
+  p.g.quaternion.setFromRotationMatrix(_m);
+  p.g.rotateZ(Math.sin(time * 0.8 + p.phase) * 0.15); // 轻微侧倾
+  const alt = p.alt + Math.sin(time * 0.6 + p.phase) * 0.15;
+  p.g.position.copy(_d).multiplyScalar(alt);
+  p.prop.rotation.z += dt * 40;
+  // 尾迹
+  p.timer += dt;
+  if (p.timer > 0.05) {
+    p.timer = 0;
+    p.head = (p.head + 1) % TRAIL_N;
+    p.hist[p.head].copy(p.g.position).addScaledVector(_T, -0.5);
+    p.filled = Math.min(TRAIL_N, p.filled + 1);
+  }
+  for (let i = 0; i < TRAIL_N; i++) {
+    if (i < p.filled) {
+      const h = p.hist[(p.head - i + TRAIL_N) % TRAIL_N];
+      const s = 0.02 + 0.085 * (1 - i / TRAIL_N) * Math.min(1, (i + 1) / 4);
+      _tm.makeScale(s, s, s).setPosition(h);
+    } else _tm.makeScale(0, 0, 0);
+    p.trail.setMatrixAt(i, _tm);
+  }
+  p.trail.instanceMatrix.needsUpdate = true;
+}
+
+/* ================= 云朵 ================= */
+const cloudMat = toon({ color: 0xffffff });
+const clouds = [];
+for (let i = 0; i < 22; i++) {
+  const parts = [], outs = [];
+  const k = 3 + Math.floor(rand() * 4);
+  for (let j = 0; j < k; j++) {
+    const s = rr(0.35, 0.7) * (j === 0 ? 1.3 : 1);
+    const x = (j - (k - 1) / 2) * rr(0.42, 0.55), y = rr(-0.05, 0.2), z = rr(-0.25, 0.25);
+    const g = new THREE.IcosahedronGeometry(1, 1);
+    g.computeVertexNormals();
+    g.scale(s, s, s);
+    const o = g.clone().scale(1.1, 1.1, 1.1);
+    g.translate(x, y, z); o.translate(x, y, z);
+    parts.push(g); outs.push(o);
+  }
+  const cloud = new THREE.Mesh(mergeGeometries(parts), cloudMat);
+  cloud.add(new THREE.Mesh(mergeGeometries(outs), outlineMat));
+  cloud.scale.set(1, 0.7, 1);
+  const baseY = rr(R + 3.1, R + 3.8);
+  cloud.position.set(0, baseY, 0);
+  cloud.rotation.y = rand() * 6.28;
+  const outer = new THREE.Object3D();
+  outer.quaternion.setFromUnitVectors(UP, randomDir(new THREE.Vector3()));
+  const inner = new THREE.Object3D();
+  inner.rotation.z = rand() * 6.28;
+  inner.add(cloud);
+  outer.add(inner);
+  tilt.add(outer);
+  clouds.push({ inner, cloud, baseY, speed: rr(0.02, 0.05) * (rand() < 0.5 ? -1 : 1), phase: rand() * 6.28 });
+}
+
+/* ================= 风车 / 热气球 / 小船 ================= */
+const windmills = [];
+{
+  const v = new THREE.Vector3();
+  const towerMat = toon({ color: 0xfff6e1 }), bladeMat = toon({ color: 0xff8787 });
+  for (let t = 0; t < 20000 && windmills.length < 7; t++) {
+    randomDir(v);
+    const n = landN(v.x, v.y, v.z);
+    if (n < 0.1 || n > 0.35 || minCityAng(v.x, v.y, v.z) < 0.4) continue;
+    if (windmills.some(w => w.dir.dot(v) > Math.cos(0.3))) continue;
+    const g = new THREE.Group();
+    const tower = addOutline(new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.08, 0.9, 6), towerMat), 1.12);
+    tower.position.y = 0.45;
+    const head = addOutline(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.16), bladeMat), 1.12);
+    head.position.y = 0.92;
+    const hub = new THREE.Group();
+    hub.position.set(0, 0.92, 0.1);
+    for (let b = 0; b < 3; b++) {
+      const blade = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.42, 0.015).translate(0, 0.21, 0), towerMat);
+      blade.rotation.z = b * Math.PI * 2 / 3;
+      hub.add(blade);
+    }
+    g.add(tower, head, hub);
+    placeOnSurface(g, v, radiusOf(n) - 0.05, rand() * 6.28);
+    planet.add(g);
+    windmills.push({ dir: v.clone(), hub, speed: rr(1.5, 3) });
+  }
+}
+const balloons = [];
+{
+  const v = new THREE.Vector3();
+  const cols = [0xff6b6b, 0xffd93d, 0x74c0fc, 0xb197fc];
+  for (let t = 0; t < 20000 && balloons.length < 4; t++) {
+    randomDir(v);
+    const n = landN(v.x, v.y, v.z);
+    if (n < 0.05 || n > 0.4) continue;
+    if (balloons.some(b => b.dir.dot(v) > Math.cos(0.6))) continue;
+    const g = new THREE.Group();
+    const env = addOutline(new THREE.Mesh(new THREE.SphereGeometry(0.32, 12, 10), toon({ color: cols[balloons.length] })), 1.08);
+    env.scale.set(1, 1.18, 1);
+    env.position.y = 0.55;
+    const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.32, 0.03, 6, 20), toon({ color: 0xffffff }));
+    stripe.rotation.x = Math.PI / 2;
+    stripe.position.y = 0.55;
+    const basket = addOutline(new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.1, 0.12), toon({ color: 0x9c6b3e })), 1.15);
+    basket.position.y = 0.06;
+    g.add(env, stripe, basket);
+    const base = radiusOf(n) + rr(1.3, 1.9);
+    placeOnSurface(g, v, base);
+    planet.add(g);
+    balloons.push({ dir: v.clone(), g, base, phase: rand() * 6.28 });
+  }
+}
+const boats = [];
+{
+  const v = new THREE.Vector3();
+  const hullMats = [toon({ color: 0xff6b6b }), toon({ color: 0xffd43b }), toon({ color: 0x4dabf7 })];
+  const sailMat = toon({ color: 0xffffff, side: THREE.DoubleSide });
+  const mastMat = toon({ color: 0x8a5a3b });
+  for (let t = 0; t < 20000 && boats.length < 8; t++) {
+    randomDir(v);
+    if (landN(v.x, v.y, v.z) > -0.25) continue;
+    if (boats.some(b => b.dir.dot(v) > Math.cos(0.4))) continue;
+    const g = new THREE.Group();
+    const hull = addOutline(new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.34), pick(hullMats)), 1.12);
+    hull.position.y = 0.02;
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 0.4, 5), mastMat);
+    mast.position.y = 0.25;
+    const sailShape = new THREE.Shape();
+    sailShape.moveTo(0, 0); sailShape.lineTo(0, 0.32); sailShape.lineTo(0.2, 0); sailShape.lineTo(0, 0);
+    const sail = new THREE.Mesh(new THREE.ShapeGeometry(sailShape), sailMat);
+    sail.rotation.y = Math.PI / 2;
+    sail.position.set(0, 0.08, 0.01);
+    g.add(hull, mast, sail);
+    placeOnSurface(g, v, R, rand() * 6.28);
+    planet.add(g);
+    boats.push({ dir: v.clone(), g, phase: rand() * 6.28, baseQ: g.quaternion.clone() });
+  }
+}
+
+/* ================= 月亮 / 太阳 / 星空 ================= */
+const moonPivot = new THREE.Object3D();
+moonPivot.rotation.z = 0.35;
+scene.add(moonPivot);
+const moon = (() => {
+  const geo = new THREE.IcosahedronGeometry(1.5, 3);
+  const p = geo.attributes.position;
+  const cols = new Float32Array(p.count * 3), col = new THREE.Color();
+  const v = new THREE.Vector3();
+  for (let i = 0; i < p.count; i++) {
+    v.fromBufferAttribute(p, i).normalize();
+    const n = vnoise(v.x * 3 + 50, v.y * 3, v.z * 3);
+    v.multiplyScalar(1.5 * (1 + (n < -0.2 ? n * 0.12 : 0.02 * n)));
+    p.setXYZ(i, v.x, v.y, v.z);
+  }
+  for (let i = 0; i < p.count; i += 3) {
+    v.fromBufferAttribute(p, i).normalize();
+    col.setHex(vnoise(v.x * 3 + 50, v.y * 3, v.z * 3) < -0.2 ? 0xb7b0c9 : 0xf1ecff);
+    for (let k = 0; k < 3; k++) cols.set([col.r, col.g, col.b], (i + k) * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(cols, 3));
+  geo.computeVertexNormals();
+  return addOutline(new THREE.Mesh(geo, toon({ vertexColors: true })), 1.05);
+})();
+moon.position.set(27, 3, 0);
+moonPivot.add(moon);
+
+{
+  // 漫画风太阳
+  const cv = document.createElement('canvas'); cv.width = cv.height = 256;
+  const g = cv.getContext('2d');
+  g.translate(128, 128);
+  g.fillStyle = '#ffd43b'; g.strokeStyle = '#2a1f3d'; g.lineWidth = 6; g.lineJoin = 'round';
+  g.beginPath();
+  for (let i = 0; i < 24; i++) {
+    const a = i / 24 * Math.PI * 2, r = i % 2 ? 72 : 118;
+    g.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  g.closePath(); g.fill(); g.stroke();
+  g.fillStyle = '#fff3bf'; g.beginPath(); g.arc(0, 0, 64, 0, Math.PI * 2); g.fill(); g.stroke();
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sprite.position.copy(sunDir).multiplyScalar(420);
+  sprite.scale.setScalar(70);
+  scene.add(sprite);
+}
+{
+  const N = 1400, pos = new Float32Array(N * 3), v = new THREE.Vector3();
+  for (let i = 0; i < N; i++) { randomDir(v).multiplyScalar(rr(500, 900)); pos.set([v.x, v.y, v.z], i * 3); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0xfff6d0, size: 2, sizeAttenuation: false })));
+}
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+const _q = new THREE.Quaternion(), _e = new THREE.Euler();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+
+  planet.rotation.y += dt * 0.025;
+  for (const c of cars) updateCar(c, dt);
+  for (const p of planes) updatePlane(p, dt, time);
+  for (const c of clouds) {
+    c.inner.rotation.z += c.speed * dt;
+    c.cloud.position.y = c.baseY + Math.sin(time * 0.5 + c.phase) * 0.12;
+  }
+  for (const w of windmills) w.hub.rotation.z += w.speed * dt;
+  for (const b of balloons) b.g.position.copy(b.dir).multiplyScalar(b.base + Math.sin(time * 0.7 + b.phase) * 0.25);
+  for (const b of boats) {
+    _q.setFromEuler(_e.set(Math.sin(time * 1.6 + b.phase) * 0.12, 0, Math.cos(time * 1.3 + b.phase) * 0.1));
+    b.g.quaternion.copy(b.baseQ).multiply(_q);
+  }
+  moonPivot.rotation.y += dt * 0.06;
+  moon.rotation.y += dt * 0.1;
+
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+<script src="../prompt-panel.js" data-id="cartoon-planet-kiro-opus"></script>
+</body>
+</html>

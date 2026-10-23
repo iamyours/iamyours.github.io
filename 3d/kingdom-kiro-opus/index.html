@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>护城河王国 · 体素城堡</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #8ec9f0; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+  .title {
+    position: fixed; top: 14px; right: 16px; z-index: 5; pointer-events: none; text-align: right;
+    color: #fffaf0; font-size: 20px; font-weight: 800; letter-spacing: 2px;
+    text-shadow: 0 2px 10px rgba(30, 60, 110, 0.55);
+  }
+  .title small { display: block; font-size: 12px; font-weight: 500; letter-spacing: 1px; opacity: .85; margin-top: 2px; }
+  .ui {
+    position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 5;
+    display: flex; gap: 10px; align-items: center; white-space: nowrap;
+  }
+  .hint, .btn {
+    padding: 6px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+    background: rgba(255, 246, 225, 0.78); color: #4a3426;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  .hint { pointer-events: none; }
+  .btn { border: none; cursor: pointer; font-family: inherit; }
+  .btn:hover { background: rgba(255, 246, 225, 0.95); }
+  .btn.on { background: #ffd27a; }
+  @media (max-width: 600px) {
+    .title { font-size: 15px; top: 18px; } .title small { display: none; }
+    .hint { display: none; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div class="title">护城河王国<small>Voxel Kingdom with Moat Castle</small></div>
+<div class="ui">
+  <span class="hint">拖动旋转 · 滚轮 / 双指缩放 · 右键平移</span>
+  <button class="btn on" id="rotBtn" type="button">自动环绕</button>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ================= 基础工具 ================= */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261021);
+const rr = (a, b) => a + (b - a) * rand();
+const ri = (a, b) => Math.floor(rr(a, b + 1));
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// 2D 值噪声 + 分形
+const perm = new Uint8Array(512);
+{
+  const p = [...Array(256).keys()];
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+}
+const h2 = (i, j) => perm[(i & 255) + perm[j & 255]] / 255;
+function vnoise2(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y), xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  return lerp(lerp(h2(xi, yi), h2(xi + 1, yi), u), lerp(h2(xi, yi + 1), h2(xi + 1, yi + 1), u), v) * 2 - 1;
+}
+function fbm2(x, y) {
+  let s = 0, a = 0.5, f = 1, n = 0;
+  for (let o = 0; o < 4; o++) { s += a * vnoise2(x * f + o * 13.1, y * f - o * 7.7); n += a; a *= 0.5; f *= 2.07; }
+  return s / n;
+}
+// 整数坐标哈希，用于体素颜色抖动
+function hash3(x, y, z) {
+  let h = (x * 374761393 + y * 668265263 + z * 1274126177) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+/* ================= 渲染器 / 场景 / 相机 ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const FOG_COL = new THREE.Color(0xbfe0f5);
+scene.fog = new THREE.Fog(FOG_COL, 180, 520);
+
+const camera = new THREE.PerspectiveCamera(42, window.innerWidth / window.innerHeight, 0.5, 3000);
+camera.position.set(95, 72, 105);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 8, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.screenSpacePanning = true;
+controls.minDistance = 15;
+controls.maxDistance = 320;
+controls.maxPolarAngle = 1.45;
+controls.rotateSpeed = 0.6;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+if (camera.aspect < 0.8) camera.position.sub(controls.target).multiplyScalar(1.7).add(controls.target);
+controls.update();
+
+const rotBtn = document.getElementById('rotBtn');
+rotBtn.addEventListener('click', () => {
+  controls.autoRotate = !controls.autoRotate;
+  rotBtn.classList.toggle('on', controls.autoRotate);
+});
+
+/* ================= 天空 / 光照 ================= */
+{
+  // 渐变天空球
+  const skyGeo = new THREE.SphereGeometry(1400, 32, 16);
+  const skyMat = new THREE.ShaderMaterial({
+    side: THREE.BackSide, depthWrite: false, fog: false,
+    uniforms: { top: { value: new THREE.Color(0x3d8be0) }, mid: { value: new THREE.Color(0x8ec9f0) }, low: { value: new THREE.Color(0xe8f4fb) } },
+    vertexShader: `varying vec3 vP; void main(){ vP = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+    fragmentShader: `uniform vec3 top; uniform vec3 mid; uniform vec3 low; varying vec3 vP;
+      void main(){ float h = vP.y; vec3 c = mix(low, mid, smoothstep(-0.05, 0.18, h)); c = mix(c, top, smoothstep(0.18, 0.75, h)); gl_FragColor = vec4(c,1.0); }`
+  });
+  scene.add(new THREE.Mesh(skyGeo, skyMat));
+}
+scene.add(new THREE.HemisphereLight(0xcfe8ff, 0x6a5a3a, 0.9));
+const sun = new THREE.DirectionalLight(0xfff1d6, 2.4);
+sun.position.set(-90, 130, 60);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+{
+  const c = sun.shadow.camera;
+  c.left = -90; c.right = 90; c.top = 90; c.bottom = -90; c.near = 10; c.far = 400;
+}
+sun.shadow.bias = -0.0005;
+sun.shadow.normalBias = 0.4;
+scene.add(sun);
+
+/* ================= 体素网格与调色板 ================= */
+const GX0 = -68, GX1 = 68, GZ0 = -68, GZ1 = 68, GH = 60;
+const NX = GX1 - GX0, NZ = GZ1 - GZ0;
+const grid = new Uint8Array(NX * NZ * GH);
+const gi = (x, y, z) => ((x - GX0) * NZ + (z - GZ0)) * GH + y;
+const inB = (x, y, z) => x >= GX0 && x < GX1 && z >= GZ0 && z < GZ1 && y >= 0 && y < GH;
+const getV = (x, y, z) => inB(x, y, z) ? grid[gi(x, y, z)] : 0;
+const setV = (x, y, z, t) => { if (inB(x, y, z)) grid[gi(x, y, z)] = t; };
+const setIfEmpty = (x, y, z, t) => { if (inB(x, y, z) && !grid[gi(x, y, z)]) grid[gi(x, y, z)] = t; };
+function fillBox(x0, y0, z0, x1, y1, z1, t) {
+  for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) setV(x, y, z, t);
+}
+
+const T = {
+  GRASS: 1, GRASS2: 2, DIRT: 3, SAND: 4, STONE: 5, STONE2: 6, DSTONE: 7, ROOF_R: 8, ROOF_B: 9,
+  WOOD: 10, PLASTER: 11, LEAF: 12, LEAF2: 13, TRUNK: 14, PATH: 15, WHEAT: 16, CROP: 17, CABBAGE: 18,
+  ROOF_O: 19, PLANK: 20, GLASS: 21, FLOWER_R: 22, FLOWER_Y: 23, FLOWER_P: 24, ROCK: 25, BLOSSOM: 26,
+  GOLD: 27, ROOF_G: 28, PLASTER2: 29, HAY: 30, COBBLE: 31, PINE: 32, SOIL: 33, LAVENDER: 34,
+  WATER: 50,
+  WINDOW: 60, TORCH: 61
+};
+const PAL = [];
+PAL[T.GRASS] = 0x6cbf4a; PAL[T.GRASS2] = 0x58a83c; PAL[T.DIRT] = 0x8a5f3a; PAL[T.SAND] = 0xe6d39a;
+PAL[T.STONE] = 0xc9c3b6; PAL[T.STONE2] = 0xb0a99a; PAL[T.DSTONE] = 0x8c8679; PAL[T.ROOF_R] = 0xc8453a;
+PAL[T.ROOF_B] = 0x3d63b8; PAL[T.WOOD] = 0x6e4526; PAL[T.PLASTER] = 0xf2e6cc; PAL[T.LEAF] = 0x3f9a3a;
+PAL[T.LEAF2] = 0x67b843; PAL[T.TRUNK] = 0x5a3b22; PAL[T.PATH] = 0xc9a874; PAL[T.WHEAT] = 0xf0c64a;
+PAL[T.CROP] = 0x8fcf4f; PAL[T.CABBAGE] = 0x3fae6a; PAL[T.ROOF_O] = 0xe07b39; PAL[T.PLANK] = 0xa87443;
+PAL[T.GLASS] = 0x2f4560; PAL[T.FLOWER_R] = 0xe8434f; PAL[T.FLOWER_Y] = 0xffe04a; PAL[T.FLOWER_P] = 0xd77fe0;
+PAL[T.ROCK] = 0x8e8e8e; PAL[T.BLOSSOM] = 0xf6a9c8; PAL[T.GOLD] = 0xf2c230; PAL[T.ROOF_G] = 0x3f8f6a;
+PAL[T.PLASTER2] = 0xf7d9b0; PAL[T.HAY] = 0xe2b85a; PAL[T.COBBLE] = 0x9d968a; PAL[T.PINE] = 0x2e7a45;
+PAL[T.SOIL] = 0x6b4428; PAL[T.LAVENDER] = 0x9a7fe0;
+PAL[T.WATER] = 0x3a9ad9; PAL[T.WINDOW] = 0xffd77a; PAL[T.TORCH] = 0xff9a3a;
+
+/* ================= 地形：高度图、护城河、河流、道路 ================= */
+const WL = 6;                       // 水面高度（y < WL 的空格填水）
+const CAST = 19, MOAT0 = 20, MOAT1 = 25;  // 城堡岛、护城河范围（切比雪夫距离）
+const cheb = (x, z) => Math.max(Math.abs(x), Math.abs(z));
+const riverX = z => -46 + 6 * Math.sin(z * 0.065) + 3 * Math.sin(z * 0.17 + 1);
+const canalOn = (x, z) => z >= -2 && z <= 2 && x > riverX(z) && x < -MOAT0;  // 河流连接护城河的水渠
+function isRoad(x, z) {
+  if (Math.abs(x) <= 1 && z > MOAT1 && z < GZ1) return true;              // 南北主路（城门向南）
+  if (Math.abs(z - 42) <= 1 && x > riverX(42) - 12) return true;             // 东西大道
+  if (Math.abs(x - 40) <= 1 && z > -60 && z < 42) return true;              // 东侧乡道
+  if (Math.abs(z + 36) <= 1 && x > 1 && x < 40) return true;               // 北侧小路
+  if (Math.abs(x) <= 1 && z < -MOAT1 && z > -36) return true;
+  if (cheb(x, z) === MOAT1 + 2 || cheb(x, z) === MOAT1 + 3) return true;  // 环城路
+  return false;
+}
+const HM = new Int16Array(NX * NZ);
+const hi = (x, z) => (x - GX0) * NZ + (z - GZ0);
+const getH = (x, z) => HM[hi(clamp(x, GX0, GX1 - 1), clamp(z, GZ0, GZ1 - 1))];
+const waterCol = new Uint8Array(NX * NZ);
+for (let x = GX0; x < GX1; x++) for (let z = GZ0; z < GZ1; z++) {
+  const d = cheb(x, z);
+  const n = fbm2(x * 0.035, z * 0.035);
+  const edge = Math.max(0, Math.max(Math.abs(x), Math.abs(z)) - 50);
+  let h = 7 + Math.round(Math.max(0, n) * 2.5 + edge * 0.45 * (0.7 + 0.6 * fbm2(x * 0.08 + 9, z * 0.08)));
+  let water = false;
+  if (d <= CAST) h = 8;
+  else if (d <= MOAT1) { h = d === MOAT0 || d === MOAT1 ? 4 : 3; water = true; }
+  const rd = Math.abs(x - riverX(z));
+  if (rd < 4.2) { h = rd < 2.5 ? 3 : 4; water = true; }
+  else if (rd < 5.5) h = Math.min(h, 6);
+  if (canalOn(x, z)) { h = Math.abs(z) <= 1 ? 3 : 4; water = true; }
+  if (isRoad(x, z) && !water) h = Math.max(7, Math.min(h, 8));
+  HM[hi(x, z)] = h;
+  waterCol[hi(x, z)] = water ? 1 : 0;
+}
+const isWaterCol = (x, z) => inB(x, 0, z) && waterCol[hi(x, z)] === 1;
+
+// 填充地表
+for (let x = GX0; x < GX1; x++) for (let z = GZ0; z < GZ1; z++) {
+  const h = getH(x, z), w = isWaterCol(x, z);
+  const road = isRoad(x, z) && !w;
+  for (let y = 0; y < h; y++) {
+    let t = y < h - 3 ? T.DSTONE : T.DIRT;
+    if (y === h - 1) {
+      if (w) t = hash3(x, y, z) > 0.5 ? T.SAND : T.DIRT;
+      else if (road) t = cheb(x, z) <= MOAT1 + 3 ? T.COBBLE : (hash3(x, 1, z) > 0.85 ? T.DIRT : T.PATH);
+      else if (h <= WL && !w) t = T.SAND;
+      else if (cheb(x, z) <= CAST) t = hash3(x, 2, z) > 0.4 ? T.GRASS : T.GRASS2;
+      else t = h > 13 ? (hash3(x, 3, z) > 0.6 ? T.ROCK : T.GRASS2) : (hash3(x, 4, z) > 0.55 ? T.GRASS : T.GRASS2);
+    }
+    setV(x, y, z, t);
+  }
+  if (w) for (let y = h; y < WL; y++) setV(x, y, z, T.WATER);
+}
+// 河岸 / 护城河岸用石砌加固
+for (let x = -MOAT1 - 1; x <= MOAT1 + 1; x++) for (let z = -MOAT1 - 1; z <= MOAT1 + 1; z++) {
+  const d = cheb(x, z);
+  if (d === CAST || d === MOAT1 + 1) for (let y = 3; y < getH(x, z); y++) setV(x, y, z, hash3(x, y, z) > 0.5 ? T.STONE2 : T.DSTONE);
+}
+
+/* ================= 城堡 ================= */
+function cyl(cx, cz, r, y0, y1, t, hollow = false) {
+  for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) for (let z = Math.floor(cz - r); z <= Math.ceil(cz + r); z++) {
+    const dd = Math.hypot(x - cx, z - cz);
+    if (dd > r) continue;
+    if (hollow && dd < r - 1.2) continue;
+    for (let y = y0; y <= y1; y++) setV(x, y, z, typeof t === 'function' ? t(x, y, z) : t);
+  }
+}
+function cone(cx, cz, r, y0, h, t) {
+  for (let i = 0; i < h; i++) {
+    const rr2 = r * (1 - i / h);
+    cyl(cx, cz, Math.max(rr2, 0.4), y0 + i, y0 + i, t);
+  }
+}
+const stoneT = (x, y, z) => { const k = hash3(x, y, z); return k > 0.82 ? T.STONE2 : k < 0.08 ? T.DSTONE : T.STONE; };
+const flagSpots = [];   // 旗帜位置 {x,y,z,color}
+const torchSpots = [];
+
+// 主城墙：切比雪夫距离 16~17，高度 8~15
+const WALL_IN = 16, WALL_OUT = 17, WALL_TOP = 15;
+for (let x = -WALL_OUT; x <= WALL_OUT; x++) for (let z = -WALL_OUT; z <= WALL_OUT; z++) {
+  const d = cheb(x, z);
+  if (d < WALL_IN || d > WALL_OUT) continue;
+  for (let y = 8; y <= WALL_TOP; y++) setV(x, y, z, stoneT(x, y, z));
+  // 外沿垛口
+  if (d === WALL_OUT && ((x + z) & 1) === 0) setV(x, WALL_TOP + 1, z, T.STONE);
+  // 箭孔
+  if (d === WALL_OUT && y11(x, z)) setV(x, 12, z, T.GLASS);
+}
+function y11(x, z) { const k = Math.abs(x) === WALL_OUT ? z : x; return ((k % 5) + 5) % 5 === 0 && Math.abs(k) < 13; }
+// 城墙顶走道
+for (let x = -WALL_IN; x <= WALL_IN; x++) for (let z = -WALL_IN; z <= WALL_IN; z++) if (cheb(x, z) === WALL_IN) setV(x, WALL_TOP, z, T.DSTONE);
+
+// 四角塔楼
+function tower(cx, cz, r, top, roof, roofH) {
+  cyl(cx, cz, r, 3, top, stoneT);
+  cyl(cx, cz, r + 0.6, top + 1, top + 1, T.STONE2);
+  for (let a = 0; a < 16; a++) {
+    if (a & 1) continue;
+    const ang = a / 16 * Math.PI * 2;
+    setV(Math.round(cx + Math.cos(ang) * (r + 0.3)), top + 2, Math.round(cz + Math.sin(ang) * (r + 0.3)), T.STONE);
+  }
+  // 窗户
+  for (let y = 11; y < top - 1; y += 4) {
+    for (let k = 0; k < 4; k++) {
+      const ang = k * Math.PI / 2 + y * 0.3;
+      setV(Math.round(cx + Math.cos(ang) * r), y, Math.round(cz + Math.sin(ang) * r), T.WINDOW);
+      setV(Math.round(cx + Math.cos(ang) * r), y + 1, Math.round(cz + Math.sin(ang) * r), T.WINDOW);
+    }
+  }
+  cone(cx, cz, r + 0.9, top + 2, roofH, roof);
+  setV(Math.round(cx), top + 2 + roofH, Math.round(cz), T.GOLD);
+  flagSpots.push({ x: Math.round(cx) + 0.5, y: top + 3 + roofH, z: Math.round(cz) + 0.5, color: roof === T.ROOF_B ? 0xe8434f : 0x3d63b8 });
+}
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) tower(sx * 17, sz * 17, 3.6, 21, T.ROOF_B, 9);
+// 城墙中段小塔
+for (const [cx, cz] of [[-17, 0], [17, 0], [0, -17]]) tower(cx, cz, 2.6, 18, T.ROOF_R, 6);
+
+// 门楼（南侧，z = +17）
+{
+  for (let x = -6; x <= 6; x++) for (let z = 14; z <= 19; z++) for (let y = 8; y <= 19; y++) setV(x, y, z, stoneT(x, y, z));
+  for (let x = -6; x <= 6; x += 2) { setV(x, 20, 14, T.STONE); setV(x, 20, 19, T.STONE); }
+  for (let z = 14; z <= 19; z += 2) { setV(-6, 20, z, T.STONE); setV(6, 20, z, T.STONE); }
+  // 拱门通道
+  for (let x = -2; x <= 2; x++) for (let z = 13; z <= 20; z++) for (let y = 8; y <= 13; y++) {
+    if (y === 13 && Math.abs(x) === 2) continue;
+    setV(x, y, z, 0);
+  }
+  // 吊闸（半升起）
+  for (let x = -2; x <= 2; x++) for (let y = 12; y <= 13; y++) if ((x & 1) === 0 || y === 12) setV(x, y, 20, T.DSTONE);
+  // 门楼两侧圆塔
+  for (const sx of [-1, 1]) tower(sx * 6, 20, 2.4, 22, T.ROOF_R, 7);
+  for (let x = -1; x <= 1; x++) { setV(x, 16, 20, T.WINDOW); }
+  setV(0, 17, 20, T.GOLD);
+  torchSpots.push([-3, 11, 21], [3, 11, 21]);
+}
+// 吊桥（木质）横跨护城河
+for (let x = -2; x <= 2; x++) for (let z = 20; z <= MOAT1 + 1; z++) {
+  setV(x, 7, z, Math.abs(x) === 2 ? T.WOOD : T.PLANK);
+  if (Math.abs(x) === 2 && (z & 1)) setV(x, 8, z, T.WOOD);
+}
+for (const sx of [-2, 2]) for (let y = 3; y < 7; y++) { setV(sx, y, 22, T.WOOD); setV(sx, y, 24, T.WOOD); }
+
+// 主堡：矩形大厅 + 角楼 + 中央高塔
+{
+  const x0 = -8, x1 = 8, z0 = -11, z1 = 3, top = 24;
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) for (let y = 8; y <= top; y++) {
+    const edge = x === x0 || x === x1 || z === z0 || z === z1;
+    if (!edge && y < top) continue;
+    let t = stoneT(x, y, z);
+    if (y === 15 || y === 16) t = T.STONE2;                        // 腰线
+    if (edge && (y % 5 === 1 || y % 5 === 2) && y > 9 && y < top - 1) {
+      const k = (x === x0 || x === x1) ? z : x;
+      if (((k % 3) + 3) % 3 === 0) t = T.WINDOW;
+    }
+    setV(x, y, z, t);
+  }
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    if ((x === x0 || x === x1 || z === z0 || z === z1) && ((x + z) & 1) === 0) setV(x, top + 1, z, T.STONE);
+  }
+  // 大门与台阶
+  for (let x = -2; x <= 2; x++) for (let y = 8; y <= 11; y++) setV(x, y, z1, y === 11 && Math.abs(x) === 2 ? T.STONE : T.WOOD);
+  setV(0, 12, z1, T.GOLD);
+  for (let x = -3; x <= 3; x++) { setV(x, 8, z1 + 1, T.STONE2); }
+  torchSpots.push([-4, 11, z1 + 1], [4, 11, z1 + 1]);
+  // 四角小角楼
+  for (const cx of [x0, x1]) for (const cz of [z0, z1]) {
+    cyl(cx, cz, 1.8, 8, top + 4, stoneT);
+    cone(cx, cz, 2.6, top + 5, 6, T.ROOF_R);
+    flagSpots.push({ x: cx + 0.5, y: top + 11, z: cz + 0.5, color: 0xf2c230 });
+  }
+  // 中央高塔
+  cyl(0, -4, 3.4, 24, 36, stoneT);
+  for (let y = 27; y < 35; y += 3) for (let k = 0; k < 6; k++) {
+    const a = k / 6 * Math.PI * 2;
+    setV(Math.round(Math.cos(a) * 3.4), y, Math.round(-4 + Math.sin(a) * 3.4), T.WINDOW);
+  }
+  cyl(0, -4, 4.2, 37, 37, T.STONE2);
+  cone(0, -4, 4.4, 38, 11, T.ROOF_B);
+  setV(0, 49, -4, T.GOLD);
+  flagSpots.push({ x: 0.5, y: 50, z: -3.5, color: 0xe8434f, big: true });
+  // 侧殿（绿色屋顶）
+  for (let x = 9; x <= 13; x++) for (let z = -10; z <= -2; z++) for (let y = 8; y <= 13; y++) {
+    if (x === 9 || x === 13 || z === -10 || z === -2) setV(x, y, z, y === 11 && (z & 1) ? T.WINDOW : T.PLASTER);
+  }
+  for (let k = 0; k < 4; k++) for (let z = -11; z <= -1; z++) for (let x = 8 + k; x <= 14 - k; x++) setV(x, 14 + k, z, T.ROOF_G);
+}
+// 庭院：石板路、水井、花坛
+for (let x = -15; x <= 15; x++) for (let z = -15; z <= 15; z++) {
+  if (getV(x, 8, z)) continue;
+  if (Math.abs(x) <= 1 && z > 3) setV(x, 7, z, T.COBBLE);
+  else if (hash3(x, 7, z) > 0.93) setV(x, 8, z, [T.FLOWER_R, T.FLOWER_Y, T.FLOWER_P][Math.floor(hash3(z, 1, x) * 3)]);
+}
+cyl(10.5, 9.5, 1.6, 8, 9, T.STONE2, true);
+setV(10, 8, 9, T.WATER);
+for (const [x, z] of [[9, 8], [12, 11], [9, 11], [12, 8]]) for (let y = 10; y <= 11; y++) setV(x, y, z, T.WOOD);
+fillBox(9, 12, 8, 12, 12, 11, T.ROOF_R);
+
+/* ================= 村庄民居 ================= */
+const occ = new Uint8Array(NX * NZ);
+const occAt = (x, z) => !inB(x, 0, z) || occ[hi(x, z)] === 1;
+const markOcc = (x0, z0, x1, z1) => { for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) if (inB(x, 0, z)) occ[hi(x, z)] = 1; };
+for (let x = GX0; x < GX1; x++) for (let z = GZ0; z < GZ1; z++) if (isRoad(x, z) || isWaterCol(x, z) || cheb(x, z) <= MOAT1 + 3) occ[hi(x, z)] = 1;
+
+// ori=0：屋脊沿 x；ori=1：屋脊沿 z。front=±1 为门所在方向
+function house(cx, cz, L, W, ori, front, roofT, wallT, inside = false) {
+  const P = (a, b) => ori === 0 ? [cx + a, cz + b] : [cx + b, cz + a];
+  const a0 = -(L >> 1), a1 = a0 + L - 1, b0 = -(W >> 1), b1 = b0 + W - 1;
+  let g = 0;
+  for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) { const [x, z] = P(a, b); g = Math.max(g, getH(x, z)); }
+  if (inside) g = 8;
+  const wallH = 3 + (L >= 7 ? 1 : 0);
+  for (let a = a0 - 1; a <= a1 + 1; a++) for (let b = b0 - 1; b <= b1 + 1; b++) {
+    const [x, z] = P(a, b);
+    for (let y = getH(x, z); y < g; y++) setV(x, y, z, T.COBBLE);
+  }
+  for (let a = a0; a <= a1; a++) for (let b = b0; b <= b1; b++) {
+    const [x, z] = P(a, b);
+    const edgeA = a === a0 || a === a1, edgeB = b === b0 || b === b1;
+    if (!edgeA && !edgeB) { setV(x, g, z, T.PLANK); continue; }
+    for (let y = g; y < g + wallH; y++) {
+      let t = wallT;
+      if (edgeA && edgeB) t = T.WOOD;
+      else if (y === g + wallH - 1) t = T.WOOD;
+      else if (y === g + 1 && ((edgeB && (a - a0) % 2 === 1) || (edgeA && b === 0))) t = T.GLASS;
+      setV(x, y, z, t);
+    }
+  }
+  // 门
+  const db = front > 0 ? b1 : b0;
+  { const [x, z] = P(0, db); setV(x, g, z, T.WOOD); setV(x, g + 1, z, T.WOOD); }
+  // 双坡屋顶
+  const rH = Math.ceil((W + 2) / 2);
+  for (let k = 0; k < rH; k++) {
+    const y = g + wallH + k;
+    for (let a = a0 - 1; a <= a1 + 1; a++) {
+      for (let b = b0 - 1 + k; b <= b1 + 1 - k; b++) {
+        const [x, z] = P(a, b);
+        const outer = b === b0 - 1 + k || b === b1 + 1 - k;
+        if (outer) setV(x, y, z, roofT);
+        else if (a === a0 || a === a1) setV(x, y, z, wallT);
+      }
+    }
+  }
+  // 烟囱
+  if (hash3(cx, 5, cz) > 0.45) { const [x, z] = P(a1 - 1, b0 + 1); for (let y = g + wallH; y < g + wallH + rH + 1; y++) setV(x, y, z, T.DSTONE); }
+  if (!inside) {
+    const [fx, fz] = P(a0, db + front);
+    if (getH(fx, fz) === g) setIfEmpty(fx, g, fz, [T.FLOWER_R, T.FLOWER_Y, T.FLOWER_P][ri(0, 2)]);
+  }
+}
+const ROOFS = [T.ROOF_R, T.ROOF_O, T.ROOF_B, T.ROOF_G, T.ROOF_R, T.ROOF_O];
+const WALLS = [T.PLASTER, T.PLASTER2, T.PLASTER, T.STONE];
+function tryHouse(cx, cz, ori, front) {
+  const L = ri(5, 8), W = ri(5, 6);
+  const ax = ori === 0 ? L : W, az = ori === 0 ? W : L;
+  const x0 = cx - (ax >> 1) - 1, z0 = cz - (az >> 1) - 1, x1 = x0 + ax + 1, z1 = z0 + az + 1;
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) if (occAt(x, z)) return false;
+  let lo = 99, hiH = 0;
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) { lo = Math.min(lo, getH(x, z)); hiH = Math.max(hiH, getH(x, z)); }
+  if (hiH - lo > 2) return false;
+  house(cx, cz, L, W, ori, front, ROOFS[ri(0, ROOFS.length - 1)], WALLS[ri(0, WALLS.length - 1)]);
+  markOcc(x0 - 1, z0 - 1, x1 + 1, z1 + 1);
+  return true;
+}
+// 沿道路两侧布置
+for (let z = 32; z < 64; z += ri(8, 10)) { tryHouse(-6, z, 1, 1); tryHouse(6, z + 3, 1, -1); }
+for (let x = -30; x < 64; x += ri(8, 10)) { if (Math.abs(x) < 8) continue; tryHouse(x, 37, 0, 1); tryHouse(x + 3, 47, 0, -1); }
+for (let z = -28; z < 30; z += ri(9, 12)) { tryHouse(35, z, 1, 1); if (z > 5) tryHouse(45, z + 4, 1, -1); }
+// 城内小屋
+house(-11, 9, 6, 5, 1, 1, T.ROOF_O, T.PLASTER2, true);
+house(-12, -8, 6, 5, 1, 1, T.ROOF_R, T.PLASTER, true);
+
+/* ================= 田野与风车 ================= */
+function field(x0, z0, x1, z1, crops) {
+  for (let x = x0; x <= x1; x++) for (let z = z0; z <= z1; z++) {
+    if (occAt(x, z)) continue;
+    const h = getH(x, z);
+    if (h > 10) continue;
+    const border = x === x0 || x === x1 || z === z0 || z === z1;
+    if (border) {
+      if (((x + z) % 9) !== 0) { setV(x, h, z, T.WOOD); if (((x + z) & 3) === 0) setV(x, h + 1, z, T.WOOD); }
+      continue;
+    }
+    // 每块再划分为 6 格宽的小条田，作物不同
+    const strip = Math.floor((x - x0) / 6), crop = crops[strip % crops.length];
+    const row = (crop === T.WHEAT || crop === T.LAVENDER) ? (z & 1) : (z % 3 === 0 ? 1 : 0);
+    if (row === 0 || crop === T.WHEAT) {
+      setV(x, h - 1, z, T.SOIL);
+      if (crop === T.WHEAT || crop === T.LAVENDER) { setV(x, h, z, crop); if (crop === T.WHEAT && hash3(x, h, z) > 0.4) setV(x, h + 1, z, crop); }
+      else if (hash3(x, 9, z) > 0.25) setV(x, h, z, crop);
+    } else setV(x, h - 1, z, T.SOIL);
+  }
+  markOcc(x0, z0, x1, z1);
+}
+field(4, -64, 37, -40, [T.WHEAT, T.CROP, T.WHEAT, T.CABBAGE, T.LAVENDER, T.WHEAT]);
+field(44, -60, 64, -32, [T.CABBAGE, T.WHEAT, T.CROP, T.WHEAT]);
+field(-38, -62, -6, -42, [T.LAVENDER, T.WHEAT, T.CROP, T.WHEAT, T.CABBAGE, T.WHEAT]);
+field(50, -24, 64, 12, [T.WHEAT, T.CROP, T.WHEAT]);
+field(18, 52, 40, 64, [T.CROP, T.WHEAT, T.CABBAGE, T.WHEAT]);
+// 草垛
+for (let i = 0; i < 10; i++) {
+  const x = ri(8, 34), z = ri(-62, -42);
+  if (getV(x, getH(x, z) + 1, z)) continue;
+  const h = getH(x, z);
+  cyl(x, z, 1.3, h, h + 1, T.HAY); setV(x, h + 2, z, T.HAY);
+}
+
+// 风车塔身（叶片为动态对象）
+const windmills = [];
+function windmill(cx, cz) {
+  const g = getH(cx, cz);
+  for (let x = cx - 4; x <= cx + 4; x++) for (let z = cz - 4; z <= cz + 4; z++) {
+    for (let y = g + 4; y >= getH(x, z); y--) if (y < g + 1) setV(x, y, z, T.COBBLE); else setV(x, y, z, 0);
+  }
+  for (let y = 0; y < 13; y++) {
+    const r = 3.2 - y * 0.12;
+    cyl(cx, cz, r, g + 1 + y, g + 1 + y, (x, yy, z) => (y === 4 || y === 9) ? T.WOOD : (hash3(x, yy, z) > 0.8 ? T.PLASTER2 : T.PLASTER), true);
+  }
+  for (const [y, t] of [[g + 2, T.WOOD], [g + 3, T.WOOD], [g + 7, T.GLASS], [g + 11, T.GLASS]]) setV(cx, y, cz + 3, t);
+  cone(cx, cz, 2.9, g + 14, 5, T.ROOF_R);
+  setV(cx, g + 12, cz + 2, T.WOOD); setV(cx, g + 12, cz + 3, T.WOOD);
+  markOcc(cx - 5, cz - 5, cx + 5, cz + 5);
+  windmills.push({ x: cx + 0.5, y: g + 12.5, z: cz + 4.2, speed: rr(0.5, 0.8) });
+}
+for (const [x, z] of [[20, -47], [55, -40], [-22, -50]]) {
+  for (let xx = x - 5; xx <= x + 5; xx++) for (let zz = z - 5; zz <= z + 5; zz++) if (inB(xx, 0, zz) && !isRoad(xx, zz) && !isWaterCol(xx, zz)) occ[hi(xx, zz)] = 0;
+  windmill(x, z);
+}
+
+/* ================= 树木、花草、岩石 ================= */
+function blob(cx, cy, cz, rx, ry, rz, pick) {
+  for (let x = -rx; x <= rx; x++) for (let y = -ry; y <= ry; y++) for (let z = -rz; z <= rz; z++) {
+    const d = (x * x) / (rx * rx + 0.5) + (y * y) / (ry * ry + 0.5) + (z * z) / (rz * rz + 0.5);
+    if (d > 1 || hash3(cx + x, cy + y, cz + z) > 0.92 + (1 - d) * 0.1) continue;
+    setIfEmpty(cx + x, cy + y, cz + z, pick(cx + x, cy + y, cz + z));
+  }
+}
+function tree(x, z, kind) {
+  const h = getH(x, z);
+  if (kind === 0) {           // 阔叶树
+    const th = ri(3, 5);
+    for (let i = 0; i < th; i++) setV(x, h + i, z, T.TRUNK);
+    const r = ri(2, 3);
+    blob(x, h + th + 1, z, r, r - 1 + ri(0, 1), r, (a, b, c) => hash3(a, b, c) > 0.7 ? T.LEAF2 : T.LEAF);
+  } else if (kind === 1) {    // 松树
+    const th = ri(1, 2);
+    for (let i = 0; i < th + 5; i++) setV(x, h + i, z, T.TRUNK);
+    const radii = rand() < 0.5 ? [3, 2, 2, 1, 1, 0, 0] : [2, 2, 1, 1, 0];
+    radii.forEach((r, j) => {
+      for (let dx = -r; dx <= r; dx++) for (let dz = -r; dz <= r; dz++) {
+        if (r > 0 && Math.abs(dx) === r && Math.abs(dz) === r) continue;
+        setIfEmpty(x + dx, h + th + j, z + dz, T.PINE);
+      }
+    });
+  } else {                    // 樱花树
+    for (let i = 0; i < 4; i++) setV(x, h + i, z, T.TRUNK);
+    setV(x + 1, h + 3, z, T.TRUNK);
+    blob(x, h + 5, z, 3, 2, 3, (a, b, c) => hash3(a, b, c) > 0.75 ? 0 || T.FLOWER_P : T.BLOSSOM);
+  }
+}
+for (let n = 0, tries = 0; n < 230 && tries < 9000; tries++) {
+  const x = ri(GX0 + 3, GX1 - 4), z = ri(GZ0 + 3, GZ1 - 4);
+  let bad = false;
+  for (let dx = -2; dx <= 2 && !bad; dx++) for (let dz = -2; dz <= 2; dz++) if (occAt(x + dx, z + dz)) { bad = true; break; }
+  if (bad) continue;
+  const edge = Math.max(Math.abs(x), Math.abs(z));
+  const westForest = x < riverX(z) - 5;
+  const dens = westForest || edge > 54 ? 0.9 : 0.25 + 0.3 * fbm2(x * 0.05 + 3, z * 0.05);
+  if (rand() > dens) continue;
+  const kind = westForest || getH(x, z) > 11 ? (rand() < 0.7 ? 1 : 0) : (rand() < 0.15 ? 2 : rand() < 0.2 ? 1 : 0);
+  tree(x, z, kind);
+  markOcc(x - 1, z - 1, x + 1, z + 1);
+  n++;
+}
+// 花丛与岩石
+for (let i = 0; i < 1400; i++) {
+  const x = ri(GX0, GX1 - 1), z = ri(GZ0, GZ1 - 1);
+  if (occAt(x, z)) continue;
+  const h = getH(x, z);
+  if (getV(x, h, z) || getV(x, h - 1, z) === T.SAND) continue;
+  const r = rand();
+  if (r < 0.05 && h > 9) { setV(x, h, z, T.ROCK); setIfEmpty(x + 1, h, z, T.ROCK); setIfEmpty(x, h + 1, z, T.STONE2); }
+  else if (r < 0.55) setV(x, h, z, [T.FLOWER_R, T.FLOWER_Y, T.FLOWER_P, T.FLOWER_Y][ri(0, 3)]);
+  else setV(x, h, z, T.LEAF2);
+}
+// 河上石桥（东西大道跨河）
+{
+  const z = 42, rx = Math.round(riverX(z));
+  for (let x = rx - 6; x <= rx + 6; x++) for (let dz = -2; dz <= 2; dz++) {
+    const y = 7 + (Math.abs(x - rx) < 4 ? 1 : 0);
+    for (let yy = getH(x, z + dz); yy < y; yy++) if (Math.abs(x - rx) > 3 || yy >= 6 || (Math.abs(x - rx) >= 3)) setV(x, yy, z + dz, stoneT(x, yy, z + dz));
+    setV(x, y - 1, z + dz, Math.abs(dz) === 2 ? T.STONE2 : T.COBBLE);
+    if (Math.abs(dz) === 2) setV(x, y, z + dz, (x & 1) ? T.STONE : 0);
+  }
+}
+// 环城路跨水渠的小木桥
+for (let x = -29; x <= -26; x++) for (let z = -3; z <= 3; z++) {
+  setV(x, 6, z, x === -29 || x === -26 ? T.WOOD : T.PLANK);
+  if ((x === -29 || x === -26) && (z & 1)) setV(x, 7, z, T.WOOD);
+}
+for (const [x, y, z] of torchSpots) { setV(x, y, z, T.TORCH); setV(x, y - 1, z, T.WOOD); }
+
+/* ================= 体素网格化（面剔除 + 顶点 AO） ================= */
+function buildVoxelMeshes() {
+  // 0：实体  1：水  2：自发光
+  const B = [0, 1, 2].map(() => ({ pos: [], nor: [], col: [], idx: [], n: 0 }));
+  const AO_K = [0.5, 0.68, 0.84, 1.0];
+  const CW = [[0, 0], [1, 0], [1, 1], [0, 1]], CCW = [[0, 0], [0, 1], [1, 1], [1, 0]];
+  const isS = (x, y, z) => { const t = getV(x, y, z); return t !== 0 && t !== T.WATER ? 1 : 0; };
+  const col = new THREE.Color();
+  const q = [0, 0, 0], vp = [0, 0, 0], ao = [0, 0, 0, 0];
+  for (let x = GX0; x < GX1; x++) for (let z = GZ0; z < GZ1; z++) for (let y = 0; y < GH; y++) {
+    const t = grid[gi(x, y, z)];
+    if (!t) continue;
+    const water = t === T.WATER, glow = t >= 60;
+    const b = B[water ? 1 : glow ? 2 : 0];
+    col.setHex(PAL[t]);
+    const j = glow ? 1.6 : water ? 0.95 + hash3(x, 0, z) * 0.1 : 0.9 + hash3(x, y, z) * 0.2;
+    for (let f = 0; f < 6; f++) {
+      const a = f >> 1, s = (f & 1) ? -1 : 1;
+      q[0] = x; q[1] = y; q[2] = z; q[a] += s;
+      const nt = getV(q[0], q[1], q[2]);
+      if (water ? nt !== 0 : (nt !== 0 && nt !== T.WATER)) continue;
+      if (water && a === 1 && s < 0) continue;
+      const u = (a + 1) % 3, v = (a + 2) % 3;
+      const cs = s > 0 ? CW : CCW;
+      const shade = a === 1 ? (s > 0 ? 1.0 : 0.7) : (a === 0 ? 0.88 : 0.94);
+      const nrm = [0, 0, 0]; nrm[a] = s;
+      for (let k = 0; k < 4; k++) {
+        const du = cs[k][0], dv = cs[k][1];
+        vp[0] = x; vp[1] = y; vp[2] = z;
+        vp[a] += s > 0 ? 1 : 0; vp[u] += du; vp[v] += dv;
+        const su = du ? 1 : -1, sv = dv ? 1 : -1;
+        q[u] += su; const s1 = isS(q[0], q[1], q[2]);
+        q[v] += sv; const c = isS(q[0], q[1], q[2]);
+        q[u] -= su; const s2 = isS(q[0], q[1], q[2]);
+        q[v] -= sv;
+        const o = (s1 && s2) ? 0 : 3 - (s1 + s2 + c);
+        ao[k] = o;
+        const m = glow ? j : (water ? j : AO_K[o] * shade * j);
+        // 水面略微下沉
+        b.pos.push(vp[0], water && a === 1 ? vp[1] - 0.18 : vp[1], vp[2]);
+        b.nor.push(nrm[0], nrm[1], nrm[2]);
+        b.col.push(col.r * m, col.g * m, col.b * m);
+      }
+      const n = b.n;
+      if (ao[0] + ao[2] < ao[1] + ao[3]) b.idx.push(n + 1, n + 2, n + 3, n + 1, n + 3, n);
+      else b.idx.push(n, n + 1, n + 2, n, n + 2, n + 3);
+      b.n += 4;
+    }
+  }
+  return B.map(b => {
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(b.pos, 3));
+    g.setAttribute('normal', new THREE.Float32BufferAttribute(b.nor, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(b.col, 3));
+    g.setIndex(b.idx);
+    g.computeBoundingSphere();
+    return g;
+  });
+}
+let waterMat;
+{
+  const [solidGeo, waterGeo, glowGeo] = buildVoxelMeshes();
+  const world = new THREE.Mesh(solidGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, metalness: 0 }));
+  world.castShadow = world.receiveShadow = true;
+  scene.add(world);
+  waterMat = new THREE.MeshStandardMaterial({ vertexColors: true, transparent: true, opacity: 0.78, roughness: 0.15, metalness: 0.1 });
+  // 水面波纹：在着色器里按位置和时间扰动法线
+  waterMat.onBeforeCompile = sh => {
+    sh.uniforms.uTime = { value: 0 };
+    waterMat.userData.shader = sh;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vWPos;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\nvWPos = (modelMatrix * vec4(transformed,1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uTime; varying vec3 vWPos;')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        float wa = sin(vWPos.x * 0.9 + uTime * 1.6) + sin(vWPos.z * 1.1 - uTime * 1.3) + sin((vWPos.x + vWPos.z) * 0.5 + uTime);
+        normal = normalize(normal + vec3(cos(vWPos.x * 0.9 + uTime * 1.6) * 0.12, 0.0, cos(vWPos.z * 1.1 - uTime * 1.3) * 0.12));
+        diffuseColor.rgb += 0.05 * wa;`);
+  };
+  const wMesh = new THREE.Mesh(waterGeo, waterMat);
+  wMesh.receiveShadow = true;
+  scene.add(wMesh);
+  scene.add(new THREE.Mesh(glowGeo, new THREE.MeshBasicMaterial({ vertexColors: true })));
+  // 底座
+  const base = new THREE.Mesh(new THREE.BoxGeometry(NX + 3, 4, NZ + 3), new THREE.MeshStandardMaterial({ color: 0x5a3b24, roughness: 0.85 }));
+  base.position.set(0, -2, 0);
+  base.receiveShadow = true;
+  scene.add(base);
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(NX + 4.5, 0.8, NZ + 4.5), new THREE.MeshStandardMaterial({ color: 0xd8b26a, roughness: 0.4, metalness: 0.4 }));
+  trim.position.set(0, -4.2, 0); scene.add(trim);
+}
+
+/* ================= 动态：旗帜 ================= */
+const flags = [];
+{
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x5a4030, roughness: 0.6 });
+  for (const f of flagSpots) {
+    const s = f.big ? 1.6 : 1;
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.1 * s, 0.1 * s, 4 * s, 6), poleMat);
+    pole.position.set(f.x, f.y + 2 * s - 1, f.z);
+    pole.castShadow = true;
+    scene.add(pole);
+    const geo = new THREE.PlaneGeometry(3 * s, 1.8 * s, 12, 4);
+    geo.translate(1.5 * s, 0, 0);
+    const base = Float32Array.from(geo.attributes.position.array);
+    const mat = new THREE.MeshStandardMaterial({ color: f.color, side: THREE.DoubleSide, roughness: 0.7 });
+    const m = new THREE.Mesh(geo, mat);
+    m.position.set(f.x + 0.1, f.y + 4 * s - 1.9 * s, f.z);
+    m.castShadow = true;
+    scene.add(m);
+    m.rotation.y = -0.35;   // 所有旗帜朝同一风向
+    flags.push({ m, base, s, ph: rand() * 6 });
+  }
+}
+
+/* ================= 动态：风车叶片 ================= */
+const millBlades = [];
+{
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x7a5232, roughness: 0.8 });
+  const sailMat = new THREE.MeshStandardMaterial({ color: 0xf4ead2, roughness: 0.9 });
+  for (const w of windmills) {
+    const g = new THREE.Group();
+    g.position.set(w.x, w.y, w.z);
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), woodMat));
+    for (let k = 0; k < 4; k++) {
+      const arm = new THREE.Group();
+      arm.rotation.z = k * Math.PI / 2;
+      const spar = new THREE.Mesh(new THREE.BoxGeometry(0.35, 9, 0.35), woodMat);
+      spar.position.y = 4.5;
+      const sail = new THREE.Mesh(new THREE.BoxGeometry(1.8, 6.5, 0.12), sailMat);
+      sail.position.set(1.05, 5.3, 0);
+      arm.add(spar, sail);
+      spar.castShadow = sail.castShadow = true;
+      g.add(arm);
+    }
+    scene.add(g);
+    millBlades.push({ g, speed: w.speed });
+  }
+}
+
+/* ================= 动态：云朵 ================= */
+const clouds = [];
+{
+  const cloudMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, emissive: 0xdde9f5, emissiveIntensity: 0.35, transparent: true, opacity: 0.92 });
+  for (let i = 0; i < 14; i++) {
+    const parts = [];
+    const n = ri(4, 8), sx = rr(3, 6);
+    for (let k = 0; k < n; k++) {
+      const w = ri(4, 9) * sx * 0.4, h = ri(2, 4), d = ri(4, 8) * sx * 0.4;
+      const b = new THREE.BoxGeometry(w, h, d);
+      b.translate(rr(-sx * 2, sx * 2), rr(0, 2) + h / 2, rr(-sx, sx));
+      parts.push(b);
+    }
+    const m = new THREE.Mesh(mergeGeometries(parts), cloudMat);
+    m.position.set(rr(-160, 160), rr(52, 75), rr(-130, 130));
+    m.castShadow = true;
+    scene.add(m);
+    clouds.push({ m, v: rr(1.2, 2.6) });
+  }
+}
+
+/* ================= 动态：行走的村民 ================= */
+const PATHS = [
+  [[0, 5], [0, 30], [0, 66]],
+  [[-30, 42], [10, 42], [62, 42]],
+  [[40, -58], [40, 0], [40, 42]],
+  [[-27, -27], [27, -27], [27, 27], [-27, 27], [-27, -27]],
+  [[0, -36], [20, -36], [39, -36]],
+  [[-8, 6], [8, 6], [8, 12], [-8, 12]]
+].map(p => {
+  const pts = p.map(([x, z]) => new THREE.Vector2(x + 0.5, z + 0.5));
+  const seg = [];
+  let L = 0;
+  for (let i = 0; i < pts.length - 1; i++) { const l = pts[i].distanceTo(pts[i + 1]); seg.push(l); L += l; }
+  return { pts, seg, L };
+});
+function pathAt(p, s, out) {
+  for (let i = 0; i < p.seg.length; i++) {
+    if (s <= p.seg[i] || i === p.seg.length - 1) {
+      const t = clamp(s / p.seg[i], 0, 1);
+      out.lerpVectors(p.pts[i], p.pts[i + 1], t);
+      return Math.atan2(p.pts[i + 1].x - p.pts[i].x, p.pts[i + 1].y - p.pts[i].y);
+    }
+    s -= p.seg[i];
+  }
+  return 0;
+}
+// 从城门通道高度向下找站立面（可走桥面）
+function walkY(x, z) {
+  const xi = Math.floor(x), zi = Math.floor(z);
+  for (let y = 13; y > 0; y--) { const t = getV(xi, y, zi); if (t && t !== T.WATER) return y + 1; }
+  return WL;
+}
+const villagers = [];
+{
+  const skin = new THREE.MeshStandardMaterial({ color: 0xf1c7a0, roughness: 0.8 });
+  const pants = new THREE.MeshStandardMaterial({ color: 0x4a3a2c, roughness: 0.9 });
+  const shirtCols = [0xd9483b, 0x3f6fc8, 0x4caf50, 0xf2b630, 0x8e5ac8, 0xf08a3c, 0xeeeeee];
+  const hatMat = new THREE.MeshStandardMaterial({ color: 0xd8b25a, roughness: 0.9 });
+  const legGeo = new THREE.BoxGeometry(0.22, 0.6, 0.22); legGeo.translate(0, -0.3, 0);
+  const bodyGeo = new THREE.BoxGeometry(0.55, 0.65, 0.35);
+  const headGeo = new THREE.BoxGeometry(0.42, 0.42, 0.42);
+  const hatGeo = new THREE.BoxGeometry(0.6, 0.12, 0.6);
+  for (let i = 0; i < 30; i++) {
+    const p = PATHS[i % PATHS.length];
+    const g = new THREE.Group();
+    const lL = new THREE.Mesh(legGeo, pants), lR = new THREE.Mesh(legGeo, pants);
+    lL.position.set(-0.13, 0.6, 0); lR.position.set(0.13, 0.6, 0);
+    const body = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({ color: shirtCols[i % shirtCols.length], roughness: 0.85 }));
+    body.position.y = 0.92;
+    const head = new THREE.Mesh(headGeo, skin);
+    head.position.y = 1.46;
+    g.add(lL, lR, body, head);
+    if (rand() < 0.4) { const hat = new THREE.Mesh(hatGeo, hatMat); hat.position.y = 1.72; g.add(hat); }
+    g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+    g.scale.setScalar(1.1);
+    scene.add(g);
+    villagers.push({ g, lL, lR, p, s: rand() * p.L, dir: rand() < 0.5 ? 1 : -1, v: rr(1.1, 2.0), off: rr(-0.6, 0.6), loop: p.pts[0].equals(p.pts[p.pts.length - 1]) });
+  }
+}
+
+/* ================= 动态：河上小船 ================= */
+const boat = new THREE.Group();
+{
+  const wood = new THREE.MeshStandardMaterial({ color: 0x8a5a32, roughness: 0.8 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(1.6, 0.6, 4), wood);
+  const bow = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.6, 1), wood); bow.position.z = 2.4;
+  const mast = new THREE.Mesh(new THREE.BoxGeometry(0.15, 3.2, 0.15), wood); mast.position.y = 1.8;
+  const sail = new THREE.Mesh(new THREE.BoxGeometry(0.06, 2.2, 1.8), new THREE.MeshStandardMaterial({ color: 0xf6eedc }));
+  sail.position.set(0, 2.1, -0.4);
+  boat.add(hull, bow, mast, sail);
+  boat.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  scene.add(boat);
+}
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+const tmp2 = new THREE.Vector2();
+function animate() {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  // 旗帜飘动
+  for (const f of flags) {
+    const pos = f.m.geometry.attributes.position, b = f.base, W = 3 * f.s;
+    for (let i = 0; i < pos.count; i++) {
+      const x = b[i * 3], y = b[i * 3 + 1], k = x / W;
+      pos.array[i * 3 + 2] = Math.sin(x * 2.2 - t * 7 + f.ph) * 0.35 * k * f.s;
+      pos.array[i * 3 + 1] = y - k * k * 0.25 * f.s + Math.sin(x * 1.5 - t * 5 + f.ph) * 0.06 * k;
+    }
+    pos.needsUpdate = true;
+    f.m.geometry.computeVertexNormals();
+  }
+  // 风车
+  for (const w of millBlades) w.g.rotation.z -= w.speed * dt;
+  // 云
+  for (const c of clouds) { c.m.position.x += c.v * dt; if (c.m.position.x > 170) c.m.position.x = -170; }
+  // 村民
+  for (const v of villagers) {
+    v.s += v.v * v.dir * dt;
+    if (v.loop) v.s = (v.s + v.p.L) % v.p.L;
+    else if (v.s > v.p.L) { v.s = v.p.L; v.dir = -1; } else if (v.s < 0) { v.s = 0; v.dir = 1; }
+    let ang = pathAt(v.p, v.s, tmp2);
+    if (v.dir < 0) ang += Math.PI;
+    const px = tmp2.x + Math.cos(ang) * v.off, pz = tmp2.y - Math.sin(ang) * v.off;
+    const y = walkY(px, pz);
+    v.g.position.set(px, lerp(v.g.position.y || y, y, 0.25) + Math.abs(Math.sin(t * v.v * 5)) * 0.06, pz);
+    v.g.rotation.y = ang;
+    const sw = Math.sin(t * v.v * 5) * 0.6;
+    v.lL.rotation.x = sw; v.lR.rotation.x = -sw;
+  }
+  // 小船沿河往返
+  {
+    // 限制在石桥以北航行，避免穿桥
+    const z = -16 + Math.sin(t * 0.05) * 44;
+    const zN = -16 + Math.sin((t + 0.5) * 0.05) * 44;
+    boat.position.set(riverX(z) + 0.5, WL - 0.35 + Math.sin(t * 1.7) * 0.06, z);
+    boat.rotation.y = Math.atan2(riverX(zN) - riverX(z), zN - z);
+    boat.rotation.z = Math.sin(t * 1.3) * 0.04;
+  }
+  if (waterMat.userData.shader) waterMat.userData.shader.uniforms.uTime.value = t;
+  controls.update();
+  renderer.render(scene, camera);
+}
+renderer.setAnimationLoop(animate);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+<script src="../prompt-panel.js" data-id="kingdom-kiro-opus"></script>
+</body>
+</html>

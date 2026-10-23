@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>永恒日落 · 体素世界</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #2a1d3f; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; }
+  canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+  .title {
+    position: fixed; top: 14px; right: 18px; z-index: 5; pointer-events: none; text-align: right;
+    color: #fff1dc; letter-spacing: 4px;
+    text-shadow: 0 2px 12px rgba(120, 30, 60, 0.65);
+  }
+  .title b { display: block; font-size: 22px; font-weight: 800; }
+  .title span { font-size: 12px; letter-spacing: 2px; opacity: .8; }
+  .ui {
+    position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); z-index: 6;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+  }
+  .glide {
+    appearance: none; border: 0; cursor: pointer;
+    padding: 10px 22px; border-radius: 999px; font-size: 15px; font-weight: 800; letter-spacing: 2px;
+    color: #4a2320; background: linear-gradient(135deg, #ffe2a8, #ff9f6e 60%, #f07a8c);
+    box-shadow: 0 6px 22px rgba(255, 120, 80, 0.45), inset 0 1px 0 rgba(255, 255, 255, .6);
+    transition: transform .15s ease, box-shadow .15s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .glide:hover { transform: translateY(-2px); box-shadow: 0 10px 26px rgba(255, 120, 80, 0.55); }
+  .glide.on { background: linear-gradient(135deg, #fff1dc, #d9b8ff); color: #3a2350; }
+  .hint {
+    padding: 5px 14px; border-radius: 999px; pointer-events: none; white-space: nowrap;
+    background: rgba(40, 20, 50, 0.38); color: #ffe9d6; font-size: 12px;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+  }
+  @media (max-width: 600px) {
+    .title b { font-size: 17px; } .title span { display: none; }
+    .hint { font-size: 11px; } .glide { font-size: 14px; padding: 9px 18px; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div class="title"><b>永恒日落</b><span>ETERNAL SUNSET · VOXEL</span></div>
+<div class="ui">
+  <button class="glide" id="glideBtn" type="button">滑翔模式</button>
+  <div class="hint" id="hint">拖动旋转 · 滚轮 / 双指缩放</div>
+</div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= 基础工具：随机数 / 噪声 ================= */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rand = mulberry32(20261021);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const smoothstep = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+
+// 自写 2D 值噪声 + 分形叠加
+const perm = new Uint8Array(512);
+{
+  const p = [...Array(256).keys()];
+  for (let i = 255; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [p[i], p[j]] = [p[j], p[i]]; }
+  for (let i = 0; i < 512; i++) perm[i] = p[i & 255];
+}
+const h2 = (i, j) => perm[(i & 255) + perm[j & 255]] / 255;
+function noise2(x, y) {
+  const xi = Math.floor(x), yi = Math.floor(y);
+  const xf = x - xi, yf = y - yi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+  const a = h2(xi, yi), b = h2(xi + 1, yi), c = h2(xi, yi + 1), d = h2(xi + 1, yi + 1);
+  return (a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v) * 2 - 1;
+}
+function fbm2(x, y, oct = 5) {
+  let s = 0, amp = 0.5, f = 1, n = 0;
+  for (let o = 0; o < oct; o++) { s += amp * noise2(x * f + o * 19.7, y * f - o * 7.3); n += amp; amp *= 0.5; f *= 2.02; }
+  return s / n;
+}
+// 位置哈希（方块色差用）
+const hash3 = (x, y, z) => {
+  let h = Math.imul(x, 374761393) + Math.imul(y, 668265263) + Math.imul(z, 2147483647);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+};
+
+/* ================= 渲染器 / 场景 / 相机 ================= */
+const isMobile = Math.min(window.innerWidth, window.innerHeight) < 700 || /Mobi|Android/i.test(navigator.userAgent);
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.autoUpdate = false; // 场景静态，阴影只渲染一次
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const FOG_COLOR = new THREE.Color('#d48a86');
+scene.fog = new THREE.FogExp2(FOG_COLOR, 0.0042);
+
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.3, 3200);
+
+// 世界常量
+const N = 96, HALF = N / 2, YS = 56, SEA = 10, WATER_Y = SEA - 0.2;
+
+// 太阳方向：视觉圆日压得很低；光照方向略高，形成长长的阴影
+const SUN_AZ = 0.12;
+const sunDir = new THREE.Vector3(Math.cos(SUN_AZ) * Math.cos(0.068), Math.sin(0.068), Math.sin(SUN_AZ) * Math.cos(0.068)).normalize();
+const lightDir = new THREE.Vector3(Math.cos(SUN_AZ) * Math.cos(0.2), Math.sin(0.2), Math.sin(SUN_AZ) * Math.cos(0.2)).normalize();
+
+const sunLight = new THREE.DirectionalLight(0xffb27a, 3.4);
+sunLight.position.copy(lightDir).multiplyScalar(150).add(new THREE.Vector3(0, 12, 0));
+sunLight.target.position.set(0, 12, 0);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(isMobile ? 2048 : 4096, isMobile ? 2048 : 4096);
+Object.assign(sunLight.shadow.camera, { left: -72, right: 72, top: 42, bottom: -42, near: 1, far: 330 });
+sunLight.shadow.bias = -0.0004;
+sunLight.shadow.normalBias = 0.06;
+scene.add(sunLight, sunLight.target);
+scene.add(new THREE.HemisphereLight(0xa48ad0, 0x5a3440, 1.55));
+
+/* ================= 天空 Shader（晚霞渐变 + 卷云 + 圆日） ================= */
+const SKY_GLSL = /* glsl */`
+uniform vec3 uSunDir;
+uniform float uTime;
+uniform vec3 uZenA, uZenB, uMidA, uMidB, uHorA, uHorB, uGlow, uSunCore, uSunEdge, uCloudLit, uCloudGold, uCloudDark;
+float hash12(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float vnoise(vec2 p){
+  vec2 i = floor(p), f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x), mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0)), u.x), u.y);
+}
+float fbm(vec2 p){
+  float v = 0.0, a = 0.5;
+  for (int i = 0; i < 4; i++) { v += a * vnoise(p); p = p * 2.03 + vec2(1.7, 9.2); a *= 0.5; }
+  return v / 0.9375;
+}
+// d: 视线方向；withSun: 是否绘制日轮；withCloud: 是否绘制云
+vec3 skyColor(vec3 d, float withSun, float withCloud){
+  d = normalize(d);
+  vec2 hz = d.xz / max(length(d.xz), 1e-4);
+  float az = dot(hz, normalize(uSunDir.xz)) * 0.5 + 0.5;   // 1 = 朝阳一侧，0 = 背阳一侧
+  float s = pow(az, 2.2);
+  float h = max(d.y, 0.0);
+  vec3 hor = mix(uHorB, uHorA, s);
+  vec3 mid = mix(uMidB, uMidA, s);
+  vec3 zen = mix(uZenB, uZenA, s * 0.55);
+  vec3 col = mix(hor, mid, smoothstep(0.0, 0.2, h));
+  col = mix(col, zen, smoothstep(0.14, 0.85, h));
+  float mu = dot(d, uSunDir);
+  float m = max(mu, 0.0);
+  // 太阳周围的大范围辉光
+  col += uGlow * (pow(m, 5.0) * 0.22 + pow(m, 30.0) * 0.55 + pow(m, 260.0) * 1.4);
+  // 地平线亮带
+  col += hor * pow(1.0 - h, 28.0) * 0.22;
+  float cloudA = 0.0;
+  if (withCloud > 0.5 && d.y > 0.004) {
+    vec2 uv = d.xz / (d.y + 0.14);
+    uv = vec2(uv.x * 1.25 + uTime * 0.004, uv.y * 0.32 + uTime * 0.0025);
+    float n = fbm(uv * 1.3);
+    float n2 = fbm(uv * 3.4 + 7.0);
+    float cover = smoothstep(0.52, 0.8, n + (n2 - 0.5) * 0.25);
+    cover *= smoothstep(0.012, 0.09, d.y) * (1.0 - smoothstep(0.3, 0.7, d.y));
+    vec3 lit = mix(uCloudLit, uCloudGold, s) + uGlow * pow(m, 7.0) * 0.9;
+    float shade = clamp(0.25 + (n2 - 0.35) * 1.4, 0.0, 1.0);
+    vec3 cc = mix(uCloudDark, lit, shade);
+    col = mix(col, cc, cover * 0.88);
+    cloudA = cover;
+  }
+  if (withSun > 0.5) {
+    float sunR = 0.043;
+    float ang = acos(clamp(mu, -1.0, 1.0));
+    float disc = 1.0 - smoothstep(sunR - 0.0022, sunR, ang);
+    float r = clamp(ang / sunR, 0.0, 1.0);
+    vec3 sc = mix(uSunCore, uSunEdge, r * r) * (5.2 - 2.2 * r * r);
+    col = mix(col, sc, disc * (1.0 - cloudA * 0.5));
+  }
+  if (d.y < 0.0) col = mix(col, hor * 0.8, smoothstep(0.0, -0.2, d.y));
+  return col;
+}
+`;
+const skyUniforms = {
+  uSunDir: { value: sunDir },
+  uTime: { value: 0 },
+  uZenA: { value: new THREE.Color('#6a4486') }, uZenB: { value: new THREE.Color('#2a2152') },
+  uMidA: { value: new THREE.Color('#ff8a5a') }, uMidB: { value: new THREE.Color('#a85a96') },
+  uHorA: { value: new THREE.Color('#ffc65e') }, uHorB: { value: new THREE.Color('#f39aa8') },
+  uGlow: { value: new THREE.Color('#ff9440') },
+  uSunCore: { value: new THREE.Color('#ffb648') }, uSunEdge: { value: new THREE.Color('#ff6414') },
+  uCloudLit: { value: new THREE.Color('#ff9c98') }, uCloudGold: { value: new THREE.Color('#ffd08a') },
+  uCloudDark: { value: new THREE.Color('#5e3e72') }
+};
+const sky = new THREE.Mesh(
+  new THREE.SphereGeometry(1000, 48, 24),
+  new THREE.ShaderMaterial({
+    uniforms: skyUniforms,
+    vertexShader: /* glsl */`
+      varying vec3 vDir;
+      void main(){
+        vDir = position;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: SKY_GLSL + /* glsl */`
+      varying vec3 vDir;
+      void main(){ gl_FragColor = vec4(skyColor(vDir, 1.0, 1.0), 1.0); }`,
+    side: THREE.BackSide, depthWrite: false
+  })
+);
+sky.renderOrder = -1000;
+sky.frustumCulled = false;
+scene.add(sky);
+
+/* ================= 程序化像素贴图图集 ================= */
+const TILE = 16, GUT = 4, SLOT = TILE + GUT * 2;
+const T = { GRASS_TOP: 0, GRASS_SIDE: 1, DIRT: 2, SAND: 3, STONE: 4, LOG_SIDE: 5, LOG_TOP: 6, LEAVES: 7, LEAVES_AUT: 8, GRAVEL: 9 };
+const NT = 10;
+const atlasTex = (() => {
+  const W = SLOT * NT, H = SLOT;
+  const cv = document.createElement('canvas'); cv.width = W; cv.height = H;
+  const ctx = cv.getContext('2d');
+  const img = ctx.createImageData(W, H);
+  const mul = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+  const r = () => rand();
+  const gen = {
+    [T.GRASS_TOP]: () => {
+      const base = [104, 170, 64];
+      return (x, y) => r() < 0.12 ? mul([78, 140, 50], 0.9 + r() * 0.2) : r() < 0.08 ? mul([140, 196, 80], 1) : mul(base, 0.86 + r() * 0.24);
+    },
+    [T.DIRT]: () => (x, y) => r() < 0.14 ? mul([102, 70, 46], 0.9 + r() * 0.2) : r() < 0.06 ? [168, 126, 88] : mul([138, 94, 62], 0.85 + r() * 0.25),
+    [T.SAND]: () => (x, y) => r() < 0.1 ? [214, 188, 138] : mul([232, 210, 160], 0.93 + r() * 0.1),
+    [T.STONE]: () => (x, y) => r() < 0.16 ? mul([98, 98, 106], 0.9 + r() * 0.2) : mul([134, 134, 140], 0.86 + r() * 0.2),
+    [T.LOG_SIDE]: () => {
+      const col = [...Array(TILE)].map(() => 0.78 + r() * 0.3);
+      return (x, y) => mul([112, 80, 50], col[x] * (0.92 + r() * 0.12));
+    },
+    [T.LOG_TOP]: () => (x, y) => {
+      const d = Math.hypot(x - 7.5, y - 7.5);
+      if (d > 6.6) return mul([100, 72, 44], 0.85 + r() * 0.2);
+      return mul(Math.floor(d) % 2 ? [168, 128, 82] : [190, 150, 98], 0.94 + r() * 0.1);
+    },
+    [T.LEAVES]: () => (x, y) => r() < 0.17 ? mul([34, 88, 30], 0.85 + r() * 0.3) : r() < 0.07 ? [110, 178, 70] : mul([62, 138, 48], 0.78 + r() * 0.34),
+    [T.LEAVES_AUT]: () => (x, y) => r() < 0.17 ? mul([150, 62, 34], 0.85 + r() * 0.3) : r() < 0.08 ? [246, 176, 80] : mul([216, 116, 50], 0.8 + r() * 0.3),
+    [T.GRAVEL]: () => (x, y) => r() < 0.25 ? mul([92, 84, 80], 0.9 + r() * 0.2) : mul([128, 118, 106], 0.85 + r() * 0.25)
+  };
+  const tiles = [];
+  for (let k = 0; k < NT; k++) {
+    const px = [];
+    if (k === T.GRASS_SIDE) {
+      const g = gen[T.GRASS_TOP](), d = gen[T.DIRT]();
+      const depth = [...Array(TILE)].map(() => 3 + (r() < 0.5 ? 1 : 0) + (r() < 0.25 ? 1 : 0));
+      for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) px.push(y < depth[x] ? mul(g(x, y), y === depth[x] - 1 ? 0.82 : 1) : d(x, y));
+    } else {
+      const f = gen[k]();
+      for (let y = 0; y < TILE; y++) for (let x = 0; x < TILE; x++) px.push(f(x, y));
+    }
+    tiles.push(px);
+  }
+  // 每块贴图四周用环绕像素填充边距，避免 mipmap 串色
+  for (let k = 0; k < NT; k++) {
+    for (let y = 0; y < SLOT; y++) for (let x = 0; x < SLOT; x++) {
+      const tx = ((x - GUT) % TILE + TILE) % TILE, ty = ((y - GUT) % TILE + TILE) % TILE;
+      const c = tiles[k][ty * TILE + tx];
+      const o = (y * W + k * SLOT + x) * 4;
+      img.data[o] = clamp(c[0], 0, 255); img.data[o + 1] = clamp(c[1], 0, 255); img.data[o + 2] = clamp(c[2], 0, 255); img.data[o + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
+  return tex;
+})();
+const ATLAS_W = SLOT * NT;
+const tileU0 = k => (k * SLOT + GUT) / ATLAS_W, tileU1 = k => (k * SLOT + GUT + TILE) / ATLAS_W;
+const TILE_V0 = GUT / SLOT, TILE_V1 = (GUT + TILE) / SLOT;
+
+/* ================= 程序化地形 ================= */
+// 方块类型
+const B = { AIR: 0, GRASS: 1, DIRT: 2, SAND: 3, STONE: 4, LOG: 5, LEAVES: 6, LEAVES_AUT: 7, GRAVEL: 8 };
+const vox = new Uint8Array(N * YS * N);
+const vi = (x, y, z) => (y * N + z) * N + x;
+const heights = new Uint8Array(N * N);   // 每列顶面高度（方块数）
+
+for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
+  const x = ix - HALF + 0.5, z = iz - HALF + 0.5;
+  const r = Math.hypot(x, z * 1.12);
+  const n = fbm2(x * 0.028 + 3.1, z * 0.028 - 8.4);
+  const land = 1 - r / 40 + n * 0.55;
+  let h;
+  if (land < 0) h = SEA - 0.6 + land * 18;
+  else {
+    const hill = fbm2(x * 0.055 + 31, z * 0.055 - 17) * 0.5 + 0.5;
+    const ridge = 1 - Math.abs(fbm2(x * 0.04 - 11, z * 0.04 + 5, 4));
+    h = SEA + 0.4 + land * 7 + smoothstep(0.12, 0.55, land) * (hill * 9 + ridge * ridge * 10);
+  }
+  heights[iz * N + ix] = clamp(Math.floor(h), 1, YS - 12);
+}
+// 近海一座小礁岛，丰富构图
+for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
+  const x = ix - HALF + 0.5, z = iz - HALF + 0.5;
+  const d = Math.hypot(x - 36, z + 30) + noise2(x * 0.3, z * 0.3) * 1.5;
+  if (d < 6) heights[iz * N + ix] = Math.max(heights[iz * N + ix], Math.floor(SEA + 0.4 + (6 - d) * 0.7));
+}
+const colH = (x, z) => {
+  const ix = Math.floor(x + HALF), iz = Math.floor(z + HALF);
+  if (ix < 0 || iz < 0 || ix >= N || iz >= N) return 0;
+  return heights[iz * N + ix];
+};
+// 填充体素
+for (let iz = 0; iz < N; iz++) for (let ix = 0; ix < N; ix++) {
+  const H = heights[iz * N + ix];
+  const x = ix - HALF, z = iz - HALF;
+  const beachN = noise2(x * 0.12 + 40, z * 0.12);
+  let maxDiff = 0;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    const jx = ix + dx, jz = iz + dz;
+    if (jx >= 0 && jz >= 0 && jx < N && jz < N) maxDiff = Math.max(maxDiff, H - heights[jz * N + jx]);
+  }
+  for (let y = 0; y < H; y++) {
+    const fromTop = H - 1 - y;
+    let t;
+    if (H < SEA) t = fromTop < 2 ? (H < SEA - 4 ? B.GRAVEL : B.SAND) : B.STONE;
+    else if (H <= SEA + 1 || (H <= SEA + 2 && beachN > 0.1)) t = fromTop < 3 ? B.SAND : B.STONE;
+    else if (H > SEA + 19 || maxDiff >= 4) t = fromTop === 0 && maxDiff < 4 && H <= SEA + 21 ? B.GRASS : (fromTop < 2 && maxDiff < 4 ? B.DIRT : B.STONE);
+    else t = fromTop === 0 ? B.GRASS : fromTop < 4 ? B.DIRT : B.STONE;
+    vox[vi(ix, y, iz)] = t;
+  }
+}
+// 方块树林
+{
+  const taken = new Uint8Array(N * N);
+  const order = [...Array(N * N).keys()];
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  for (const id of order) {
+    const ix = id % N, iz = Math.floor(id / N);
+    if (ix < 3 || iz < 3 || ix > N - 4 || iz > N - 4) continue;
+    const H = heights[id];
+    if (vox[vi(ix, H - 1, iz)] !== B.GRASS || H < SEA + 2) continue;
+    const x = ix - HALF, z = iz - HALF;
+    const forest = fbm2(x * 0.07 + 50, z * 0.07 - 20, 3);
+    if (rand() > (forest > 0.02 ? 0.16 : 0.012)) continue;
+    let ok = true;
+    for (let dz = -2; dz <= 2 && ok; dz++) for (let dx = -2; dx <= 2; dx++) {
+      const k = (iz + dz) * N + ix + dx;
+      if (taken[k] || Math.abs(heights[k] - H) > 1) { ok = false; break; }
+    }
+    if (!ok) continue;
+    for (let dz = -2; dz <= 2; dz++) for (let dx = -2; dx <= 2; dx++) taken[(iz + dz) * N + ix + dx] = 1;
+    const th = 4 + Math.floor(rand() * 3);
+    const leaf = noise2(x * 0.09 - 9, z * 0.09 + 13) > 0.25 || rand() < 0.08 ? B.LEAVES_AUT : B.LEAVES;
+    for (let y = H; y < H + th; y++) vox[vi(ix, y, iz)] = B.LOG;
+    for (let dy = th - 2; dy <= th + 1; dy++) {
+      const rad = dy < th ? 2 : 1;
+      for (let dz = -rad; dz <= rad; dz++) for (let dx = -rad; dx <= rad; dx++) {
+        if (Math.abs(dx) === rad && Math.abs(dz) === rad && (dy === th + 1 || rand() < 0.55)) continue;
+        const y = H + dy;
+        if (y >= YS) continue;
+        const k = vi(ix + dx, y, iz + dz);
+        if (!vox[k]) vox[k] = leaf;
+      }
+    }
+  }
+}
+
+/* ================= 体素网格化：只生成可见面 + 顶点 AO ================= */
+const FACES = [
+  { n: [-1, 0, 0], c: [[0, 1, 0], [0, 0, 0], [0, 1, 1], [0, 0, 1]] },
+  { n: [1, 0, 0], c: [[1, 1, 1], [1, 0, 1], [1, 1, 0], [1, 0, 0]] },
+  { n: [0, -1, 0], c: [[1, 0, 1], [0, 0, 1], [1, 0, 0], [0, 0, 0]] },
+  { n: [0, 1, 0], c: [[0, 1, 1], [1, 1, 1], [0, 1, 0], [1, 1, 0]] },
+  { n: [0, 0, -1], c: [[1, 0, 0], [0, 0, 0], [1, 1, 0], [0, 1, 0]] },
+  { n: [0, 0, 1], c: [[0, 0, 1], [1, 0, 1], [0, 1, 1], [1, 1, 1]] }
+];
+function tileOf(t, fi) {
+  const top = fi === 3, bottom = fi === 2;
+  switch (t) {
+    case B.GRASS: return top ? T.GRASS_TOP : bottom ? T.DIRT : T.GRASS_SIDE;
+    case B.DIRT: return T.DIRT;
+    case B.SAND: return T.SAND;
+    case B.STONE: return T.STONE;
+    case B.LOG: return top || bottom ? T.LOG_TOP : T.LOG_SIDE;
+    case B.LEAVES: return T.LEAVES;
+    case B.LEAVES_AUT: return T.LEAVES_AUT;
+    default: return T.GRAVEL;
+  }
+}
+// 世界外视为实心（被深海覆盖），y<0 视为实心
+const solid = (x, y, z) => {
+  if (y < 0) return 1;
+  if (y >= YS) return 0;
+  if (x < 0 || z < 0 || x >= N || z >= N) return 1;
+  return vox[vi(x, y, z)] ? 1 : 0;
+};
+const AO_LEVEL = [0.4, 0.63, 0.83, 1.0];
+const terrainGeo = (() => {
+  const pos = [], nor = [], uv = [], col = [], idx = [];
+  let maxY = 0;
+  for (let i = 0; i < heights.length; i++) maxY = Math.max(maxY, heights[i]);
+  maxY = Math.min(YS, maxY + 10);
+  const ao = [0, 0, 0, 0];
+  for (let y = 0; y < maxY; y++) for (let z = 0; z < N; z++) for (let x = 0; x < N; x++) {
+    const t = vox[vi(x, y, z)];
+    if (!t) continue;
+    const tint = 0.93 + hash3(x, y, z) * 0.12;
+    // 草地大尺度色块（偏黄 / 偏绿）
+    const gw = t === B.GRASS ? noise2(x * 0.08, z * 0.08) : 0;
+    for (let fi = 0; fi < 6; fi++) {
+      const f = FACES[fi];
+      const nx = x + f.n[0], ny = y + f.n[1], nz = z + f.n[2];
+      if (solid(nx, ny, nz)) continue;
+      const axis = f.n[0] ? 0 : f.n[1] ? 1 : 2;
+      const ba = (axis + 1) % 3, ca = (axis + 2) % 3;
+      const tile = tileOf(t, fi);
+      const u0 = tileU0(tile), u1 = tileU1(tile);
+      const base = pos.length / 3;
+      for (let k = 0; k < 4; k++) {
+        const c = f.c[k];
+        // 顶点 AO：检查法线方向一层的两个侧邻与对角
+        const o = [nx, ny, nz];
+        const sb = c[ba] ? 1 : -1, sc = c[ca] ? 1 : -1;
+        const p1 = o.slice(); p1[ba] += sb;
+        const p2 = o.slice(); p2[ca] += sc;
+        const p3 = o.slice(); p3[ba] += sb; p3[ca] += sc;
+        const s1 = solid(p1[0], p1[1], p1[2]), s2 = solid(p2[0], p2[1], p2[2]), s3 = solid(p3[0], p3[1], p3[2]);
+        const a = s1 && s2 ? 0 : 3 - (s1 + s2 + s3);
+        ao[k] = a;
+        pos.push(x + c[0] - HALF, y + c[1], z + c[2] - HALF);
+        nor.push(f.n[0], f.n[1], f.n[2]);
+        let u, v;
+        if (axis === 0) { u = c[2]; v = c[1]; } else if (axis === 2) { u = c[0]; v = c[1]; } else { u = c[0]; v = c[2]; }
+        uv.push(u0 + (u1 - u0) * u, TILE_V0 + (TILE_V1 - TILE_V0) * v);
+        const l = AO_LEVEL[a] * tint;
+        col.push(l * (1 + gw * 0.08), l * (1 + gw * 0.02), l * (1 - gw * 0.12));
+      }
+      // 按 AO 选择对角线，避免各向异性瑕疵
+      if (ao[0] + ao[3] > ao[1] + ao[2]) idx.push(base, base + 1, base + 3, base, base + 3, base + 2);
+      else idx.push(base, base + 1, base + 2, base + 2, base + 1, base + 3);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  return g;
+})();
+const terrain = new THREE.Mesh(terrainGeo, new THREE.MeshLambertMaterial({ map: atlasTex, vertexColors: true }));
+terrain.castShadow = true;
+terrain.receiveShadow = true;
+scene.add(terrain);
+
+/* ================= 海面 Shader（菲涅尔天空反射 + 金色日光路 + 浅滩泡沫） ================= */
+const heightTex = new THREE.DataTexture(heights, N, N, THREE.RedFormat, THREE.UnsignedByteType);
+heightTex.minFilter = heightTex.magFilter = THREE.LinearFilter;
+heightTex.generateMipmaps = false;
+heightTex.needsUpdate = true;
+
+const waterUniforms = Object.assign({}, skyUniforms, {
+  uHeight: { value: heightTex },
+  uWaterY: { value: WATER_Y },
+  uWorldHalf: { value: HALF },
+  uDeep: { value: new THREE.Color('#1c1e46') },
+  uShallow: { value: new THREE.Color('#3f9f9c') },
+  uFoam: { value: new THREE.Color('#ffe6d2') },
+  uSunCol: { value: new THREE.Color('#ffa848') },
+  uFogD: { value: 0.0011 }
+});
+const water = new THREE.Mesh(
+  new THREE.PlaneGeometry(4200, 4200, 1, 1).rotateX(-Math.PI / 2),
+  new THREE.ShaderMaterial({
+    uniforms: waterUniforms,
+    vertexShader: /* glsl */`
+      varying vec3 vWorld;
+      void main(){
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vWorld = w.xyz;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }`,
+    fragmentShader: SKY_GLSL + /* glsl */`
+      uniform sampler2D uHeight;
+      uniform float uWaterY, uWorldHalf, uFogD;
+      uniform vec3 uDeep, uShallow, uFoam, uSunCol;
+      varying vec3 vWorld;
+      vec2 wv(vec2 p, vec2 d, float f, float a, float s){
+        return d * (a * f * cos(dot(d, p) * f + uTime * s));
+      }
+      vec2 waveGrad(vec2 p){
+        vec2 g = vec2(0.0);
+        g += wv(p, normalize(vec2(1.0, 0.3)), 0.32, 0.11, 1.1);
+        g += wv(p, normalize(vec2(0.7, -0.7)), 0.57, 0.06, 1.5);
+        g += wv(p, normalize(vec2(-0.3, 1.0)), 0.93, 0.034, 2.0);
+        g += wv(p, normalize(vec2(0.2, -1.0)), 1.61, 0.02, 2.7);
+        g += wv(p, normalize(vec2(-0.9, 0.45)), 2.73, 0.012, 3.4);
+        // 细碎噪声扰动，打破正弦的规律感
+        vec2 q = p * 0.8 + uTime * vec2(0.35, 0.22);
+        float n0 = vnoise(q), nx = vnoise(q + vec2(0.2, 0.0)), nz = vnoise(q + vec2(0.0, 0.2));
+        g += vec2(nx - n0, nz - n0) * 0.32;
+        return g;
+      }
+      void main(){
+        vec3 toCam = cameraPosition - vWorld;
+        float dist = length(toCam);
+        vec3 V = toCam / dist;
+        vec3 dirP = -V;
+        vec2 p = vWorld.xz;
+        float lod = 1.0 / (1.0 + dist * 0.006);
+        vec2 g = waveGrad(p) * mix(0.5, 1.0, lod);
+        vec3 N = normalize(vec3(-g.x, 1.0, -g.y));
+        float NV = max(dot(N, V), 0.0);
+        float F = 0.02 + 0.98 * pow(1.0 - NV, 5.0);
+        vec3 R = reflect(dirP, N);
+        R.y = abs(R.y) + 0.002;
+        vec3 refl = skyColor(R, 1.0, 1.0);
+
+        // 根据地形高度图求水深
+        vec2 huv = (p + uWorldHalf) / (2.0 * uWorldHalf);
+        float depth = 30.0;
+        if (huv.x > 0.0 && huv.y > 0.0 && huv.x < 1.0 && huv.y < 1.0) depth = uWaterY - texture2D(uHeight, huv).r * 255.0;
+        vec3 body = mix(uShallow, uDeep, smoothstep(0.3, 5.5, depth));
+        body += uSunCol * 0.05 * (1.0 - smoothstep(0.0, 3.0, depth));
+        vec3 col = mix(body, refl, F);
+
+        // 太阳高光
+        float mu = max(dot(R, uSunDir), 0.0);
+        col += uSunCol * (pow(mu, 1400.0) * 12.0 + pow(mu, 160.0) * 1.4 + pow(mu, 22.0) * 0.12);
+
+        // 浅滩泡沫
+        float foam = 1.0 - smoothstep(0.0, 1.2, depth);
+        foam *= 0.55 + 0.45 * sin(depth * 7.0 - uTime * 2.0 + vnoise(p * 0.7) * 6.0);
+        foam = clamp(foam, 0.0, 1.0) * step(-0.6, depth);
+        col = mix(col, uFoam * (0.75 + 0.25 * NV), foam * 0.75);
+
+        float alpha = mix(0.5, 1.0, smoothstep(0.2, 3.5, depth));
+        alpha = max(max(alpha, F), foam * 0.9);
+
+        // 远处融入地平线天空色
+        float fogF = 1.0 - exp(-dist * dist * uFogD * uFogD);
+        vec3 hz = skyColor(vec3(dirP.x, 0.012, dirP.z), 0.0, 0.0);
+        col = mix(col, hz, fogF * 0.92);
+        alpha = mix(alpha, 1.0, fogF);
+
+        // 通向地平线的金色日光路（按方位角集中，闪烁碎金）
+        vec2 hp = dirP.xz / max(length(dirP.xz), 1e-4);
+        float a = max(dot(hp, normalize(uSunDir.xz)), 0.0);
+        float roadW = mix(90.0, 700.0, smoothstep(30.0, 900.0, dist));
+        float road = pow(a, roadW) * smoothstep(8.0, 140.0, dist);
+        float gn = vnoise(p * 2.1 + uTime * vec2(1.1, -0.7)) * vnoise(p * 3.3 + uTime * vec2(-0.8, 0.9));
+        float glit = smoothstep(0.3, 0.72, gn + length(g) * 0.8);
+        col += uSunCol * road * (0.32 + glit * 3.2) * (0.6 + 0.4 * fogF);
+
+        gl_FragColor = vec4(col, alpha);
+      }`,
+    transparent: true
+  })
+);
+water.position.y = WATER_Y;
+water.renderOrder = 1;
+scene.add(water);
+
+/* ================= 海鸟剪影 ================= */
+const birds = [];
+const flock = new THREE.Group();
+scene.add(flock);
+{
+  const birdMat = new THREE.MeshBasicMaterial({ color: 0x2a1830, side: THREE.DoubleSide });
+  const wingGeo = new THREE.BufferGeometry();
+  wingGeo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, -0.25, 0, 0, 0.35, 1.25, 0, -0.05, 0, 0, -0.25, 1.25, 0, -0.05, 1.6, 0, -0.35], 3));
+  wingGeo.computeVertexNormals();
+  const bodyGeo = new THREE.BoxGeometry(0.16, 0.14, 0.8);
+  for (let i = 0; i < 9; i++) {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(bodyGeo, birdMat));
+    const wr = new THREE.Mesh(wingGeo, birdMat);
+    const wl = new THREE.Mesh(wingGeo, birdMat); wl.scale.x = -1;
+    g.add(wr, wl);
+    const side = i % 2 ? 1 : -1, rank = Math.ceil(i / 2);
+    g.position.set(side * rank * 2.3, rank * 0.35 + (rand() - 0.5) * 0.6, -rank * 2.1);
+    g.scale.setScalar(1.1);
+    flock.add(g);
+    birds.push({ g, wr, wl, phase: rand() * 6.28, base: g.position.clone() });
+  }
+}
+
+/* ================= 后期：辉光 ================= */
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+composer.setSize(window.innerWidth, window.innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.62, 0.7, 0.86);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ================= 相机控制：环绕俯瞰 ================= */
+const ORBIT_TARGET = new THREE.Vector3(6, 13, 0);
+{
+  // 开场机位：隔着小岛望向落日，竖屏时让太阳更居中
+  const viewAz = SUN_AZ - (camera.aspect < 1 ? 0.06 : 0.3);
+  const hd = camera.aspect < 0.8 ? 105 : 74;
+  camera.position.set(ORBIT_TARGET.x - Math.cos(viewAz) * hd, camera.aspect < 0.8 ? 34 : 28, ORBIT_TARGET.z - Math.sin(viewAz) * hd);
+}
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.copy(ORBIT_TARGET);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.enablePan = false;
+controls.minDistance = 22;
+controls.maxDistance = 190;
+controls.minPolarAngle = 0.35;
+controls.maxPolarAngle = 1.46;
+controls.rotateSpeed = 0.55;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.35;
+controls.update();
+
+/* ================= 滑翔模式：沿海岸线的电影镜头 ================= */
+const glidePath = (() => {
+  const M = 72, radii = [];
+  for (let i = 0; i < M; i++) {
+    const th = i / M * Math.PI * 2;
+    let r = 2;
+    while (r < 66 && colH(Math.cos(th) * r, Math.sin(th) * r) >= SEA) r += 0.5;
+    radii.push(r);
+  }
+  for (let pass = 0; pass < 3; pass++) {
+    const c = radii.slice();
+    for (let i = 0; i < M; i++) radii[i] = (c[(i + M - 1) % M] + c[i] * 2 + c[(i + 1) % M]) / 4;
+  }
+  const pts = radii.map((r, i) => {
+    const th = i / M * Math.PI * 2, rr = Math.min(r + 9, 62);
+    return new THREE.Vector3(Math.cos(th) * rr, WATER_Y + 7 + Math.sin(th * 3) * 2.2, Math.sin(th) * rr);
+  });
+  return new THREE.CatmullRomCurve3(pts, true, 'centripetal');
+})();
+const glideLen = glidePath.getLength();
+const GLIDE_SPEED = 6.5;
+let mode = 'orbit';          // orbit | toGlide | glide | toOrbit
+let glideU = 0, trans = 0, roll = 0;
+const startPos = new THREE.Vector3(), startQuat = new THREE.Quaternion();
+const savedPos = new THREE.Vector3(), savedTarget = new THREE.Vector3();
+const _p = new THREE.Vector3(), _a = new THREE.Vector3(), _look = new THREE.Vector3(), _in = new THREE.Vector3();
+const _t1 = new THREE.Vector3(), _t2 = new THREE.Vector3();
+const _m4 = new THREE.Matrix4(), _q = new THREE.Quaternion(), _qr = new THREE.Quaternion();
+const UP = new THREE.Vector3(0, 1, 0), FWD_Z = new THREE.Vector3(0, 0, 1);
+const ease = k => k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
+
+function glidePose(dt, outPos, outQuat) {
+  glidePath.getPointAt(glideU, outPos);
+  glidePath.getPointAt((glideU + 0.03) % 1, _a);
+  _in.set(-_a.x, 0, -_a.z).normalize();
+  _look.copy(_a).addScaledVector(_in, 10).add(_p.set(0, -3, 0));
+  _m4.lookAt(outPos, _look, UP);
+  outQuat.setFromRotationMatrix(_m4);
+  // 根据转弯曲率做轻微侧倾
+  glidePath.getTangentAt(glideU, _t1);
+  glidePath.getTangentAt((glideU + 0.02) % 1, _t2);
+  const turn = _t1.x * _t2.z - _t1.z * _t2.x;
+  roll += (clamp(-turn * 9, -0.32, 0.32) - roll) * Math.min(1, dt * 1.5);
+  outQuat.multiply(_qr.setFromAxisAngle(FWD_Z, roll));
+}
+function nearestU(pos) {
+  let best = 0, bd = Infinity;
+  for (let i = 0; i < 240; i++) {
+    const d = glidePath.getPointAt(i / 240, _p).distanceToSquared(pos);
+    if (d < bd) { bd = d; best = i / 240; }
+  }
+  return best;
+}
+const btn = document.getElementById('glideBtn');
+const hint = document.getElementById('hint');
+btn.addEventListener('click', () => {
+  if (mode === 'orbit' || mode === 'toOrbit') {
+    if (mode === 'orbit') { savedPos.copy(camera.position); savedTarget.copy(controls.target); }
+    controls.enabled = false;
+    controls.autoRotate = false;
+    glideU = nearestU(camera.position);
+    roll = 0;
+    startPos.copy(camera.position); startQuat.copy(camera.quaternion);
+    trans = 0; mode = 'toGlide';
+    btn.textContent = '返回环绕';
+    btn.classList.add('on');
+    hint.textContent = '滑翔中 · 沿海岸线飞行';
+  } else {
+    startPos.copy(camera.position); startQuat.copy(camera.quaternion);
+    trans = 0; mode = 'toOrbit';
+    btn.textContent = '滑翔模式';
+    btn.classList.remove('on');
+    hint.textContent = '拖动旋转 · 滚轮 / 双指缩放';
+  }
+});
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+const gPos = new THREE.Vector3(), gQuat = new THREE.Quaternion();
+const _dir = new THREE.Vector3(), _fc = new THREE.Vector3();
+renderer.shadowMap.needsUpdate = true;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.elapsedTime;
+  skyUniforms.uTime.value = time;
+
+  if (mode === 'orbit') {
+    // 面向落日时放慢环绕，多停留在最美的角度
+    camera.getWorldDirection(_dir);
+    const facing = _dir.x * sunDir.x + _dir.z * sunDir.z;
+    controls.autoRotateSpeed = 0.18 + 0.6 * (1 - clamp(facing, 0, 1));
+    controls.update();
+  } else if (mode === 'toGlide' || mode === 'glide') {
+    glideU = (glideU + dt * GLIDE_SPEED / glideLen) % 1;
+    glidePose(dt, gPos, gQuat);
+    if (mode === 'toGlide') {
+      trans = Math.min(1, trans + dt / 2.6);
+      const k = ease(trans);
+      camera.position.lerpVectors(startPos, gPos, k);
+      camera.quaternion.slerpQuaternions(startQuat, gQuat, k);
+      if (trans >= 1) mode = 'glide';
+    } else {
+      camera.position.copy(gPos);
+      camera.quaternion.copy(gQuat);
+    }
+  } else if (mode === 'toOrbit') {
+    trans = Math.min(1, trans + dt / 2.4);
+    const k = ease(trans);
+    _m4.lookAt(savedPos, savedTarget, UP);
+    _q.setFromRotationMatrix(_m4);
+    camera.position.lerpVectors(startPos, savedPos, k);
+    camera.quaternion.slerpQuaternions(startQuat, _q, k);
+    if (trans >= 1) {
+      camera.position.copy(savedPos);
+      controls.target.copy(savedTarget);
+      controls.enabled = true;
+      controls.autoRotate = true;
+      controls.update();
+      mode = 'orbit';
+    }
+  }
+
+  // 天空球跟随相机
+  sky.position.copy(camera.position);
+
+  // 海鸟：在落日一侧的海面上空盘旋
+  const ph = time * 0.045;
+  flock.position.set(34 + Math.cos(ph) * 22, 30 + Math.sin(time * 0.3) * 1.5, Math.sin(ph) * 30);
+  _fc.set(34 + Math.cos(ph + 0.05) * 22, flock.position.y, Math.sin(ph + 0.05) * 30);
+  flock.lookAt(_fc);
+  for (const b of birds) {
+    const f = Math.sin(time * 5.2 + b.phase);
+    b.wr.rotation.z = f * 0.55;
+    b.wl.rotation.z = -f * 0.55;
+    b.g.position.y = b.base.y - f * 0.08;
+  }
+
+  composer.render();
+}
+animate();
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  const pr = Math.min(window.devicePixelRatio, 2);
+  renderer.setPixelRatio(pr);
+  renderer.setSize(w, h);
+  composer.setPixelRatio(pr);
+  composer.setSize(w, h);
+});
+</script>
+<script src="../prompt-panel.js" data-id="sunset-voxel-kiro-opus"></script>
+</body>
+</html>

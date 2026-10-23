@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>卡冈图雅 · 引力透镜黑洞</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; color: #f3e9d6; }
+  canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+  #panel {
+    position: fixed; top: 14px; right: 14px; z-index: 10; width: 232px;
+    background: rgba(12, 9, 6, 0.62); border: 1px solid rgba(255, 196, 120, 0.22);
+    border-radius: 12px; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    font-size: 13px; user-select: none; -webkit-user-select: none;
+  }
+  #panel .ph {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 13px; cursor: pointer; font-weight: 700; letter-spacing: 1px; color: #ffd9a0;
+  }
+  #panel .ph span { font-size: 16px; line-height: 1; opacity: .8; }
+  #panel .pb { padding: 2px 13px 12px; }
+  #panel.folded .pb { display: none; }
+  #panel label { display: block; margin: 8px 0 2px; }
+  #panel .row { display: flex; justify-content: space-between; }
+  #panel b { font-weight: 600; color: #ffc27a; font-variant-numeric: tabular-nums; }
+  #panel input[type=range] { width: 100%; margin: 5px 0 0; accent-color: #ff9d3c; cursor: pointer; }
+  #panel .sw { display: flex; align-items: center; gap: 8px; margin-top: 12px; cursor: pointer; }
+  #panel .sw input { width: 16px; height: 16px; accent-color: #ff9d3c; cursor: pointer; }
+  #caption {
+    position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 5;
+    max-width: min(92vw, 760px); text-align: center; pointer-events: none;
+    font-size: 12.5px; line-height: 1.6; color: rgba(255, 236, 205, 0.86);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); letter-spacing: .5px;
+    transition: opacity .4s ease;
+  }
+  @media (max-width: 600px) {
+    #panel { width: 184px; font-size: 12px; top: 56px; }
+    #caption { font-size: 11.5px; bottom: 10px; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:640px){#caption{bottom:64px}}</style>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div id="panel">
+  <div class="ph" id="panelHead">黑洞参数 <span id="fold">−</span></div>
+  <div class="pb">
+    <label><div class="row">黑洞质量 <b id="vMass">1.00</b></div>
+      <input type="range" id="mass" min="0.5" max="1.8" step="0.01" value="1"></label>
+    <label><div class="row">吸积盘亮度 <b id="vDisk">1.00</b></div>
+      <input type="range" id="disk" min="0.2" max="2.5" step="0.01" value="1"></label>
+    <label><div class="row">旋转速度 <b id="vSpeed">1.00</b></div>
+      <input type="range" id="speed" min="0" max="3" step="0.01" value="1"></label>
+    <label><div class="row">粒子数量 <b id="vCount">4000</b></div>
+      <input type="range" id="count" min="0" max="8000" step="100" value="4000"></label>
+    <label class="sw"><input type="checkbox" id="lens" checked> 透镜效果</label>
+  </div>
+</div>
+<div id="caption"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+/* ================= 参数 ================= */
+const params = { mass: 1.0, disk: 1.0, speed: 1.0, count: 4000, lens: true };
+const TS = 15.0;          // 开普勒角速度的视觉时间缩放（与 shader 保持一致）
+const R_OUT = 14.0;       // 吸积盘外半径（世界单位）
+const rsOf = () => params.mass;          // 史瓦西半径 rs
+const rinOf = () => 3.0 * params.mass;   // 最内稳定圆轨道 ISCO = 3 rs
+
+/* ================= 渲染器 / 相机 ================= */
+const maxPR = Math.min(window.devicePixelRatio || 1, 2);
+let pixelRatio = maxPR;
+const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance' });
+renderer.setPixelRatio(pixelRatio);
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 1);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.95;
+document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.05, 500);
+camera.position.set(-4.0, 3.0, 30.0);
+if (camera.aspect < 0.8) camera.position.setLength(46);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.05;
+controls.enablePan = false;
+controls.rotateSpeed = 0.55;
+controls.zoomSpeed = 0.7;
+controls.minDistance = 6;
+controls.maxDistance = 70;
+controls.autoRotate = true;
+controls.autoRotateSpeed = 0.25;
+controls.addEventListener('start', () => { controls.autoRotate = false; });
+
+// 吸积盘整体略微倾斜（粒子与 shader 共用同一个旋转）
+const diskGroup = new THREE.Group();
+diskGroup.rotation.set(0.0, 0.0, 0.09);
+scene.add(diskGroup);
+diskGroup.updateMatrixWorld(true);
+const tiltM3 = new THREE.Matrix3().setFromMatrix4(new THREE.Matrix4().makeRotationFromEuler(diskGroup.rotation));
+const tiltInvM3 = tiltM3.clone().transpose();
+
+/* ================= 引力透镜全屏后处理 Shader =================
+ * 每个像素从相机发射一条光线，在史瓦西度规的等效力 a = -1.5·rs·h²·x / r⁵ 下逐步积分弯曲。
+ * 光线穿过盘面（盘坐标系 y=0）时累积吸积盘发光，因此盘的背面会被弯折到黑洞上方/下方；
+ * 逃逸的光线采样程序化星空与银河，被捕获的光线为纯黑事件视界。
+ */
+const lensShader = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uInvProj: { value: new THREE.Matrix4() },
+    uCamWorld: { value: new THREE.Matrix4() },
+    uCamPos: { value: new THREE.Vector3() },
+    uTilt: { value: tiltM3.clone() },
+    uTiltInv: { value: tiltInvM3.clone() },
+    uRs: { value: 1.0 },
+    uRin: { value: 3.0 },
+    uRout: { value: R_OUT },
+    uLens: { value: 1.0 },
+    uDiskBright: { value: 1.0 },
+    uDiskTime: { value: 0.0 },
+    uTime: { value: 0.0 },
+    uPixAng: { value: 0.001 },
+    uAspect: { value: 1.0 }
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }
+  `,
+  fragmentShader: /* glsl */`
+    precision highp float;
+    uniform sampler2D tDiffuse;
+    uniform mat4 uInvProj, uCamWorld;
+    uniform vec3 uCamPos;
+    uniform mat3 uTilt, uTiltInv;
+    uniform float uRs, uRin, uRout, uLens, uDiskBright, uDiskTime, uTime, uPixAng, uAspect;
+    varying vec2 vUv;
+
+    #define MAX_STEPS 320
+    const float PI = 3.14159265;
+    const float TAU = 6.28318531;
+    const float TS = ${TS.toFixed(1)};
+
+    /* ---------- 哈希与噪声 ---------- */
+    float hash12(vec2 p) {
+      vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+      p3 += dot(p3, p3.yzx + 33.33);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+    float hash13(vec3 p3) {
+      p3 = fract(p3 * 0.1031);
+      p3 += dot(p3, p3.zyx + 31.32);
+      return fract((p3.x + p3.y) * p3.z);
+    }
+    // 角向周期的二维值噪声（避免 atan 接缝）
+    float pnoise(vec2 p, float per) {
+      vec2 i = floor(p), f = fract(p);
+      vec2 u = f * f * (3.0 - 2.0 * f);
+      float x0 = mod(i.x, per), x1 = mod(i.x + 1.0, per);
+      float a = hash12(vec2(x0, i.y)), b = hash12(vec2(x1, i.y));
+      float c = hash12(vec2(x0, i.y + 1.0)), d = hash12(vec2(x1, i.y + 1.0));
+      return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+    }
+    float pfbm(vec2 p, float per) {
+      float s = 0.0, a = 0.5;
+      for (int i = 0; i < 5; i++) { s += a * pnoise(p, per); p *= 2.0; p.y += 1.7; per *= 2.0; a *= 0.5; }
+      return s / 0.96875;
+    }
+    float vnoise3(vec3 p) {
+      vec3 i = floor(p), f = fract(p);
+      vec3 u = f * f * (3.0 - 2.0 * f);
+      float n000 = hash13(i), n100 = hash13(i + vec3(1,0,0));
+      float n010 = hash13(i + vec3(0,1,0)), n110 = hash13(i + vec3(1,1,0));
+      float n001 = hash13(i + vec3(0,0,1)), n101 = hash13(i + vec3(1,0,1));
+      float n011 = hash13(i + vec3(0,1,1)), n111 = hash13(i + vec3(1,1,1));
+      return mix(mix(mix(n000, n100, u.x), mix(n010, n110, u.x), u.y),
+                 mix(mix(n001, n101, u.x), mix(n011, n111, u.x), u.y), u.z);
+    }
+    float fbm3(vec3 p) {
+      float s = 0.0, a = 0.5;
+      for (int i = 0; i < 5; i++) { s += a * vnoise3(p); p = p * 2.03 + 11.7; a *= 0.5; }
+      return s / 0.96875;
+    }
+
+    /* ---------- 程序化星空 + 银河 ---------- */
+    vec3 starColor(float t) {
+      vec3 c = mix(vec3(1.0, 0.62, 0.38), vec3(1.0, 0.93, 0.82), smoothstep(0.0, 0.45, t));
+      return mix(c, vec3(0.68, 0.8, 1.0), smoothstep(0.55, 1.0, t));
+    }
+    vec3 starLayer(vec3 d, float scale, float density, float radius, float gain) {
+      vec3 c = floor(d * scale);
+      float h = hash13(c);
+      if (h > density) return vec3(0.0);
+      vec3 sp = vec3(hash13(c + 1.31), hash13(c + 7.13), hash13(c + 3.77)) * 0.7 + 0.15;
+      vec3 sd = normalize(c + sp);
+      float ang = length(d - sd);
+      // 像素级抗锯齿：星点不小于像素角尺寸，同时保持总光通量
+      float rEff = max(radius, uPixAng * 0.9);
+      float flux = (radius * radius) / (rEff * rEff);
+      float b = pow(hash13(c + 13.7), 5.0) * 4.0 + 0.15;
+      float tw = 0.85 + 0.15 * sin(uTime * (1.0 + 3.0 * hash13(c + 5.1)) + h * 40.0);
+      return starColor(hash13(c + 2.9)) * b * gain * flux * tw * exp(-(ang * ang) / (rEff * rEff));
+    }
+    vec3 sky(vec3 d) {
+      vec3 gn = normalize(vec3(0.28, 0.88, -0.38));            // 银河平面法线
+      vec3 gc = normalize(vec3(0.9, 0.05, 0.6));
+      gc = normalize(gc - gn * dot(gc, gn));                     // 银心方向
+      float b = dot(d, gn);
+      float n = fbm3(d * 3.2);
+      float dust = fbm3(d * 7.5 + 5.0);
+      float band = exp(-b * b * 16.0);
+      float core = exp(-max(1.0 - dot(d, gc), 0.0) * 3.2);
+      float lanes = smoothstep(0.46, 0.72, dust) * exp(-b * b * 90.0);
+      vec3 mw = mix(vec3(0.42, 0.52, 0.82), vec3(1.0, 0.74, 0.48), core);
+      mw *= band * (0.2 + 0.9 * n * n) * (0.55 + 1.6 * core);
+      mw *= 1.0 - 0.85 * lanes;
+      vec3 col = mw * 0.26;
+      // 极淡的星云
+      float neb1 = fbm3(d * 1.7 + 21.0), neb2 = fbm3(d * 2.3 - 9.0);
+      col += vec3(0.32, 0.08, 0.16) * pow(neb1, 4.0) * 0.35;
+      col += vec3(0.05, 0.12, 0.26) * pow(neb2, 4.0) * 0.35;
+      // 三层星点，银河带内更密
+      float dens = 1.0 + band * 1.6;
+      col += starLayer(d, 55.0, 0.22 * dens, 0.0016, 1.6);
+      col += starLayer(d, 130.0, 0.20 * dens, 0.0010, 0.9);
+      col += starLayer(d, 300.0, 0.14 * dens, 0.0007, 0.45 * (0.4 + band));
+      return col;
+    }
+
+    /* ---------- 吸积盘 ---------- */
+    float omegaK(float r) { return TS * sqrt(0.5 * uRs / (r * r * r)); }
+    vec3 diskColor(float t) {
+      vec3 c = mix(vec3(0.22, 0.015, 0.0), vec3(0.85, 0.18, 0.02), smoothstep(0.0, 0.32, t));
+      c = mix(c, vec3(1.0, 0.5, 0.12), smoothstep(0.28, 0.58, t));
+      c = mix(c, vec3(1.0, 0.82, 0.5), smoothstep(0.55, 0.84, t));
+      return mix(c, vec3(1.0, 0.97, 0.92), smoothstep(0.84, 1.0, t));
+    }
+    // 差速旋转 + 双相位流动贴图，避免纹理被无限剪切
+    float diskNoise(float r, float phi) {
+      float w = omegaK(max(r, uRin * 0.8));
+      const float P = 4.0;
+      float t1 = fract(uDiskTime / P), t2 = fract(uDiskTime / P + 0.5);
+      float lr = log(r) * 9.0;
+      float a1 = (phi - w * t1 * P) / TAU * 10.0;
+      float a2 = (phi - w * t2 * P) / TAU * 10.0 + 3.0;
+      float n1 = pfbm(vec2(a1, lr), 10.0);
+      float n2 = pfbm(vec2(a2, lr + 5.3), 10.0);
+      return mix(n1, n2, abs(1.0 - 2.0 * t1));
+    }
+    vec4 shadeDisk(vec3 p, float r, vec3 vel) {
+      float phi = atan(p.z, p.x);
+      float n = diskNoise(r, phi);
+      float inner = smoothstep(uRin * 0.82, uRin * 1.04, r);
+      float outer = 1.0 - smoothstep(uRout * 0.55, uRout, r);
+      float x = uRin / r;
+      // 多普勒集束 + 引力红移
+      vec3 vdir = normalize(vec3(-p.z, 0.0, p.x));
+      float beta = clamp(sqrt(0.5 * uRs / max(r - uRs, 0.05)), 0.0, 0.72);
+      float gam = inversesqrt(1.0 - beta * beta);
+      float cosT = dot(vdir, -normalize(vel));
+      float D = 1.0 / (gam * (1.0 - beta * cosT));
+      float g = sqrt(max(1.0 - uRs / r, 0.0));
+      float shift = D * g;
+      float T = clamp(pow(x, 0.85) * mix(0.72, 1.25, smoothstep(0.4, 1.6, shift)) * (0.85 + 0.3 * n), 0.0, 1.0);
+      float I = pow(x, 1.5) * (0.25 + 1.5 * n * n) * pow(shift, 3.0);
+      float streak = 0.75 + 0.5 * pnoise(vec2(phi / TAU * 40.0, r * 6.0 - uDiskTime * 0.2), 40.0);
+      vec3 col = diskColor(T) * I * streak * uDiskBright * 2.2;
+      float a = inner * outer * clamp(0.35 + 0.85 * n, 0.0, 1.0);
+      return vec4(col, a);
+    }
+
+    void main() {
+      vec2 ndc = vUv * 2.0 - 1.0;
+      vec4 vv = uInvProj * vec4(ndc, 1.0, 1.0);
+      vec3 dirW = normalize((uCamWorld * vec4(normalize(vv.xyz / vv.w), 0.0)).xyz);
+
+      // 转到盘坐标系积分（黑洞球对称，只需旋转一次）
+      vec3 pos = uTiltInv * uCamPos;
+      vec3 vel = uTiltInv * dirW;
+      vec3 hv = cross(pos, vel);
+      float h2 = dot(hv, hv);
+
+      vec3 diskCol = vec3(0.0);
+      float diskA = 0.0;
+      bool captured = false;
+      float minR = 1e9;
+
+      for (int i = 0; i < MAX_STEPS; i++) {
+        float r = length(pos);
+        minR = min(minR, r);
+        if (r < uRs) { captured = true; break; }
+        if (r > 80.0 && dot(pos, vel) > 0.0) break;
+        if (diskA > 0.995) break;
+        float dt = clamp(0.06 * r, 0.008, 3.0);
+        vec3 prev = pos;
+        float r2 = r * r;
+        vec3 acc = -1.5 * uRs * h2 * pos / (r2 * r2 * r) * uLens;
+        vel += acc * dt;
+        pos += vel * dt;
+        if (prev.y * pos.y < 0.0) {
+          float f = prev.y / (prev.y - pos.y);
+          vec3 hp = mix(prev, pos, f);
+          float hr = length(hp.xz);
+          if (hr > uRin * 0.82 && hr < uRout) {
+            vec4 dc = shadeDisk(hp, hr, vel);
+            diskCol += (1.0 - diskA) * dc.rgb * dc.a;
+            diskA += (1.0 - diskA) * dc.a;
+          }
+        }
+      }
+
+      vec3 col = diskCol;
+      if (!captured) {
+        col += (1.0 - diskA) * sky(normalize(uTilt * vel));
+        // 光子环：贴近光子球 1.5 rs 后逃逸的光线
+        float dr = max(minR - 1.5 * uRs, 0.0) / uRs;
+        float ring = exp(-dr / 0.035) * 1.6 + exp(-dr / 0.35) * 0.1;
+        col += vec3(1.0, 0.82, 0.58) * ring * uDiskBright * uLens * (1.0 - diskA * 0.6);
+      }
+
+      // 叠加环绕等离子体粒子层（已由视界遮挡体剔除背面粒子）
+      col += texture2D(tDiffuse, vUv).rgb;
+
+      // 电影感：暗角 + 轻微颗粒
+      vec2 q = ndc * vec2(uAspect, 1.0) * 0.55;
+      col *= 1.0 - 0.38 * smoothstep(0.35, 1.25, length(q));
+      col += (hash12(gl_FragCoord.xy + fract(uTime) * 517.0) - 0.5) * 0.012;
+      gl_FragColor = vec4(max(col, 0.0), 1.0);
+    }
+  `
+};
+
+/* ================= 环绕等离子体粒子 =================
+ * CPU 推进螺旋落入轨道（开普勒角速度 + 径向内流），每个粒子渲染 TRAIL 个拖尾点，
+ * 拖尾点在顶点着色器中按角速度回溯相位，形成轻微的弧形拖尾。
+ */
+const MAXP = 8000, TRAIL = 4;
+const pR = new Float32Array(MAXP), pPhi = new Float32Array(MAXP), pY = new Float32Array(MAXP), pSeed = new Float32Array(MAXP);
+const stateArr = new Float32Array(MAXP * TRAIL * 4);
+const trailArr = new Float32Array(MAXP * TRAIL);
+const seedArr = new Float32Array(MAXP * TRAIL);
+
+function spawn(i, anywhere) {
+  const rin = rinOf();
+  const lo = rin * 1.15, hi = 17.0;
+  const u = Math.random();
+  pR[i] = anywhere ? lo + (hi - lo) * Math.pow(u, 0.8) : hi - (hi - lo) * 0.35 * u;
+  pPhi[i] = Math.random() * Math.PI * 2;
+  // 近似高斯的薄层厚度
+  pY[i] = (Math.random() + Math.random() + Math.random() - 1.5) * 0.55;
+  pSeed[i] = Math.random();
+}
+for (let i = 0; i < MAXP; i++) {
+  spawn(i, true);
+  for (let k = 0; k < TRAIL; k++) {
+    trailArr[i * TRAIL + k] = k;
+    seedArr[i * TRAIL + k] = pSeed[i];
+  }
+}
+const pGeo = new THREE.BufferGeometry();
+pGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(MAXP * TRAIL * 3), 3));
+const stateAttr = new THREE.BufferAttribute(stateArr, 4);
+stateAttr.setUsage(THREE.DynamicDrawUsage);
+pGeo.setAttribute('aState', stateAttr);
+pGeo.setAttribute('aTrail', new THREE.BufferAttribute(trailArr, 1));
+pGeo.setAttribute('aSeed', new THREE.BufferAttribute(seedArr, 1));
+
+const pMat = new THREE.ShaderMaterial({
+  uniforms: {
+    uPR: { value: pixelRatio },
+    uScale: { value: 1 },
+    uLag: { value: 0.05 },
+    uRs: { value: 1 },
+    uRin: { value: 3 },
+    uBright: { value: 1 }
+  },
+  vertexShader: /* glsl */`
+    attribute vec4 aState;
+    attribute float aTrail;
+    attribute float aSeed;
+    uniform float uPR, uScale, uLag, uRs, uRin, uBright;
+    varying vec3 vCol;
+    varying float vA;
+    void main() {
+      float r = aState.x, phi = aState.y, y = aState.z, w = aState.w;
+      float ph = phi - w * aTrail * uLag;
+      vec3 p = vec3(r * cos(ph), y, r * sin(ph));
+      vec4 mv = modelViewMatrix * vec4(p, 1.0);
+      gl_Position = projectionMatrix * mv;
+      float x = clamp(uRin / r, 0.0, 1.6);
+      float size = (0.045 + 0.1 * fract(aSeed * 7.13)) * (1.0 - aTrail * 0.17);
+      gl_PointSize = clamp(size * uScale * uPR / -mv.z, 1.0, 40.0);
+      vec3 c = mix(vec3(1.0, 0.3, 0.05), vec3(1.0, 0.72, 0.38), smoothstep(0.22, 0.7, x));
+      c = mix(c, vec3(0.78, 0.87, 1.0), smoothstep(0.8, 1.3, x));
+      // 朝向观察者运动的一侧略亮（多普勒）
+      vec3 vdir = normalize((modelViewMatrix * vec4(-sin(ph), 0.0, cos(ph), 0.0)).xyz);
+      float dop = 1.0 + 0.45 * dot(vdir, normalize(-mv.xyz)) * clamp(x, 0.0, 1.0);
+      vCol = c * uBright * (0.35 + 0.9 * fract(aSeed * 3.7)) * dop * (0.6 + 0.8 * x);
+      vA = pow(1.0 - aTrail / 4.0, 1.5) * smoothstep(uRs * 1.02, uRs * 1.7, r);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    varying vec3 vCol;
+    varying float vA;
+    void main() {
+      float d = length(gl_PointCoord - 0.5);
+      float a = smoothstep(0.5, 0.0, d);
+      gl_FragColor = vec4(vCol, a * a * vA);
+    }
+  `,
+  transparent: true,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+const points = new THREE.Points(pGeo, pMat);
+points.frustumCulled = false;
+diskGroup.add(points);
+
+// 视界遮挡体：始终朝向相机的黑色圆片，只写深度，挡住阴影背后的粒子
+const occluder = new THREE.Mesh(
+  new THREE.CircleGeometry(1, 64),
+  new THREE.MeshBasicMaterial({ color: 0x000000, colorWrite: false })
+);
+occluder.renderOrder = -1;
+scene.add(occluder);
+
+function updateParticles(dt) {
+  const rs = rsOf(), rin = rinOf();
+  const sdt = dt * params.speed;
+  const n = params.count;
+  for (let i = 0; i < n; i++) {
+    let r = pR[i];
+    const w = TS * Math.sqrt(0.5 * rs / (r * r * r));
+    // 盘内缓慢内流；进入 ISCO 后快速螺旋坠落
+    const vr = r > rin ? -0.1 * (1 + 3 * Math.pow(rin / r, 3)) : -(0.9 + 2.5 * (rin - r) / rs);
+    r += vr * sdt;
+    pPhi[i] = (pPhi[i] + w * sdt) % (Math.PI * 2);
+    if (r < rs * 1.02) { spawn(i, false); r = pR[i]; }
+    pR[i] = r;
+    const flat = Math.min(1, Math.max(0, (r - rs) / (rin - rs)));
+    const y = pY[i] * (r / 10) * flat * (0.7 + 0.3 * Math.sin(pPhi[i] + pSeed[i] * 6.28));
+    for (let k = 0; k < TRAIL; k++) {
+      const o = (i * TRAIL + k) * 4;
+      stateArr[o] = r; stateArr[o + 1] = pPhi[i]; stateArr[o + 2] = y; stateArr[o + 3] = w;
+    }
+  }
+  pGeo.setDrawRange(0, n * TRAIL);
+  stateAttr.needsUpdate = true;
+}
+
+/* ================= 后处理链 ================= */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const lensPass = new ShaderPass(lensShader);
+composer.addPass(lensPass);
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.85, 0.55, 0.78);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+const LU = lensPass.uniforms;
+
+function applySize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(pixelRatio);
+  renderer.setSize(w, h);
+  composer.setPixelRatio(pixelRatio);
+  composer.setSize(w, h);
+  const tanHalf = Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+  pMat.uniforms.uScale.value = h / (2 * tanHalf);
+  pMat.uniforms.uPR.value = pixelRatio;
+  LU.uPixAng.value = (2 * tanHalf) / (h * pixelRatio);
+  LU.uAspect.value = w / h;
+}
+applySize();
+window.addEventListener('resize', applySize);
+
+/* ================= 控制面板 ================= */
+const $ = id => document.getElementById(id);
+function bindRange(id, key, label, digits) {
+  const el = $(id), out = $(label);
+  const sync = () => { params[key] = parseFloat(el.value); out.textContent = params[key].toFixed(digits); };
+  el.addEventListener('input', sync);
+  sync();
+}
+bindRange('mass', 'mass', 'vMass', 2);
+bindRange('disk', 'disk', 'vDisk', 2);
+bindRange('speed', 'speed', 'vSpeed', 2);
+bindRange('count', 'count', 'vCount', 0);
+$('lens').addEventListener('change', e => { params.lens = e.target.checked; });
+$('panelHead').addEventListener('click', () => {
+  const p = $('panel');
+  p.classList.toggle('folded');
+  $('fold').textContent = p.classList.contains('folded') ? '+' : '−';
+});
+if (window.innerWidth < 600) { $('panel').classList.add('folded'); $('fold').textContent = '+'; }
+
+/* ================= 底部现象说明 ================= */
+const caption = $('caption');
+let lastCaption = '';
+function updateCaption() {
+  const rs = rsOf();
+  const d = camera.position.length() / rs;
+  const elev = Math.abs(Math.asin(THREE.MathUtils.clamp(camera.position.y / camera.position.length(), -1, 1))) * 180 / Math.PI;
+  let t;
+  if (!params.lens) {
+    t = '透镜已关闭：光线沿直线传播，只剩一个扁平的吸积盘和很小的视界，盘的背面被黑洞挡住，看不到爱因斯坦环。';
+  } else if (elev > 55) {
+    t = '俯视视角：吸积盘接近正圆，背面的光被弯折成紧贴阴影的细环，外圈星光被拉成同心弧。';
+  } else if (d > 38) {
+    t = '远观：背景星空在黑洞周围轻微扭曲，盘的背面已被引力弯折，在阴影上下方露出明亮的光弧。';
+  } else if (d > 20) {
+    t = '中距离：上方光弧是吸积盘背面的像，下方更细的是次级像；朝向我们运动的一侧因多普勒集束更亮。';
+  } else if (d > 11) {
+    t = '近距离：星光被拉伸成爱因斯坦环，阴影边缘是绕黑洞转过半圈以上的光形成的细锐光子环。';
+  } else {
+    t = '极近：时空强烈弯曲，大半个天空被压缩进黑洞周围的环带，透镜扭曲达到最强。';
+  }
+  if (t !== lastCaption) { caption.textContent = t; lastCaption = t; }
+}
+
+/* ================= 主循环 ================= */
+const clock = new THREE.Clock();
+let elapsed = 0, diskTime = 0;
+let fpsAcc = 0, fpsFrames = 0, captionTimer = 1;
+
+function animate() {
+  requestAnimationFrame(animate);
+  const rawDt = clock.getDelta();
+  const dt = Math.min(rawDt, 0.05);
+  elapsed += dt;
+  diskTime += dt * params.speed;
+
+  const rs = rsOf(), rin = rinOf();
+  controls.minDistance = Math.max(6, 5.5 * rs);
+  controls.update();
+  camera.updateMatrixWorld();
+
+  updateParticles(dt);
+  pMat.uniforms.uRs.value = rs;
+  pMat.uniforms.uRin.value = rin;
+  pMat.uniforms.uBright.value = 0.55 + 0.45 * params.disk;
+  pMat.uniforms.uLag.value = 0.05 * params.speed;
+
+  // 遮挡体大小 ≈ 阴影半径（开启透镜时为临界碰撞参数 √27/2·rs）
+  occluder.scale.setScalar(params.lens ? 2.55 * rs : rs);
+  occluder.lookAt(camera.position);
+
+  LU.uInvProj.value.copy(camera.projectionMatrixInverse);
+  LU.uCamWorld.value.copy(camera.matrixWorld);
+  LU.uCamPos.value.copy(camera.position);
+  LU.uRs.value = rs;
+  LU.uRin.value = rin;
+  LU.uLens.value = params.lens ? 1 : 0;
+  LU.uDiskBright.value = params.disk;
+  LU.uDiskTime.value = diskTime;
+  LU.uTime.value = elapsed;
+
+  composer.render(dt);
+
+  captionTimer += dt;
+  if (captionTimer > 0.3) { captionTimer = 0; updateCaption(); }
+
+  // 自适应分辨率：帧率不足时降低像素比，保持流畅
+  fpsAcc += rawDt; fpsFrames++;
+  if (fpsAcc > 2) {
+    const fps = fpsFrames / fpsAcc;
+    if (fps < 45 && pixelRatio > 0.6) { pixelRatio = Math.max(0.6, pixelRatio - 0.25); applySize(); }
+    else if (fps > 58 && pixelRatio < maxPR) { pixelRatio = Math.min(maxPR, pixelRatio + 0.25); applySize(); }
+    fpsAcc = 0; fpsFrames = 0;
+  }
+}
+animate();
+</script>
+<script src="../prompt-panel.js" data-id="black-hole-kiro-opus"></script>
+</body>
+</html>

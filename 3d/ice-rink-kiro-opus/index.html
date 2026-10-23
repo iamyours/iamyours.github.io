@@ -1,0 +1,1381 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pixel Ice Rink</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#f3f5f8;--fg:#1b1f2a;--muted:#5d6678;--panel:rgba(255,255,255,.86);--line:#d4dae3;--btn:#fff;--btn-on:#1b1f2a;--btn-on-fg:#fff;--accent:#e8483f;--bar:#4689c4;--red:#e8483f;--blue:#4689c4}
+[data-theme=dark]{--bg:#0d0f15;--fg:#e8ecf3;--muted:#8e97aa;--panel:rgba(22,25,34,.88);--line:#2b3040;--btn:#171a24;--btn-on:#e8ecf3;--btn-on-fg:#0d0f15;--accent:#ff6f61;--bar:#6aaedf;--red:#ff6f61;--blue:#6aaedf}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 Inter,system-ui,sans-serif}
+body{overflow:hidden}
+#stage{position:fixed;inset:0}
+#stage canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#stage canvas:active{cursor:grabbing}
+header{position:fixed;left:20px;top:16px;pointer-events:none;max-width:340px}
+h1{margin:0;font:700 26px/1.05 Silkscreen,monospace;letter-spacing:1px}
+header p{margin:6px 0 0;color:var(--muted);font-size:12.5px}
+#score{position:fixed;top:14px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 18px;background:var(--panel);border:1px solid var(--line);border-radius:10px;backdrop-filter:blur(6px);font-family:Silkscreen,monospace;pointer-events:none}
+#score .main{display:flex;gap:12px;align-items:center;font-size:20px}
+#score .t{font-size:12px}
+#score .red{color:var(--red)} #score .blue{color:var(--blue)}
+#score small{font:500 11px Inter,sans-serif;color:var(--muted)}
+#clock{min-width:64px;text-align:center}
+#rail{position:fixed;right:14px;top:14px;bottom:14px;width:252px;overflow-y:auto;padding:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(6px)}
+.grp{margin-bottom:12px}
+.grp h3{font:400 11px Silkscreen,monospace;color:var(--muted);margin:0 0 6px;letter-spacing:.5px}
+.row{display:flex;gap:6px;flex-wrap:wrap}
+button{flex:1 1 auto;font:500 12px Inter,sans-serif;padding:7px 8px;border:1px solid var(--line);background:var(--btn);color:var(--fg);border-radius:7px;cursor:pointer;min-width:0}
+button:hover{border-color:var(--muted)}
+button.on{background:var(--btn-on);color:var(--btn-on-fg);border-color:var(--btn-on)}
+button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.bar{height:10px;border:1px solid var(--line);border-radius:5px;overflow:hidden;margin-top:4px}
+.bar i{display:block;height:100%;background:var(--bar);width:0;transition:width .3s}
+label{font-size:12px;color:var(--muted);display:flex;justify-content:space-between}
+input[type=range]{width:100%}
+#how{position:fixed;left:16px;bottom:16px;max-width:380px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 12px;backdrop-filter:blur(6px);font-size:12.5px}
+#how summary{font:400 12px Silkscreen,monospace;cursor:pointer}
+#how ol{padding-left:18px;margin:8px 0 2px}
+#how li{margin-bottom:4px;color:var(--muted)}
+@media (max-width:760px){
+  body{overflow-x:hidden;overflow-y:auto}
+  #stage{position:relative;height:64vh;width:100%}
+  header{position:absolute;left:12px;top:10px}
+  h1{font-size:18px}
+  header p{display:none}
+  #score{position:absolute;top:40px;padding:5px 12px}
+  #score .main{font-size:15px}
+  #rail{position:static;width:auto;margin:10px;max-height:none}
+  #how{position:static;margin:0 10px 16px;max-width:none}
+}
+</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js"}}</script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (min-width:761px){#rail{bottom:64px}}</style>
+<style>/* 避开左上角「← 返回 3D 作品」链接 */header{transform:translateY(44px)}@media (max-width:760px){#score{transform:translateX(-50%) translateY(44px)}}</style>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div id="stage"></div>
+<header><h1>Pixel Ice Rink</h1><p>A 3D diorama rendered as pixel art. Drag to turn, scroll or pinch to zoom, click the ice to drop a puck.</p></header>
+<div id="score" aria-live="polite">
+  <div class="main"><span class="t red">RED</span><b id="sH" class="red">0</b><span id="clock">5:00</span><b id="sA" class="blue">0</b><span class="t blue">BLUE</span></div>
+  <small id="shots">Shots 0 – 0</small><small id="status">Face-off</small>
+</div>
+<aside id="rail" aria-label="Controls">
+  <div class="grp"><h3>Light</h3><div class="row" data-group="light">
+    <button data-v="day" class="on">Day</button><button data-v="dusk">Dusk</button><button data-v="night">Night</button></div></div>
+  <div class="grp"><h3>Snow</h3><div class="row" data-group="snow">
+    <button data-v="0" class="on">Off</button><button data-v="1">Light</button><button data-v="2">Heavy</button></div></div>
+  <div class="grp"><h3>Game</h3><div class="row">
+    <button id="bResurf">Resurface the ice</button><button id="bDrop">Drop a puck</button>
+    <button id="bPause" aria-pressed="false">Pause</button><button id="bNew">New game</button></div>
+    <label style="margin-top:8px"><span>Ice worn</span><span id="wearTxt">0%</span></label><div class="bar"><i id="wearBar"></i></div></div>
+  <div class="grp"><h3>View</h3><div class="row">
+    <button id="bLeft">⟲ Turn left</button><button id="bRight">Turn right ⟳</button></div>
+    <div class="row" data-group="mode" style="margin-top:6px"><button data-v="pixel" class="on">Pixel art</button><button data-v="raw">Raw 3D</button></div>
+    <label style="margin-top:8px" for="pxSize"><span>Pixel size</span><span id="pxTxt">3</span></label>
+    <input id="pxSize" type="range" min="1" max="8" step="1" value="3">
+    <div class="row" style="margin-top:6px">
+      <button id="tPal" class="on" aria-pressed="true">Palette</button><button id="tDith" aria-pressed="false">Dither</button><button id="tOut" class="on" aria-pressed="true">Outlines</button></div></div>
+  <div class="grp"><h3>Theme</h3><div class="row" data-group="theme"><button data-v="light" class="on">Light</button><button data-v="dark">Dark</button></div></div>
+</aside>
+<details id="how"><summary>How it's drawn</summary><ol>
+  <li>An orthographic camera (31° up, 45° + 90° steps) renders the scene into a tiny target, about 480×300, with no anti-aliasing. The camera is snapped so the world origin lands on a whole pixel, so static things never shimmer.</li>
+  <li>The ice samples a second target holding the scene mirrored about the ice plane. Gloss rises on wet, fresh ice and drops where it is scratched.</li>
+  <li>A post pass darkens pixels that stand more than 0.55 m in front of a neighbour (depth outlines), then maps every pixel to the nearest of 49 winter colours in OKLab, with optional 4×4 Bayer dither.</li>
+  <li>The result is upscaled with texelFetch so every art pixel is an exact block of device pixels. Background pixels show the page colour.</li>
+  <li>Skaters are ~16 boxes placed every frame with two-bone IK for legs and arms. Their blades write scratches into a 20 px/m wear texture that the resurfacer wipes clean.</li>
+</ol></details>
+<script type="module">
+import * as THREE from 'three';
+const V3 = THREE.Vector3, UP = new V3(0, 1, 0);
+const $ = s => document.querySelector(s);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
+const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+const wrapA = a => { while (a > Math.PI) a -= Math.PI * 2; while (a < -Math.PI) a += Math.PI * 2; return a; };
+function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const srnd = mulberry32(20261023), sr = (a = 0, b = 1) => a + srnd() * (b - a);
+
+// ---------- 圆角矩形工具（冰场边界、路径） ----------
+const RA = 12, RB = 6, RR = 3;
+function rrSDF(x, z, a, b, r) {
+  const qx = Math.abs(x) - (a - r), qz = Math.abs(z) - (b - r);
+  return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r;
+}
+function rrNormal(x, z, a, b, r) {
+  const e = 0.01;
+  const nx = rrSDF(x + e, z, a, b, r) - rrSDF(x - e, z, a, b, r), nz = rrSDF(x, z + e, a, b, r) - rrSDF(x, z - e, a, b, r);
+  const l = Math.hypot(nx, nz) || 1; return [nx / l, nz / l];
+}
+// 沿圆角矩形周长采样，从 (-a,0) 出发
+function rrPath(a, b, r, step) {
+  const pts = [], c = [[-a + r, b - r], [a - r, b - r], [a - r, -(b - r)], [-a + r, -(b - r)]];
+  const segs = [{ L: [-a, 0, -a, b - r] }, { A: [c[0][0], c[0][1], Math.PI, Math.PI / 2] }, { L: [-a + r, b, a - r, b] },
+  { A: [c[1][0], c[1][1], Math.PI / 2, 0] }, { L: [a, b - r, a, -(b - r)] }, { A: [c[2][0], c[2][1], 0, -Math.PI / 2] },
+  { L: [a - r, -b, -a + r, -b] }, { A: [c[3][0], c[3][1], -Math.PI / 2, -Math.PI] }, { L: [-a, -(b - r), -a, 0] }];
+  const pt = (x, z) => { const [nx, nz] = rrNormal(x, z, a, b, Math.max(r, 0.01)); return { x, z, nx, nz }; };
+  for (const s of segs) {
+    if (s.L) {
+      const [x0, z0, x1, z1] = s.L, len = Math.hypot(x1 - x0, z1 - z0); if (len < 1e-6) continue;
+      const n = Math.max(1, Math.round(len / step));
+      for (let i = 0; i < n; i++) { const t = i / n; pts.push(pt(x0 + (x1 - x0) * t, z0 + (z1 - z0) * t)); }
+    } else {
+      const [cx, cz, a0, a1] = s.A, n = Math.max(1, Math.round(Math.abs(a1 - a0) * r / step));
+      for (let i = 0; i < n; i++) { const an = a0 + (a1 - a0) * i / n; pts.push(pt(cx + r * Math.cos(an), cz + r * Math.sin(an))); }
+    }
+  }
+  return pts;
+}
+
+// ---------- 49 色冬季调色板 ----------
+const PALETTE = ['#ffffff', '#f2f5f8', '#e1e8ef', '#c9d3de', '#aab6c4', '#8995a6', '#6a7486', '#4c5466', '#343a4a', '#22263a', '#14161f',
+  '#dff3ff', '#bfe3f7', '#94cdef', '#6aaedf', '#4689c4', '#2f63a0', '#234278',
+  '#ff8f80', '#e8483f', '#b8282f', '#7e1a27', '#4a1220',
+  '#fff3b0', '#ffd86a', '#f5a83a', '#d9822b', '#a85a28', '#7a3e22', '#52291a', '#f3c9a6', '#d79c78', '#a86e52',
+  '#9ccf8a', '#5f9e5c', '#3b7046', '#24503a', '#163428',
+  '#ffd0b0', '#f7a58f', '#e07f8e', '#b06a94', '#7e5a8f', '#c6a8d8', '#9d8ac0',
+  '#f0d26a', '#c9a640', '#94742a', '#5e4a22'];
+const s2l = c => c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+function hexSRGB(h) { const n = parseInt(h.replace('#', ''), 16); return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+function linToLab(r, g, b) {
+  let l = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b, m = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b, s = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  l = Math.cbrt(l); m = Math.cbrt(m); s = Math.cbrt(s);
+  return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s, 1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+}
+const palSRGB = PALETTE.map(h => new V3(...hexSRGB(h)));
+const palLab = PALETTE.map(h => { const c = hexSRGB(h).map(s2l); return new V3(...linToLab(...c)); });
+
+// ---------- 渲染器与渲染目标 ----------
+const stage = $('#stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.BasicShadowMap;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.appendChild(renderer.domElement);
+
+const view = { mode: 'pixel', pxCss: clamp(Math.round(innerWidth / 480), 2, 6), palette: true, dither: false, outline: true,
+  az: Math.PI / 4, azT: Math.PI / 4, zoom: 1, paused: false };
+let dpr = 1, devW = 1, devH = 1, block = 3, W = 1, H = 1, offX = 0, offY = 0;
+let rtMain = null, rtPost = null, rtRefl = null;
+const NEAR = 1, FAR = 260;
+
+const quadCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const quadGeo = new THREE.PlaneGeometry(2, 2);
+const VS = 'void main(){ gl_Position = vec4(position.xy, 0.0, 1.0); }';
+const postMat = new THREE.ShaderMaterial({
+  uniforms: { tCol: { value: null }, tDep: { value: null }, uPal: { value: palSRGB }, uLab: { value: palLab }, uBg: { value: new V3(1, 1, 1) },
+    uRange: { value: FAR - NEAR }, uPalOn: { value: 1 }, uDith: { value: 0 }, uOut: { value: 1 } },
+  vertexShader: VS,
+  fragmentShader: `
+  uniform sampler2D tCol; uniform sampler2D tDep; uniform vec3 uPal[49]; uniform vec3 uLab[49]; uniform vec3 uBg;
+  uniform float uRange, uPalOn, uDith, uOut;
+  vec3 toLab(vec3 c){
+    float l=0.4122214708*c.r+0.5363325363*c.g+0.0514459929*c.b;
+    float m=0.2119034982*c.r+0.6806995451*c.g+0.1073969566*c.b;
+    float s=0.0883024619*c.r+0.2817188376*c.g+0.6299787005*c.b;
+    l=pow(max(l,0.0),1.0/3.0); m=pow(max(m,0.0),1.0/3.0); s=pow(max(s,0.0),1.0/3.0);
+    return vec3(0.2104542553*l+0.7936177850*m-0.0040720468*s, 1.9779984951*l-2.4285922050*m+0.4505937099*s, 0.0259040371*l+0.7827717662*m-0.8086757660*s);
+  }
+  vec3 toSRGB(vec3 c){ c=clamp(c,0.0,1.0); return mix(c*12.92, 1.055*pow(c,vec3(1.0/2.4))-0.055, step(0.0031308,c)); }
+  float bayer(ivec2 p){
+    int i=(p.x&3)+((p.y&3)<<2);
+    float m[16]=float[16](0.,8.,2.,10.,12.,4.,14.,6.,3.,11.,1.,9.,15.,7.,13.,5.);
+    return (m[i]+0.5)/16.0;
+  }
+  void main(){
+    ivec2 p=ivec2(gl_FragCoord.xy); ivec2 sz=textureSize(tDep,0);
+    float d=texelFetch(tDep,p,0).r;
+    if(d>=0.99999){ gl_FragColor=vec4(uBg,1.0); return; }
+    vec3 c=texelFetch(tCol,p,0).rgb;
+    if(uOut>0.5){
+      float z=d*uRange, mx=0.0;
+      mx=max(mx, texelFetch(tDep,clamp(p+ivec2(1,0),ivec2(0),sz-1),0).r*uRange-z);
+      mx=max(mx, texelFetch(tDep,clamp(p+ivec2(-1,0),ivec2(0),sz-1),0).r*uRange-z);
+      mx=max(mx, texelFetch(tDep,clamp(p+ivec2(0,1),ivec2(0),sz-1),0).r*uRange-z);
+      mx=max(mx, texelFetch(tDep,clamp(p+ivec2(0,-1),ivec2(0),sz-1),0).r*uRange-z);
+      if(mx>0.55) c*=0.38;
+    }
+    float b=bayer(p)-0.5;
+    if(uPalOn>0.5){
+      vec3 lab=toLab(c);
+      if(uDith>0.5){ lab.x+=b*0.06; }
+      float best=1e9; vec3 bc=vec3(0.0);
+      for(int i=0;i<49;i++){ vec3 e=lab-uLab[i]; e.yz*=1.25; float q=dot(e,e); if(q<best){best=q; bc=uPal[i];} }
+      gl_FragColor=vec4(bc,1.0);
+    } else {
+      vec3 o=toSRGB(c); if(uDith>0.5) o=floor(o*12.0+b+0.5)/12.0;
+      gl_FragColor=vec4(o,1.0);
+    }
+  }`,
+  depthTest: false, depthWrite: false
+});
+const blitMat = new THREE.ShaderMaterial({
+  uniforms: { tPost: { value: null }, uOff: { value: new THREE.Vector2() }, uBlock: { value: 3 }, uBg: postMat.uniforms.uBg },
+  vertexShader: VS,
+  fragmentShader: `
+  uniform sampler2D tPost; uniform vec2 uOff; uniform float uBlock; uniform vec3 uBg;
+  void main(){
+    vec2 f=gl_FragCoord.xy-uOff; ivec2 p=ivec2(floor(f/uBlock)); ivec2 sz=textureSize(tPost,0);
+    if(f.x<0.0||f.y<0.0||p.x>=sz.x||p.y>=sz.y){ gl_FragColor=vec4(uBg,1.0); return; }
+    gl_FragColor=texelFetch(tPost,p,0);
+  }`,
+  depthTest: false, depthWrite: false
+});
+const postScene = new THREE.Scene(), blitScene = new THREE.Scene();
+const pq = new THREE.Mesh(quadGeo, postMat); pq.frustumCulled = false; postScene.add(pq);
+const bq = new THREE.Mesh(quadGeo, blitMat); bq.frustumCulled = false; blitScene.add(bq);
+
+function makeTargets() {
+  [rtMain, rtPost, rtRefl].forEach(t => { if (t) { if (t.depthTexture) t.depthTexture.dispose(); t.dispose(); } });
+  const nn = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, generateMipmaps: false };
+  rtMain = new THREE.WebGLRenderTarget(W, H, { ...nn, depthBuffer: true, depthTexture: new THREE.DepthTexture(W, H) });
+  rtPost = new THREE.WebGLRenderTarget(W, H, { ...nn, depthBuffer: false });
+  const rw = view.mode === 'pixel' ? W : devW, rh = view.mode === 'pixel' ? H : devH;
+  rtRefl = new THREE.WebGLRenderTarget(rw, rh, { ...nn, depthBuffer: true });
+  postMat.uniforms.tCol.value = rtMain.texture; postMat.uniforms.tDep.value = rtMain.depthTexture;
+  blitMat.uniforms.tPost.value = rtPost.texture;
+  iceU.uRefl.value = rtRefl.texture;
+}
+
+// ---------- 场景 ----------
+const scene = new THREE.Scene();
+const camera = new THREE.OrthographicCamera(-10, 10, 10, -10, NEAR, FAR);
+const BOX = new THREE.BoxGeometry(1, 1, 1);
+const matCache = new Map();
+function mat(hex) { if (!matCache.has(hex)) matCache.set(hex, new THREE.MeshLambertMaterial({ color: hex, flatShading: true })); return matCache.get(hex); }
+function addBox(parent, w, h, d, hex, x, y, z, ry = 0) {
+  const m = new THREE.Mesh(BOX, typeof hex === 'string' ? mat(hex) : hex);
+  m.scale.set(w, h, d); m.position.set(x, y, z); m.rotation.y = ry; parent.add(m); return m;
+}
+const C = { snow: '#f2f5f8', white: '#ffffff', red: '#e8483f', dred: '#b8282f', blue: '#4689c4', yellow: '#ffd86a', wood: '#a85a28',
+  dwood: '#7a3e22', dark: '#22263a', black: '#14161f', steel: '#c9d3de', grey: '#8995a6', skin: '#f3c9a6' };
+const glowMats = []; // 随光照变化的自发光材质
+function glowMat(dim, bright, key) { const m = new THREE.MeshBasicMaterial({ color: dim }); glowMats.push({ m, dim: new THREE.Color(dim), bright: new THREE.Color(bright), key }); return m; }
+
+// 光照
+const hemi = new THREE.HemisphereLight('#d6ebff', '#8f9db0', 1.5); scene.add(hemi);
+const sun = new THREE.DirectionalLight('#fff1dc', 2.7);
+sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -27, right: 27, top: 27, bottom: -27, near: 1, far: 120 });
+sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03;
+scene.add(sun, sun.target);
+
+// 漂浮地块：雪 / 土 / 岩
+const slab = new THREE.Group(); scene.add(slab);
+function raggedShape(a, b, r, amp, seed) {
+  const rnd = mulberry32(seed), pts = rrPath(a, b, r, 0.9), ph = [rnd() * 6, rnd() * 6, rnd() * 6], sh = new THREE.Shape();
+  pts.forEach((p, i) => {
+    const t = i / pts.length * Math.PI * 2;
+    const o = amp * (0.5 * Math.sin(t * 5 + ph[0]) + 0.3 * Math.sin(t * 11 + ph[1]) + 0.2 * Math.sin(t * 23 + ph[2])) + (rnd() - 0.5) * amp * 0.5;
+    const x = p.x + p.nx * o, y = -(p.z + p.nz * o);
+    i ? sh.lineTo(x, y) : sh.moveTo(x, y);
+  });
+  sh.closePath(); return sh;
+}
+function slabLayer(a, b, r, amp, seed, top, depth, hex) {
+  const g = new THREE.ExtrudeGeometry(raggedShape(a, b, r, amp, seed), { depth, bevelEnabled: false, curveSegments: 3 });
+  g.rotateX(-Math.PI / 2); g.translate(0, top - depth, 0);
+  const m = new THREE.Mesh(g, mat(hex)); slab.add(m); return m;
+}
+slabLayer(20, 14, 5, 0.6, 11, -0.02, 0.6, C.snow);
+slabLayer(19.7, 13.7, 5, 0.8, 12, -0.62, 1.2, '#7a3e22');
+slabLayer(19.1, 13.1, 5.5, 1.0, 13, -1.82, 1.6, '#6a7486');
+slabLayer(16, 10.5, 6, 1.4, 14, -3.42, 1.5, '#4c5466');
+slabLayer(11, 7, 5, 1.4, 15, -4.92, 1.4, '#343a4a');
+for (let i = 0; i < 9; i++) { // 底部垂挂岩块
+  const m = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 0), mat(i % 2 ? '#4c5466' : '#343a4a'));
+  const a = sr(0, Math.PI * 2), rr = sr(2, 8);
+  m.position.set(Math.cos(a) * rr * 1.3, sr(-6.6, -5.6), Math.sin(a) * rr * 0.8); m.scale.set(sr(1.2, 2.2), sr(1.4, 2.4), sr(1.2, 2));
+  m.rotation.set(sr(0, 3), sr(0, 3), 0); slab.add(m);
+}
+
+// 冰面标线：逐纹素绘制到 10 px/m 画布
+const markCanvas = document.createElement('canvas'); markCanvas.width = 240; markCanvas.height = 120;
+{
+  const ctx = markCanvas.getContext('2d'), img = ctx.createImageData(240, 120);
+  const col = { ice: hexSRGB('#e8f0f6'), red: hexSRGB('#e8483f'), blue: hexSRGB('#4689c4'), crease: hexSRGB('#94cdef') };
+  for (let j = 0; j < 120; j++) for (let i = 0; i < 240; i++) {
+    const x = (i + 0.5) / 10 - 12, z = (j + 0.5) / 10 - 6, ax = Math.abs(x);
+    let c = col.ice;
+    const cd = 10 - ax, cr = Math.hypot(cd, z);
+    if (cd >= 0 && cr < 1.2) c = col.crease;
+    if (cd >= 0 && Math.abs(cr - 1.2) < 0.06) c = col.red;
+    if (Math.abs(ax - 10) < 0.05) c = col.red;
+    if (Math.abs(ax - 4) < 0.15) c = col.blue;
+    const dc = Math.hypot(x, z); if (Math.abs(dc - 2.4) < 0.06 || dc < 0.16) c = col.blue;
+    if (ax < 0.15) c = col.red;
+    for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+      const d = Math.hypot(x - sx * 7, z - sz * 3); if (Math.abs(d - 1.9) < 0.06 || d < 0.2) c = col.red;
+      if (Math.hypot(x - sx * 3.2, z - sz * 3) < 0.16) c = col.red;
+    }
+    const k = (j * 240 + i) * 4; img.data[k] = c[0] * 255; img.data[k + 1] = c[1] * 255; img.data[k + 2] = c[2] * 255; img.data[k + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+}
+const markTex = new THREE.CanvasTexture(markCanvas);
+Object.assign(markTex, { flipY: false, colorSpace: THREE.SRGBColorSpace, magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter, generateMipmaps: false });
+
+// 冰面磨损纹理：R=划痕, G=湿润（20 px/m）
+const WW = 480, WH = 240, wear = new Uint8Array(WW * WH * 2), inside = new Uint8Array(WW * WH);
+let insideCount = 0, wearSum = 0, wearDirty = true;
+for (let j = 0; j < WH; j++) for (let i = 0; i < WW; i++) if (rrSDF((i + 0.5) / 20 - 12, (j + 0.5) / 20 - 6, RA, RB, RR) < 0) { inside[j * WW + i] = 1; insideCount++; }
+const wearTex = new THREE.DataTexture(wear, WW, WH, THREE.RGFormat, THREE.UnsignedByteType);
+wearTex.magFilter = wearTex.minFilter = THREE.NearestFilter; wearTex.needsUpdate = true;
+
+const iceU = { uRefl: { value: null }, uWear: { value: wearTex }, uRes: { value: new THREE.Vector2(1, 1) }, uGloss: { value: 0.12 } };
+const iceMat = new THREE.MeshLambertMaterial({ map: markTex });
+iceMat.onBeforeCompile = sh => {
+  Object.assign(sh.uniforms, iceU);
+  sh.fragmentShader = 'uniform sampler2D uRefl; uniform sampler2D uWear; uniform vec2 uRes; uniform float uGloss;\n' + sh.fragmentShader
+    .replace('#include <map_fragment>', `#include <map_fragment>
+      vec2 wv = texture2D(uWear, vMapUv).rg;
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82,0.86,0.9), clamp(wv.r*1.2,0.0,0.8));
+      diffuseColor.rgb *= 1.0 - 0.12*wv.g;`)
+    .replace('#include <opaque_fragment>', `#include <opaque_fragment>
+      vec3 refl = texture2D(uRefl, gl_FragCoord.xy / uRes).rgb;
+      float gl = clamp(uGloss + 0.55*wv.g - 0.18*wv.r, 0.02, 0.85);
+      gl_FragColor.rgb = mix(gl_FragColor.rgb, refl, gl);`);
+};
+const icePts = rrPath(RA, RB, RR, 0.25);
+const iceShape = new THREE.Shape(); icePts.forEach((p, i) => i ? iceShape.lineTo(p.x, -p.z) : iceShape.moveTo(p.x, -p.z));
+const iceGeo = new THREE.ShapeGeometry(iceShape, 2); iceGeo.rotateX(-Math.PI / 2);
+{ const pa = iceGeo.attributes.position, uv = iceGeo.attributes.uv; for (let i = 0; i < pa.count; i++) uv.setXY(i, (pa.getX(i) + 12) / 24, (pa.getZ(i) + 6) / 12); }
+const ice = new THREE.Mesh(iceGeo, iceMat); ice.receiveShadow = true; scene.add(ice);
+
+// 界墙：带缺口的分段（两个球员席门 + 一个双开浇冰车闸门）
+const isGap = (x, z) => (z > 5.5 && Math.abs(Math.abs(x) - 3) < 0.5) || (z < -5.5 && x > -9 && x < -6);
+const bsegs = [];
+for (let i = 0; i < icePts.length; i++) {
+  const p = icePts[i], q = icePts[(i + 1) % icePts.length], mx = (p.x + q.x) / 2, mz = (p.z + q.z) / 2;
+  if (isGap(mx, mz)) continue;
+  const [nx, nz] = rrNormal(mx, mz, RA, RB, RR);
+  bsegs.push({ x: mx + nx * 0.08, z: mz + nz * 0.08, yaw: Math.atan2(-(q.z - p.z), q.x - p.x), len: Math.hypot(q.x - p.x, q.z - p.z) + 0.03 });
+}
+const BL = [[0, 0.2, 0.16, C.yellow], [0.2, 1.0, 0.16, C.white], [1.0, 1.08, 0.24, C.red]]; // 踢脚板 / 白板 / 红色压顶
+for (const [y0, y1, th, hex] of BL) {
+  const im = new THREE.InstancedMesh(BOX, mat(hex), bsegs.length), o = new THREE.Object3D();
+  bsegs.forEach((s, i) => { o.position.set(s.x, (y0 + y1) / 2, s.z); o.rotation.set(0, s.yaw, 0); o.scale.set(s.len, y1 - y0, th); o.updateMatrix(); im.setMatrixAt(i, o.matrix); });
+  scene.add(im);
+}
+const doors = [];
+function makeDoor(hx, hz, closed, open, len) {
+  const g = new THREE.Group(); g.position.set(hx, 0, hz); g.rotation.y = closed; scene.add(g);
+  for (const [y0, y1, th, hex] of BL) addBox(g, len - 0.04, y1 - y0, th, hex, len / 2, (y0 + y1) / 2, 0);
+  const d = { g, closed, open, t: 0, target: 0 }; doors.push(d); return d;
+}
+const benchDoors = [makeDoor(-3.5, 6.08, 0, Math.PI / 2, 1), makeDoor(3.5, 6.08, Math.PI, Math.PI / 2, 1)];
+const gateDoors = [makeDoor(-9, -6.08, 0, Math.PI / 2, 1.5), makeDoor(-6, -6.08, Math.PI, Math.PI / 2, 1.5)];
+
+// 球门：红色门柱 + alpha 测试的网格球网
+const netCanvas = document.createElement('canvas'); netCanvas.width = netCanvas.height = 8;
+{ const c = netCanvas.getContext('2d'); c.fillStyle = '#fff'; c.fillRect(0, 0, 8, 1); c.fillRect(0, 0, 1, 8); }
+const netTex = new THREE.CanvasTexture(netCanvas);
+Object.assign(netTex, { wrapS: THREE.RepeatWrapping, wrapT: THREE.RepeatWrapping, magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter, generateMipmaps: false });
+const netMat = new THREE.MeshLambertMaterial({ map: netTex, alphaTest: 0.5, side: THREE.DoubleSide, color: '#f2f5f8' });
+function netPlane(g, w, h, x, y, z, rx, ry) {
+  const geo = new THREE.PlaneGeometry(w, h), uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * w * 7, uv.getY(i) * h * 7);
+  const m = new THREE.Mesh(geo, netMat); m.position.set(x, y, z); m.rotation.set(rx, ry, 0); g.add(m);
+}
+for (const gs of [1, -1]) {
+  const g = new THREE.Group(); g.position.set(gs * 10, 0, 0); g.rotation.y = gs > 0 ? 0 : Math.PI; scene.add(g);
+  for (const z of [-0.9, 0.9]) { addBox(g, 0.08, 1.2, 0.08, C.red, 0, 0.6, z); addBox(g, 1.0, 0.05, 0.05, C.red, 0.5, 0.03, z); addBox(g, 0.05, 1.2, 0.05, C.red, 1.0, 0.6, z); }
+  addBox(g, 0.08, 0.08, 1.88, C.red, 0, 1.2, 0); addBox(g, 0.05, 0.05, 1.8, C.red, 1.0, 0.03, 0); addBox(g, 0.05, 0.05, 1.8, C.red, 1.0, 1.2, 0);
+  netPlane(g, 1.8, 1.2, 1.0, 0.6, 0, 0, Math.PI / 2);
+  netPlane(g, 1.0, 1.2, 0.5, 0.6, 0.9, 0, 0); netPlane(g, 1.0, 1.2, 0.5, 0.6, -0.9, 0, 0);
+  netPlane(g, 1.0, 1.8, 0.5, 1.2, 0, -Math.PI / 2, 0);
+}
+
+// 球员席
+for (const sx of [-1, 1]) {
+  for (const cx of [sx * 1.6, sx * 4.6]) {
+    addBox(scene, 2.0, 0.08, 0.45, C.wood, cx, 0.46, 7.4); addBox(scene, 2.0, 0.4, 0.06, C.dwood, cx, 0.85, 7.62);
+    for (const lx of [-0.85, 0.85]) addBox(scene, 0.08, 0.46, 0.4, C.dwood, cx + lx, 0.23, 7.4);
+  }
+}
+
+// 计分牌：3×5 像素数字
+const DIG = ['111101101101111', '010110010010111', '111001111100111', '111001111001111', '101101111001001', '111100111001111', '111100111101111', '111001001001001', '111101111101111', '111101111001111'];
+const sbCanvas = document.createElement('canvas'); sbCanvas.width = 48; sbCanvas.height = 18;
+const sbTex = new THREE.CanvasTexture(sbCanvas);
+Object.assign(sbTex, { colorSpace: THREE.SRGBColorSpace, magFilter: THREE.NearestFilter, minFilter: THREE.NearestFilter, generateMipmaps: false });
+function drawDigit(c, d, x, y, col) { c.fillStyle = col; const s = DIG[d]; for (let k = 0; k < 15; k++) if (s[k] === '1') c.fillRect(x + k % 3, y + (k / 3 | 0), 1, 1); }
+function drawNum(c, n, x, y, col) { String(clamp(n, 0, 99)).padStart(2, '0').split('').forEach((ch, i) => drawDigit(c, +ch, x + i * 4, y, col)); }
+function drawScoreboard() {
+  const c = sbCanvas.getContext('2d');
+  c.fillStyle = '#14161f'; c.fillRect(0, 0, 48, 18); c.fillStyle = '#343a4a'; c.fillRect(0, 8, 48, 1);
+  drawNum(c, game.score[0], 2, 2, '#ff8f80'); drawNum(c, game.score[1], 39, 2, '#94cdef');
+  const t = Math.max(0, Math.ceil(game.clock)), m = Math.min(9, t / 60 | 0), s = t % 60;
+  drawDigit(c, m, 16, 2, '#ffd86a'); c.fillStyle = '#ffd86a'; c.fillRect(20, 3, 1, 1); c.fillRect(20, 5, 1, 1);
+  drawDigit(c, s / 10 | 0, 22, 2, '#ffd86a'); drawDigit(c, s % 10, 26, 2, '#ffd86a');
+  drawNum(c, game.shots[0], 2, 11, '#f0d26a'); drawNum(c, game.shots[1], 39, 11, '#f0d26a');
+  c.fillStyle = '#e8483f'; c.fillRect(15, 12, 7, 3); c.fillStyle = '#4689c4'; c.fillRect(26, 12, 7, 3);
+  sbTex.needsUpdate = true;
+}
+{
+  const g = new THREE.Group(); g.position.set(0, 0, -8.6); scene.add(g);
+  for (const x of [-2.3, 2.3]) addBox(g, 0.16, 2.8, 0.16, '#4c5466', x, 1.4, 0);
+  addBox(g, 5.2, 2.1, 0.3, C.dark, 0, 3.75, 0); addBox(g, 5.3, 0.1, 0.4, C.red, 0, 4.85, 0);
+  const face = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 1.8), new THREE.MeshBasicMaterial({ map: sbTex }));
+  face.position.set(0, 3.75, 0.16); g.add(face);
+}
+
+// 木屋（亮灯窗户 + 烟囱）
+const HUT = { x: 15.5, z: -9.6, hw: 2.3, hd: 1.8 };
+{
+  const g = new THREE.Group(); g.position.set(HUT.x, 0, HUT.z); scene.add(g);
+  const { hw, hd } = HUT;
+  for (let k = 0; k < 10; k++) {
+    const y = 0.15 + k * 0.3, hex = k % 2 ? '#a85a28' : '#7a3e22';
+    addBox(g, hw * 2 + 0.3, 0.28, 0.3, hex, 0, y, hd); addBox(g, hw * 2 + 0.3, 0.28, 0.3, hex, 0, y, -hd);
+    addBox(g, 0.3, 0.28, hd * 2 + 0.3, k % 2 ? '#7a3e22' : '#a85a28', hw, y, 0); addBox(g, 0.3, 0.28, hd * 2 + 0.3, k % 2 ? '#7a3e22' : '#a85a28', -hw, y, 0);
+  }
+  const win = glowMat('#343a4a', '#ffd86a', 'glow');
+  for (const x of [-1.3, 1.3]) { addBox(g, 0.95, 0.75, 0.05, win, x, 1.6, hd + 0.17); addBox(g, 1.1, 0.1, 0.12, C.snow, x, 1.17, hd + 0.2); }
+  addBox(g, 0.05, 0.7, 0.8, win, hw + 0.17, 1.6, 0);
+  addBox(g, 0.9, 1.9, 0.08, '#52291a', 0, 0.95, hd + 0.17);
+  const th = 0.62, half = hd + 0.6, ridge = 3.0 + half * Math.sin(th) * 0.95;
+  for (const sd of [1, -1]) {
+    const roof = addBox(g, hw * 2 + 0.9, 0.18, half, '#52291a', 0, ridge - half / 2 * Math.sin(th), sd * half / 2 * Math.cos(th));
+    roof.rotation.x = sd * th;
+    const sn = addBox(g, hw * 2 + 1.0, 0.16, half + 0.05, C.snow, 0, 0, 0);
+    sn.position.copy(roof.position).add(new V3(0, Math.cos(th) * 0.16, sd * Math.sin(th) * 0.16)); sn.rotation.x = sd * th;
+  }
+  const tri = new THREE.Shape(); tri.moveTo(-hd - 0.1, 0); tri.lineTo(hd + 0.1, 0); tri.lineTo(0, ridge - 3.0); tri.closePath();
+  const tg = new THREE.ExtrudeGeometry(tri, { depth: 0.3, bevelEnabled: false });
+  for (const sx of [-1, 1]) { const m = new THREE.Mesh(tg, mat('#7a3e22')); m.rotation.y = Math.PI / 2; m.position.set(sx * hw - 0.15, 3.0, 0); g.add(m); }
+  addBox(g, 0.5, 1.8, 0.5, '#8995a6', 1.3, 3.9, -0.7); addBox(g, 0.6, 0.12, 0.6, C.snow, 1.3, 4.85, -0.7);
+}
+const CHIMNEY = new V3(HUT.x + 1.3, 5.0, HUT.z - 0.7);
+
+// 浇冰车车库（开口朝向闸门 +z）
+const GAR = { x: -7.5, z: -10.6 };
+{
+  const g = new THREE.Group(); g.position.set(GAR.x, 0, GAR.z); scene.add(g);
+  addBox(g, 4.8, 2.8, 0.25, C.dred, 0, 1.4, -2.3);
+  for (const x of [-2.3, 2.3]) addBox(g, 0.25, 2.8, 4.8, C.dred, x, 1.4, 0);
+  addBox(g, 4.85, 0.6, 0.25, C.dred, 0, 2.5, 2.3); addBox(g, 4.9, 0.12, 0.3, C.snow, 0, 2.15, 2.35);
+  for (const x of [-2.2, 2.2]) addBox(g, 0.12, 2.2, 0.3, C.snow, x, 1.1, 2.35);
+  addBox(g, 5.2, 0.25, 5.2, '#4a1220', 0, 2.92, 0); addBox(g, 5.3, 0.22, 5.3, C.snow, 0, 3.15, 0);
+}
+
+// 浇冰车（局部 +x 为前方）
+const resurf = new THREE.Group(); scene.add(resurf);
+{
+  const g = resurf;
+  addBox(g, 2.6, 0.5, 1.5, C.snow, 0, 0.5, 0); addBox(g, 2.62, 0.09, 1.52, C.red, 0, 0.66, 0);
+  addBox(g, 1.5, 0.8, 1.5, C.blue, -0.4, 1.15, 0); addBox(g, 0.7, 0.45, 1.4, C.snow, 0.95, 0.97, 0);
+  addBox(g, 0.35, 0.5, 0.42, C.red, 0.5, 1.45, 0); addBox(g, 0.24, 0.24, 0.24, C.skin, 0.5, 1.84, 0); addBox(g, 0.27, 0.1, 0.27, C.blue, 0.5, 2.0, 0);
+  addBox(g, 0.05, 0.3, 0.3, C.dark, 0.78, 1.42, 0);
+  for (const x of [-0.8, 0.8]) for (const z of [-0.72, 0.72]) addBox(g, 0.5, 0.5, 0.22, C.black, x, 0.25, z);
+  addBox(g, 0.45, 0.32, 1.8, C.grey, -1.5, 0.18, 0);
+  addBox(g, 0.16, 0.16, 0.16, glowMat('#a85a28', '#f5a83a', 'beacon'), -0.4, 1.63, 0);
+}
+
+// 灯柱 + 点光源
+const lampGroup = new THREE.Group(); scene.add(lampGroup);
+const LAMPS = [[12.4, 6.6], [-12.4, 6.6], [-12.4, -6.6], [12.4, -6.6]];
+const lampLights = [];
+const lampLens = glowMat('#8995a6', '#fff3b0', 'lamp');
+for (const [x, z] of LAMPS) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); lampGroup.add(g);
+  addBox(g, 0.16, 5.0, 0.16, '#343a4a', 0, 2.5, 0); addBox(g, 0.3, 0.3, 0.3, '#343a4a', 0, 0.15, 0);
+  const ax = -Math.sign(x) * 0.5, az = -Math.sign(z) * 0.5;
+  addBox(g, 0.08, 0.08, 1.0, '#343a4a', ax / 2, 4.95, az / 2).rotation.y = Math.atan2(ax, az);
+  addBox(g, 0.42, 0.18, 0.42, C.dark, ax, 4.9, az); addBox(g, 0.32, 0.06, 0.32, lampLens, ax, 4.79, az);
+  const L = new THREE.PointLight('#ffd9a0', 0, 22, 2); L.position.set(x + ax, 4.55, z + az); scene.add(L); lampLights.push(L);
+}
+// 串灯
+const bulbCols = [['#7e1a27', '#ff8f80'], ['#5e4a22', '#ffd86a'], ['#234278', '#94cdef'], ['#24503a', '#9ccf8a']].map(([d, b]) => glowMat(d, b, 'str'));
+const wireMat = new THREE.LineBasicMaterial({ color: '#343a4a' });
+for (let i = 0; i < 4; i++) {
+  const [x0, z0] = LAMPS[i], [x1, z1] = LAMPS[(i + 1) % 4];
+  const len = Math.hypot(x1 - x0, z1 - z0), sag = len > 20 ? 1.4 : 0.9, pts = [];
+  const n = Math.round(len / 1.1);
+  for (let k = 0; k <= n; k++) {
+    const t = k / n, y = 4.7 - sag * 4 * t * (1 - t), p = new V3(lerp(x0, x1, t) * 0.97, y, lerp(z0, z1, t) * 0.96);
+    pts.push(p);
+    if (k > 0 && k < n) addBox(scene, 0.14, 0.18, 0.14, bulbCols[k % 4], p.x, p.y - 0.12, p.z);
+  }
+  scene.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), wireMat));
+}
+
+// 松树、雪堆、雪人
+function pine(x, z, s) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.scale.setScalar(s); g.rotation.y = sr(0, 6); scene.add(g);
+  addBox(g, 0.3, 0.8, 0.3, '#52291a', 0, 0.4, 0);
+  const tiers = [[1.3, 1.4, 0.6], [1.0, 1.25, 1.35], [0.7, 1.1, 2.05]];
+  tiers.forEach(([r, h, y], i) => {
+    const c = new THREE.Mesh(new THREE.ConeGeometry(r, h, 7), mat(i % 2 ? '#3b7046' : '#24503a')); c.position.y = y + h / 2; g.add(c);
+    const sn = new THREE.Mesh(new THREE.ConeGeometry(r * 0.55, h * 0.45, 7), mat(C.snow)); sn.position.y = y + h - h * 0.2; g.add(sn);
+  });
+}
+const blockers = [[HUT.x, HUT.z, 3.6], [GAR.x, GAR.z, 3.8], [0, -8.6, 3.2], [-3.2, 7.4, 3.2], [3.2, 7.4, 3.2], [15, 9.5, 1.6], [GAR.x, -7.2, 2.0], ...LAMPS.map(([x, z]) => [x, z, 1.2])];
+const pines = [];
+for (let tries = 0; tries < 800 && pines.length < 26; tries++) {
+  const x = sr(-19.5, 19.5), z = sr(-13.5, 13.5);
+  if (rrSDF(x, z, 19.2, 13.2, 5) > -0.8 || rrSDF(x, z, RA, RB, RR) < 2.4) continue;
+  if (blockers.some(([bx, bz, r]) => Math.hypot(x - bx, z - bz) < r)) continue;
+  if (pines.some(([px, pz]) => Math.hypot(x - px, z - pz) < 1.9)) continue;
+  pines.push([x, z]); pine(x, z, sr(0.75, 1.35));
+}
+const icoG = new THREE.IcosahedronGeometry(1, 0);
+for (let k = 0; k < 18; k++) {
+  const p = icePts[(k * 37 + 11) % icePts.length], off = sr(0.8, 1.6), x = p.x + p.nx * off, z = p.z + p.nz * off;
+  if (isGap(p.x, p.z) || Math.abs(Math.abs(x) - 3) < 3.5 && z > 5 || (x > -10 && x < -5 && z < -5) || blockers.some(([bx, bz, r]) => Math.hypot(x - bx, z - bz) < r * 0.8)) continue;
+  const m = new THREE.Mesh(icoG, mat(C.snow)); m.position.set(x, 0, z); m.scale.set(sr(0.9, 1.6), sr(0.35, 0.6), sr(0.7, 1.1)); m.rotation.y = sr(0, 6); scene.add(m);
+}
+{
+  const g = new THREE.Group(); g.position.set(15, 0, 9.5); g.rotation.y = -2.4; scene.add(g);
+  const sg = new THREE.IcosahedronGeometry(1, 1);
+  [[0.6, 0.55], [0.42, 1.38], [0.3, 1.98]].forEach(([r, y]) => { const m = new THREE.Mesh(sg, mat(C.white)); m.scale.setScalar(r); m.position.y = y; g.add(m); });
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 5), mat('#f5a83a')); nose.rotation.x = Math.PI / 2; nose.position.set(0, 1.98, 0.38); g.add(nose);
+  for (const x of [-0.1, 0.1]) addBox(g, 0.06, 0.06, 0.04, C.black, x, 2.06, 0.27);
+  addBox(g, 0.42, 0.05, 0.42, C.black, 0, 2.24, 0); addBox(g, 0.28, 0.3, 0.28, C.black, 0, 2.4, 0); addBox(g, 0.29, 0.06, 0.29, C.red, 0, 2.29, 0);
+  for (const s of [-1, 1]) { const a = addBox(g, 0.7, 0.05, 0.05, '#52291a', s * 0.65, 1.5, 0); a.rotation.z = s * 0.5; }
+  addBox(g, 0.5, 0.1, 0.46, C.red, 0, 1.75, 0);
+}
+
+// ---------- 球员骨架：约 16 个方块，每帧由朝向/倾斜/下蹲/转弯侧倾摆放 ----------
+const _x = new V3(), _y = new V3(), _z = new V3(), _m4 = new THREE.Matrix4(), _d = new V3(), _b = new V3();
+function placeBone(m, a, b, w, d, ref) {
+  _y.subVectors(b, a); const len = _y.length() || 1e-3; _y.divideScalar(len);
+  _x.crossVectors(_y, ref); if (_x.lengthSq() < 1e-6) _x.set(1, 0, 0).cross(_y); _x.normalize();
+  _z.crossVectors(_x, _y);
+  _m4.makeBasis(_x, _y, _z); m.quaternion.setFromRotationMatrix(_m4);
+  m.position.addVectors(a, b).multiplyScalar(0.5); m.scale.set(w, len, d);
+}
+function placeBox(m, c, fwd, up, w, h, d) {
+  _y.copy(up).normalize(); _z.copy(fwd).addScaledVector(_y, -fwd.dot(_y)).normalize(); _x.crossVectors(_y, _z);
+  _m4.makeBasis(_x, _y, _z); m.quaternion.setFromRotationMatrix(_m4); m.position.copy(c); m.scale.set(w, h, d);
+}
+// 两骨骼 IK：返回关节位置，target 超出可达范围时会被拉回
+function ik(a, t, l1, l2, bend, out) {
+  _d.subVectors(t, a); let d = _d.length(); _d.divideScalar(d || 1);
+  d = clamp(d, 0.05, l1 + l2 - 0.002); t.copy(a).addScaledVector(_d, d);
+  const x = (l1 * l1 - l2 * l2 + d * d) / (2 * d), h = Math.sqrt(Math.max(0, l1 * l1 - x * x));
+  _b.copy(bend).addScaledVector(_d, -bend.dot(_d)); if (_b.lengthSq() < 1e-6) _b.set(0, 1, 0); _b.normalize();
+  return out.copy(a).addScaledVector(_d, x).addScaledVector(_b, h);
+}
+const T = {}; ['f', 's', 'u', 'st', 'P', 'H', 'Tp', 'dT', 'hu', 'hc', 'A', 'K', 'hip', 'fy', 'bend', 'tmp', 'S', 'E', 'Hz', 'dn', 'top', 'h0', 'h1', 'td', 'vh']
+  .forEach(k => T[k] = new V3());
+let simTime = 0;
+
+class Rig {
+  constructor(p) {
+    const jersey = p.team ? '#4689c4' : '#e8483f', trim = p.team ? '#234278' : '#7e1a27', G = p.goalie;
+    this.g = new THREE.Group(); scene.add(this.g);
+    const mk = hex => { const m = new THREE.Mesh(BOX, mat(hex)); this.g.add(m); return m; };
+    this.pelvis = mk(C.dark); this.torso = mk(jersey); this.head = mk(C.skin); this.helmet = mk(G ? C.white : trim);
+    this.uarm = [mk(jersey), mk(jersey)]; this.farm = [mk(jersey), mk(jersey)];
+    this.glove = G ? [mk('#f0d26a'), mk(trim)] : [mk(trim), mk(trim)];
+    this.thigh = [mk(C.dark), mk(C.dark)]; this.shin = G ? [mk(C.white), mk(C.white)] : [mk('#343a4a'), mk('#343a4a')];
+    this.skate = [mk(C.black), mk(C.black)]; this.blade = [mk(C.steel), mk(C.steel)];
+    this.shaft = mk('#d9822b'); this.sblade = mk(C.black);
+    this.feet = [new V3(), new V3()]; this.lift = [0, 0];
+  }
+  pose(p) {
+    const { f, s, u, st, P, H, Tp, dT, hu, hc, A, K, hip, fy, bend, tmp, S, E, Hz, dn, top, h0, h1, td, vh } = T;
+    const G = p.goalie, bf = p.bf;
+    f.set(Math.cos(p.h), 0, Math.sin(p.h)); s.set(-Math.sin(p.h), 0, Math.cos(p.h));
+    const cr = Math.cos(p.roll), sn = Math.sin(p.roll);
+    u.set(0, cr, 0).addScaledVector(s, sn); st.copy(s).multiplyScalar(cr).addScaledVector(UP, -sn);
+    P.set(p.x, 0, p.z);
+    const hipH = G ? lerp(0.74, 0.42, bf) : 0.93 - 0.2 * p.crouch;
+    H.copy(P).addScaledVector(u, hipH).addScaledVector(f, -0.04);
+    const spd = Math.hypot(p.vx, p.vz); vh.set(p.vx, 0, p.vz); if (spd > 0.01) vh.divideScalar(spd);
+    const sb = p.stopB;
+    // 腿：滑行蹬冰（外推 + 外八）、滑行、侧身急停
+    for (let i = 0; i < 2; i++) {
+      const sg = i ? 1 : -1; let a, c, lift, yaw;
+      if (G) { a = lerp(0, -0.22, bf); c = sg * lerp(0.28, 0.56, bf); lift = 0; yaw = sg * lerp(0.25, 1.25, bf); }
+      else {
+        const ps = p.phase + (i ? 0 : Math.PI), sw = Math.sin(ps), str = p.str;
+        a = 0.2 * Math.cos(ps) * str + sg * 0.05 * (1 - str);
+        c = sg * (0.13 + 0.26 * Math.max(0, sw) * str);
+        lift = 0.09 * Math.max(0, -sw) * str; yaw = sg * 0.45 * Math.max(0, sw) * str;
+        a = lerp(a, sg * 0.1, sb); c = lerp(c, sg * 0.2, sb); lift *= 1 - sb; yaw *= 1 - sb;
+      }
+      A.copy(P).addScaledVector(f, a).addScaledVector(s, c).addScaledVector(UP, 0.1 + lift).addScaledVector(vh, 0.28 * sb);
+      hip.copy(H).addScaledVector(st, sg * 0.12);
+      fy.copy(f).multiplyScalar(Math.cos(yaw)).addScaledVector(s, Math.sin(yaw));
+      bend.copy(fy); if (G) bend.addScaledVector(UP, -0.3 * bf);
+      ik(hip, A, 0.46, 0.46, bend, K);
+      placeBone(this.thigh[i], hip, K, G ? 0.2 : 0.17, 0.19, fy);
+      placeBone(this.shin[i], K, A, G ? 0.3 : 0.13, G ? 0.24 : 0.14, fy);
+      tmp.copy(A).addScaledVector(fy, 0.07).addScaledVector(UP, -0.04); placeBox(this.skate[i], tmp, fy, UP, 0.11, 0.12, 0.32);
+      tmp.copy(A).addScaledVector(fy, 0.07).addScaledVector(UP, -0.12); placeBox(this.blade[i], tmp, fy, UP, 0.03, 0.04, 0.34);
+      this.feet[i].set(A.x, 0, A.z); this.lift[i] = lift;
+    }
+    // 躯干、头盔
+    const lean = (G ? 0.35 : 0.3 + 0.35 * p.crouch) - 0.25 * sb;
+    dT.copy(u).multiplyScalar(Math.cos(lean)).addScaledVector(f, Math.sin(lean));
+    Tp.copy(H).addScaledVector(dT, 0.55);
+    placeBox(this.pelvis, H, f, u, 0.36, 0.16, 0.24);
+    placeBone(this.torso, H, Tp, G ? 0.56 : 0.42, G ? 0.34 : 0.26, f);
+    hu.copy(dT).multiplyScalar(0.4).addScaledVector(UP, 0.6).normalize();
+    hc.copy(Tp).addScaledVector(hu, 0.16).addScaledVector(f, 0.04); placeBox(this.head, hc, f, hu, 0.2, 0.22, 0.22);
+    tmp.copy(hc).addScaledVector(hu, 0.08).addScaledVector(f, -0.02); placeBox(this.helmet, tmp, f, hu, 0.25, 0.13, 0.27);
+    // 球杆与手
+    const B = p.blade, L = G ? 1.25 : 1.45;
+    if (p.pose === 'celebrate') {
+      Hz.copy(Tp).addScaledVector(u, 0.5).addScaledVector(f, 0.12);
+      h0.copy(Hz).addScaledVector(s, -0.07); h1.copy(Hz).addScaledVector(s, 0.07);
+      B.copy(Hz).addScaledVector(UP, 0.95).addScaledVector(f, 0.35);
+      dn.subVectors(Hz, B).normalize(); top.copy(B).addScaledVector(dn, L);
+    } else {
+      if (G) Hz.copy(Tp).addScaledVector(f, 0.3).addScaledVector(dT, -0.25).addScaledVector(s, 0.2);
+      else Hz.copy(Tp).addScaledVector(f, 0.22).addScaledVector(dT, -0.18).addScaledVector(s, -0.08);
+      dn.subVectors(Hz, B).normalize(); top.copy(B).addScaledVector(dn, L);
+      h0.copy(B).addScaledVector(dn, L - 0.06); h1.copy(B).addScaledVector(dn, G ? 0.75 : 0.92);
+      if (G) h0.copy(Tp).addScaledVector(s, -0.45).addScaledVector(f, 0.25).addScaledVector(dT, -0.15 - 0.2 * bf);
+    }
+    for (let i = 0; i < 2; i++) {
+      const sg = i ? 1 : -1, hd = i ? h1 : h0;
+      S.copy(Tp).addScaledVector(dT, -0.06).addScaledVector(st, sg * 0.21);
+      bend.copy(st).multiplyScalar(sg * 0.6).addScaledVector(f, -0.3).addScaledVector(UP, -0.5);
+      ik(S, hd, 0.3, 0.3, bend, E);
+      placeBone(this.uarm[i], S, E, 0.12, 0.12, f); placeBone(this.farm[i], E, hd, 0.1, 0.1, f);
+      if (G) placeBox(this.glove[i], hd, f, UP, i ? 0.08 : 0.26, i ? 0.38 : 0.24, i ? 0.32 : 0.26);
+      else placeBox(this.glove[i], hd, f, UP, 0.11, 0.11, 0.13);
+    }
+    placeBone(this.shaft, B, top, 0.04, 0.04, f);
+    td.crossVectors(dn, UP); td.y = 0; if (td.lengthSq() < 1e-6) td.copy(f); td.normalize(); if (td.dot(f) < 0) td.negate();
+    tmp.copy(B).addScaledVector(td, 0.14); placeBox(this.sblade, tmp, td, UP, 0.025, G ? 0.1 : 0.07, G ? 0.36 : 0.3);
+  }
+}
+
+// 球员
+const players = [];
+let pid = 0;
+class Player {
+  constructor(team, goalie) {
+    Object.assign(this, { id: pid++, team, goalie, x: 0, z: 0, vx: 0, vz: 0, h: team ? Math.PI : 0, roll: 0, crouch: 0.4, phase: rand(0, 6),
+      str: 0, stop: 0, stopB: 0, stopVX: 0, stopVZ: 0, stopSide: 1, pose: 'carry', poseT: 0, blade: new V3(), cool: 0, bf: 0, bfT: 0,
+      tx: 0, tz: 0, maxS: 7, accel: 7, arrive: 1.8, sepR: 1.1, face: null, noBoards: false, path: null, pi: 0, action: null, hold: 0, think: 0,
+      prevFeet: [null, null], desSp: 0 });
+    this.rig = new Rig(this);
+    players.push(this);
+  }
+}
+const atk = t => t ? -1 : 1;           // 红队(0)进攻 +x，蓝队(1)进攻 -x
+for (const t of [0, 1]) { new Player(t, false); new Player(t, false); new Player(t, true); }
+const skaters = players.filter(p => !p.goalie), goalies = players.filter(p => p.goalie);
+const goalieOf = t => goalies.find(g => g.team === t);
+const mateOf = p => skaters.find(o => o.team === p.team && o !== p);
+
+function carrySpot(p, out) {
+  const f = Math.cos(p.h), g = Math.sin(p.h);
+  const side = 0.32 + (puck.owner === p ? Math.sin(simTime * 9 + p.id) * 0.2 : 0);
+  out.x = p.x + f * 0.72 - g * side; out.z = p.z + g * 0.72 + f * side; return out;
+}
+const _cs = { x: 0, z: 0 };
+// 球杆刃目标：持杆/运球、大力抽射引拍与击球、传球横扫
+function bladeTarget(p, out) {
+  const fx = Math.cos(p.h), fz = Math.sin(p.h), sx = -fz, sz = fx;
+  const at = (a, c, y) => out.set(p.x + fx * a + sx * c, y, p.z + fz * a + sz * c);
+  if (p.goalie) return at(0.5, 0.08, 0.03);
+  const k = p.poseT;
+  switch (p.pose) {
+    case 'windup': { const t = smooth(0, 0.42, k); return at(lerp(0.72, -0.45, t), lerp(0.32, 0.75, t), lerp(0.03, 1.05, t)); }
+    case 'strike': {
+      if (k < 0.1) { const t = k / 0.1; return at(lerp(-0.45, 0.6, t), lerp(0.75, 0.25, t), lerp(1.05, 0.03, t)); }
+      const t = smooth(0.1, 0.4, k); return at(lerp(0.6, 0.95, t), lerp(0.25, -0.1, t), lerp(0.03, 0.75, t));
+    }
+    case 'pass': { const t = smooth(0, 0.2, k); return at(lerp(-0.1, 0.85, t), lerp(0.55, 0.05, t), 0.03 + 0.25 * smooth(0.2, 0.45, k)); }
+    default: { carrySpot(p, _cs); return out.set(_cs.x, 0.03, _cs.z); }
+  }
+}
+
+// ---------- 冰球 ----------
+const PR = 0.1;
+const puck = { x: 0, z: 0, vx: 0, vz: 0, owner: null, inNet: 0, lastTeam: 0, shooter: null, shotT: 9,
+  mesh: new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.07, 8), mat(C.black)) };
+puck.mesh.position.y = 0.035; scene.add(puck.mesh);
+
+const game = { state: 'faceoff', t: 0, score: [0, 0], shots: [0, 0], clock: 300, sub: '', subT: 0, status: 'Face-off', scorer: 0 };
+const rs = { s: 0, wait: 0, active: false, path: [], cum: [], h: Math.PI / 2, x: GAR.x, z: GAR.z + 0.2 };
+
+// ---------- 转向：到达、分离、避开界墙与球门 ----------
+function movePlayer(p, dt) {
+  let dx = p.tx - p.x, dz = p.tz - p.z; const d = Math.hypot(dx, dz);
+  const sp = p.maxS * Math.min(1, d / p.arrive);
+  let dvx = d > 0.03 ? dx / d * sp : 0, dvz = d > 0.03 ? dz / d * sp : 0;
+  for (const o of players) {
+    if (o === p) continue;
+    const ex = p.x - o.x, ez = p.z - o.z, dd = Math.hypot(ex, ez);
+    if (dd < p.sepR && dd > 1e-4) { const k = (p.sepR - dd) / p.sepR * 3.2; dvx += ex / dd * k; dvz += ez / dd * k; }
+  }
+  if (!p.noBoards) {
+    const sd = rrSDF(p.x, p.z, RA, RB, RR);
+    const zone = p.chasing ? 0.45 : 1.2; // 追球时允许贴近界墙
+    if (sd > -zone) { const [nx, nz] = rrNormal(p.x, p.z, RA, RB, RR), k = (sd + zone) * 3; dvx -= nx * k; dvz -= nz * k; }
+    if (!p.goalie && !p.chasing) for (const g of [1, -1]) {
+      const cx = clamp(p.x, Math.min(g * 9.95, g * 11.1), Math.max(g * 9.95, g * 11.1)), cz = clamp(p.z, -1, 1);
+      const ex = p.x - cx, ez = p.z - cz, ed = Math.hypot(ex, ez);
+      if (ed < 0.9) { const k = (0.9 - ed) * 5; if (ed > 1e-3) { dvx += ex / ed * k; dvz += ez / ed * k; } else dvx -= g * k; }
+    }
+  }
+  const desSp = Math.hypot(dvx, dvz), spd = Math.hypot(p.vx, p.vz); p.desSp = desSp;
+  // 急停：大角度反向时侧身刹车
+  if (!p.goalie && p.stop <= 0 && spd > 3.6 && desSp > 0.5 && (dvx * p.vx + dvz * p.vz) / (desSp * spd) < -0.35) {
+    p.stop = 0.55; p.stopVX = p.vx / spd; p.stopVZ = p.vz / spd;
+    p.stopSide = (p.vx * dvz - p.vz * dvx) > 0 ? 1 : -1;
+  }
+  if (p.stop > 0) {
+    p.stop -= dt; const dec = Math.min(spd, 13 * dt);
+    if (spd > 1e-3) { p.vx -= p.vx / spd * dec; p.vz -= p.vz / spd * dec; }
+    if (spd < 0.5) p.stop = 0;
+    if (Math.random() < dt * 30) for (const ft of p.rig.feet) spawnSpray(ft.x, ft.z, p.stopVX, p.stopVZ, 2);
+    for (const ft of p.rig.feet) addWear(ft.x, ft.z, 0.13, 26);
+  } else {
+    let ax = dvx - p.vx, az = dvz - p.vz; const al = Math.hypot(ax, az), mA = p.accel * dt;
+    if (al > mA) { ax *= mA / al; az *= mA / al; }
+    p.vx += ax; p.vz += az;
+  }
+  p.x += p.vx * dt; p.z += p.vz * dt;
+  if (!p.noBoards) {
+    const sd = rrSDF(p.x, p.z, RA, RB, RR) + 0.35;
+    if (sd > 0) { const [nx, nz] = rrNormal(p.x, p.z, RA, RB, RR); p.x -= nx * sd; p.z -= nz * sd; const vn = p.vx * nx + p.vz * nz; if (vn > 0) { p.vx -= vn * nx; p.vz -= vn * nz; } }
+  }
+  // 朝向、侧倾、步幅
+  const nsp = Math.hypot(p.vx, p.vz);
+  let th = p.h;
+  if (p.stop > 0) th = Math.atan2(p.stopVZ, p.stopVX) + p.stopSide * Math.PI / 2;
+  else if (p.face) th = Math.atan2(p.face.z - p.z, p.face.x - p.x);
+  else if (nsp > 0.5) th = Math.atan2(p.vz, p.vx);
+  const rate = (p.stop > 0 ? 14 : 7) * dt, step = clamp(wrapA(th - p.h), -rate, rate);
+  p.h = wrapA(p.h + step);
+  const omega = step / Math.max(dt, 1e-4);
+  p.roll += ((p.stop > 0 ? 0 : clamp(omega * nsp * 0.05, -0.5, 0.5)) - p.roll) * Math.min(1, dt * 8);
+  const strT = p.stop > 0 ? 0 : (desSp > 1 ? clamp(0.3 + (desSp - nsp) * 0.45 + (nsp > 2 ? 0.25 : 0), 0, 1) : 0);
+  p.str += (strT - p.str) * Math.min(1, dt * 5);
+  p.phase += dt * (4.5 + nsp * 0.55) * (p.str > 0.05 ? 1 : 0.3);
+  p.crouch = lerp(p.crouch, p.stop > 0 ? 0.75 : 0.35 + 0.4 * p.str, Math.min(1, dt * 6));
+  p.stopB = lerp(p.stopB, p.stop > 0 ? 1 : 0, Math.min(1, dt * 12));
+  p.poseT += dt; p.cool -= dt;
+}
+
+// ---------- 进攻决策 ----------
+function segDist(px, pz, x0, z0, x1, z1) {
+  const vx = x1 - x0, vz = z1 - z0, l2 = vx * vx + vz * vz || 1, t = clamp(((px - x0) * vx + (pz - z0) * vz) / l2, 0, 1);
+  return Math.hypot(px - x0 - vx * t, pz - z0 - vz * t);
+}
+const laneOpen = (x0, z0, x1, z1, team, r) => !skaters.some(o => o.team !== team && segDist(o.x, o.z, x0, z0, x1, z1) < r);
+function shoot(p) {
+  const A = atk(p.team), g = goalieOf(1 - p.team), dist = Math.hypot(A * 10 - p.x, p.z);
+  const slap = dist > 5.2 && !skaters.some(o => o.team !== p.team && Math.hypot(o.x - p.x, o.z - p.z) < 2.4);
+  const aimZ = (g.z > 0 ? -0.68 : 0.68) + rand(-0.2, 0.2);
+  p.action = { type: 'shot', t: 0, wind: slap ? 0.42 : 0.14, slap, ax: A * 10.4, az: aimZ, speed: slap ? rand(21, 25) : rand(15, 18) };
+  p.pose = slap ? 'windup' : 'pass'; p.poseT = 0; game.shots[p.team]++; sbDirty = true;
+}
+function pass(p, m) {
+  const tx = m.x + m.vx * 0.45, tz = m.z + m.vz * 0.45;
+  p.action = { type: 'pass', t: 0, wind: 0.14, ax: tx, az: tz, speed: clamp(Math.hypot(tx - p.x, tz - p.z) * 1.6 + 5, 7, 14) };
+  p.pose = 'pass'; p.poseT = 0;
+}
+function release(p, a) {
+  carrySpot(p, _cs); puck.x = _cs.x; puck.z = _cs.z;
+  const dx = a.ax - puck.x, dz = a.az - puck.z, d = Math.hypot(dx, dz) || 1;
+  puck.vx = dx / d * a.speed; puck.vz = dz / d * a.speed; puck.owner = null; puck.shooter = p; puck.shotT = 0; puck.lastTeam = p.team;
+  p.cool = 0.45; if (a.slap) { p.pose = 'strike'; p.poseT = 0; }
+}
+
+function updateGoalie(g, dt) {
+  const gx = -atk(g.team) * 10, inw = -Math.sign(gx);
+  const ang = clamp(Math.atan2(puck.z, (puck.x - gx) * inw), -1.15, 1.15);
+  g.tx = gx + inw * Math.cos(ang) * 0.75; g.tz = clamp(Math.sin(ang) * 0.9, -0.8, 0.8);
+  g.face = puck; g.maxS = 3.2; g.accel = 9; g.arrive = 0.6; g.sepR = 0.4;
+  const sp = Math.hypot(puck.vx, puck.vz), toward = puck.vx * (gx - puck.x) + puck.vz * (-puck.z) > 0;
+  if (!puck.owner && sp > 7 && toward && Math.hypot(puck.x - gx, puck.z) < 8) g.bfT = 0.7;
+  g.bfT -= dt; g.bf = lerp(g.bf, g.bfT > 0 ? 1 : 0, Math.min(1, dt * 12));
+  if (puck.owner === g) {
+    g.hold -= dt;
+    if (g.hold <= 0) {
+      const m = skaters.filter(s => s.team === g.team).sort((a, b) => Math.hypot(b.x - gx, b.z) - Math.hypot(a.x - gx, a.z))[0];
+      g.action = null; pass(g, m); release(g, g.action); g.action = null; g.cool = 0.8;
+    }
+  }
+}
+
+function play(dt) {
+  game.clock -= dt;
+  if (game.clock <= 0) { game.clock = 0; game.state = 'final'; game.t = 0; sbDirty = true; return; }
+  const own = puck.owner;
+  for (const p of skaters) { p.chasing = false; p.face = null; p.maxS = 7.2; p.accel = 7; p.arrive = 1.8; p.sepR = 1.1; if (p.pose === 'celebrate') p.pose = 'carry'; }
+  if (own && !own.goalie) {
+    const c = own, t = c.team, A = atk(t), m = mateOf(c);
+    if (A * c.x < 3) { c.tx = A * 6.5; c.tz = c.z * 0.6 + Math.sin(simTime * 0.8 + c.id) * 1.6; }
+    else { c.tx = A * 6.2; c.tz = 2.2 * Math.sin(simTime * 0.9 + c.id); }
+    c.maxS = c.action && c.action.slap ? 2.5 : 6.3;
+    m.tx = A * clamp(A * c.x + 1.5, 2.5, 6.5); m.tz = c.z > 0 ? -2.6 : 2.6;
+    const gx = A * 10, defs = skaters.filter(o => o.team !== t).sort((a, b) => Math.hypot(a.x - c.x, a.z - c.z) - Math.hypot(b.x - c.x, b.z - c.z));
+    const [d1, d2] = defs;
+    let ux = gx - c.x, uz = -c.z, ul = Math.hypot(ux, uz) || 1;
+    d1.tx = c.x + ux / ul * 0.9; d1.tz = c.z + uz / ul * 0.9; d1.arrive = 0.8;
+    ux = gx - m.x; uz = -m.z; ul = Math.hypot(ux, uz) || 1;
+    d2.tx = m.x + ux / ul * 1.4; d2.tz = m.z + uz / ul * 1.4;
+    // 戳球
+    if (Math.hypot(d1.x - c.x, d1.z - c.z) < 1.1 && d1.cool <= 0) {
+      d1.cool = 0.8; d1.pose = 'pass'; d1.poseT = 0;
+      if (Math.random() < 0.35) { puck.owner = null; c.action = null; c.cool = 0.6; const a = rand(0, 6.28); puck.vx = Math.cos(a) * 3.5; puck.vz = Math.sin(a) * 3.5; puck.lastTeam = d1.team; }
+    }
+    // 持球人：射门 / 传球
+    c.think -= dt;
+    if (puck.owner === c && !c.action && c.think <= 0) {
+      c.think = 0.12;
+      const dist = Math.hypot(gx - puck.x, puck.z), g = goalieOf(1 - t);
+      const pressured = Math.hypot(d1.x - c.x, d1.z - c.z) < 1.5;
+      const aimZ = g.z > 0 ? -0.68 : 0.68;
+      c.holdT = (c.holdT || 0) + 0.12;
+      if (dist < 8.5 && A * puck.x < 9.4 && Math.abs(puck.z) < 5 && laneOpen(puck.x, puck.z, gx, aimZ, t, 0.5) && (Math.random() < 0.35 || dist < 4.5)) shoot(c);
+      else if ((pressured && Math.random() < 0.5 || c.holdT > 6) && laneOpen(puck.x, puck.z, m.x, m.z, t, 0.6)) pass(c, m);
+      else if (c.holdT > 7 && dist < 10) shoot(c);
+    }
+  } else if (own && own.goalie) {
+    for (const p of skaters) {
+      const A = atk(p.team);
+      if (p.team === own.team) { p.tx = -A * 5; p.tz = (p === skaters.find(s => s.team === p.team) ? 1 : -1) * 3.2; }
+      else { p.tx = A * 1; p.tz = (p.id % 2 ? 1 : -1) * 2.5; }
+    }
+  } else {
+    // 散球：最近的球员追，另一队最近者也来争
+    const ix = puck.x + puck.vx * 0.25, iz = puck.z + puck.vz * 0.25;
+    const byD = [...skaters].sort((a, b) => Math.hypot(a.x - ix, a.z - iz) - Math.hypot(b.x - ix, b.z - iz));
+    const chaser = byD[0], rival = byD.find(o => o.team !== chaser.team);
+    for (const p of skaters) {
+      if (p === chaser || (p === rival && Math.hypot(p.x - ix, p.z - iz) < 6)) { p.tx = ix; p.tz = iz; p.arrive = 0.3; p.chasing = true; continue; }
+      const A = atk(p.team);
+      if (p.team === puck.lastTeam) { p.tx = A * 4.5; p.tz = puck.z > 0 ? -2.5 : 2.5; }
+      else { const gx = -A * 10; p.tx = gx + (puck.x - gx) * 0.45; p.tz = puck.z * 0.45 + (p.id % 2 ? 1.5 : -1.5); }
+    }
+  }
+  for (const p of skaters) if (p.action) {
+    p.action.t += dt;
+    if (puck.owner !== p) p.action = null;
+    else if (p.action.t >= p.action.wind) { const a = p.action; p.action = null; release(p, a); }
+  }
+  for (const g of goalies) updateGoalie(g, dt);
+  // 获得球权
+  if (!puck.owner && !puck.inNet) for (const p of skaters) {
+    if (p.cool > 0) continue;
+    carrySpot(p, _cs);
+    const sp = Math.hypot(puck.vx - p.vx, puck.vz - p.vz);
+    if ((Math.hypot(puck.x - _cs.x, puck.z - _cs.z) < 0.55 || Math.hypot(puck.x - p.x, puck.z - p.z) < 0.7) && sp < 10) { puck.owner = p; p.holdT = 0; p.pose = 'carry'; puck.lastTeam = p.team; break; }
+  }
+}
+
+function placeForFaceoff() {
+  for (const p of players) {
+    const A = atk(p.team), first = p === players.find(o => o.team === p.team);
+    if (p.goalie) { p.tx = -A * 9.3; p.tz = 0; }
+    else if (first) { p.tx = -A * 0.75; p.tz = 0; }
+    else { p.tx = -A * 3.2; p.tz = p.team ? -2.6 : 2.6; }
+    p.face = puck; p.arrive = 1.2; p.maxS = 6; p.sepR = 0.8; p.action = null; p.pose = 'carry';
+  }
+}
+function startFaceoff() {
+  game.state = 'faceoff'; game.t = 0;
+  Object.assign(puck, { x: 0, z: 0, vx: 0, vz: 0, owner: null, inNet: 0, shooter: null }); puck.mesh.visible = true;
+  placeForFaceoff();
+}
+function newGame() { game.score = [0, 0]; game.shots = [0, 0]; game.clock = 300; sbDirty = true; startFaceoff(); }
+
+// ---------- 冰球物理（子步）：摩擦、界墙反弹、门柱、实体球网、扑救、挡球 ----------
+function goalScored(team) {
+  game.score[team]++; game.state = 'goal'; game.t = 0; game.scorer = team; sbDirty = true;
+  for (const p of skaters) if (p.team === team) { p.pose = 'celebrate'; p.poseT = 0; }
+}
+function stepPuck(dt) {
+  puck.shotT += dt;
+  if (puck.owner) {
+    const o = puck.owner;
+    if (o.goalie) { const fx = Math.cos(o.h), fz = Math.sin(o.h); puck.x = o.x + fx * 0.3 + fz * 0.42; puck.z = o.z + fz * 0.3 - fx * 0.42; }
+    else { carrySpot(o, _cs); puck.x = _cs.x; puck.z = _cs.z; }
+    puck.vx = o.vx; puck.vz = o.vz; return;
+  }
+  const N = 6, h = dt / N;
+  for (let k = 0; k < N; k++) {
+    let sp = Math.hypot(puck.vx, puck.vz);
+    if (sp > 0) { const ns = Math.max(0, sp - (0.35 + 0.03 * sp) * h); puck.vx *= ns / sp; puck.vz *= ns / sp; sp = ns; }
+    const px = puck.x, pz = puck.z;
+    puck.x += puck.vx * h; puck.z += puck.vz * h;
+    if (puck.inNet) { // 球在网内
+      const g = puck.inNet; puck.vx *= 0.9; puck.vz *= 0.9;
+      puck.x = g * clamp(g * puck.x, 10.08, 10.92); puck.z = clamp(puck.z, -0.82, 0.82); continue;
+    }
+    for (const g of [1, -1]) {
+      const lx = g * puck.x, plx = g * px;
+      if (plx < 10 && lx >= 10 && Math.abs(puck.z) < 0.9 - PR * 0.3 && game.state === 'play') { puck.inNet = g; goalScored(g > 0 ? 0 : 1); break; }
+      if (lx > 10 - PR && lx < 11.1 + PR && Math.abs(puck.z) < 0.95 + PR) {
+        if (Math.abs(pz) >= 0.95 + PR) { puck.z = Math.sign(pz) * (0.95 + PR); puck.vz = -puck.vz * 0.4; }
+        else if (plx >= 11.1 + PR) { puck.x = g * (11.1 + PR); puck.vx = -puck.vx * 0.4; }
+        else if (plx < 10 && Math.abs(puck.z) >= 0.87) { puck.x = g * (10 - PR); puck.vx = -puck.vx * 0.5; } // 只有门框外侧才弹回，门口放行
+      }
+      for (const zz of [-0.9, 0.9]) { // 门柱
+        const ex = puck.x - g * 10, ez = puck.z - zz, ed = Math.hypot(ex, ez);
+        if (ed < PR + 0.05 && ed > 1e-4) {
+          const nx = ex / ed, nz = ez / ed; puck.x = g * 10 + nx * (PR + 0.05); puck.z = zz + nz * (PR + 0.05);
+          const vn = puck.vx * nx + puck.vz * nz; if (vn < 0) { puck.vx -= 1.7 * vn * nx; puck.vz -= 1.7 * vn * nz; }
+        }
+      }
+    }
+    if (puck.inNet) continue;
+    const sd = rrSDF(puck.x, puck.z, RA, RB, RR) + PR;
+    if (sd > 0) {
+      const [nx, nz] = rrNormal(puck.x, puck.z, RA, RB, RR); puck.x -= nx * sd; puck.z -= nz * sd;
+      const vn = puck.vx * nx + puck.vz * nz; if (vn > 0) { puck.vx = (puck.vx - 1.55 * vn * nx) * 0.92; puck.vz = (puck.vz - 1.55 * vn * nz) * 0.92; }
+    }
+    if (game.state !== 'play') continue;
+    // 守门员扑救：挡出或接住
+    for (const g of goalies) {
+      if (g.cool > 0 || puck.owner) continue;
+      const fx = Math.cos(g.h), fz = Math.sin(g.h), dx = puck.x - g.x, dz = puck.z - g.z;
+      const lat = -dx * fz + dz * fx, lon = dx * fx + dz * fz, reach = 0.34 + 0.24 * g.bf;
+      if (Math.abs(lat) < reach && Math.abs(lon) < 0.3) {
+        g.cool = 0.35;
+        // 打在身体边缘的球有机会挤过去
+        if (sp > 8 && Math.random() > (Math.abs(lat) < 0.22 ? 0.88 : 0.35)) break;
+        if (sp < 15 && Math.random() < 0.45) { puck.owner = g; g.hold = 1.0; puck.vx = puck.vz = 0; puck.lastTeam = g.team; }
+        else {
+          const a = g.h + rand(-1.1, 1.1) + Math.sign(lat || 1) * 0.3, ns = Math.max(3, sp * 0.35);
+          puck.vx = Math.cos(a) * ns; puck.vz = Math.sin(a) * ns; puck.x = g.x + fx * 0.4; puck.z = g.z + fz * 0.4;
+        }
+        break;
+      }
+    }
+    // 冰刀挡球
+    if (!puck.owner && sp > 9) for (const p of skaters) {
+      if (p === puck.shooter && puck.shotT < 0.5) continue;
+      if (p.cool > 0) continue;
+      if (Math.hypot(puck.x - p.x, puck.z - p.z) < 0.35) {
+        const a = rand(0, 6.28); puck.vx = Math.cos(a) * sp * 0.3; puck.vz = Math.sin(a) * sp * 0.3; p.cool = 0.3; break;
+      }
+    }
+  }
+}
+
+// ---------- 浇冰流程 ----------
+const BENCH = { 0: { bx: -3, spots: [-4.9, -4.1, -1.6] }, 1: { bx: 3, spots: [4.9, 4.1, 1.6] } };
+function benchPath(p) {
+  const b = BENCH[p.team], idx = players.filter(o => o.team === p.team).indexOf(p);
+  return [{ x: b.bx, z: 4.9 }, { x: b.bx, z: 6.9 }, { x: b.spots[idx], z: 6.95 }];
+}
+function startResurface() {
+  if (game.state === 'resurface') return;
+  game.state = 'resurface'; game.sub = 'leave'; game.subT = 0;
+  puck.owner = null; puck.vx = puck.vz = 0; puck.inNet = 0; puck.mesh.visible = false;
+  benchDoors.forEach(d => d.target = 1);
+  for (const p of players) { p.path = benchPath(p); p.pi = 0; p.noBoards = true; p.sepR = 0.5; p.maxS = 5; p.action = null; p.pose = 'carry'; p.face = null; p.bf = 0; p.bfT = 0; }
+}
+function buildResurfPath() {
+  const P = [], add = (x, z) => P.push({ x, z });
+  add(GAR.x, GAR.z + 0.2); add(GAR.x, -8.2); add(GAR.x, -6.6); add(GAR.x, -5.3);
+  let last = null;
+  for (let k = 0; k < 3; k++) {
+    const inset = 0.95 + 1.7 * k, a = RA - inset, b = RB - inset, r = Math.min(b, Math.max(1.2, RR - inset));
+    const lap = rrPath(a, b, r, 0.35).map(p => {
+      const mx = 9.0 + 2.6 * smooth(1.1, 2.9, Math.abs(p.z)); // 在球门前绕开
+      return { x: Math.sign(p.x) * Math.min(Math.abs(p.x), mx), z: p.z };
+    });
+    let si = 0, best = 1e9; lap.forEach((p, i) => { const d = Math.hypot(p.x - GAR.x, p.z + b); if (d < best) { best = d; si = i; } });
+    for (let i = 0; i <= lap.length; i++) { const p = lap[(si + i) % lap.length]; add(p.x, p.z); last = p; }
+  }
+  [[-8.8, -1.3], [-9.2, -0.5], [-8.8, 0.2], [-8.0, 0.3], [8.0, 0.1], [8.9, -0.5], [8.7, -1.6], [7.6, -2.6], [-3, -4.4], [GAR.x, -4.7], [GAR.x, -5.8], [GAR.x, -7.4], [GAR.x, GAR.z + 0.6]].forEach(([x, z]) => add(x, z));
+  rs.path = P; rs.cum = [0];
+  for (let i = 1; i < P.length; i++) rs.cum.push(rs.cum[i - 1] + Math.hypot(P[i].x - P[i - 1].x, P[i].z - P[i - 1].z));
+}
+buildResurfPath();
+function pathAt(s, out) {
+  const c = rs.cum, P = rs.path; s = clamp(s, 0, c[c.length - 1]);
+  let i = 1; while (i < c.length - 1 && c[i] < s) i++;
+  const t = (s - c[i - 1]) / ((c[i] - c[i - 1]) || 1); out.x = lerp(P[i - 1].x, P[i].x, t); out.z = lerp(P[i - 1].z, P[i].z, t); return out;
+}
+const _pa = { x: 0, z: 0 }, _pb = { x: 0, z: 0 };
+function followPath(p) {
+  const w = p.path[p.pi]; p.tx = w.x; p.tz = w.z; p.arrive = p.pi === p.path.length - 1 ? 0.8 : 0.3;
+  if (Math.hypot(p.x - w.x, p.z - w.z) < 0.35 && p.pi < p.path.length - 1) p.pi++;
+  return p.pi === p.path.length - 1 && Math.hypot(p.x - w.x, p.z - w.z) < 0.35;
+}
+function updateResurface(dt) {
+  game.subT += dt;
+  if (game.sub === 'leave' || game.sub === 'return') {
+    let done = true;
+    for (const p of players) { const ok = followPath(p); done = done && ok; if (game.sub === 'leave' && p.pi === 2) p.face = { x: p.x, z: 0 }; }
+    if (game.sub === 'leave' && (done || game.subT > 12)) {
+      if (!done) for (const p of players) { const w = p.path[2]; p.x = w.x; p.z = w.z; p.vx = p.vz = 0; }
+      game.sub = 'drive'; game.subT = 0; benchDoors.forEach(d => d.target = 0); gateDoors.forEach(d => d.target = 1);
+      rs.s = 0; rs.wait = 1.6; rs.active = true;
+    }
+    if (game.sub === 'return') {
+      const allIn = players.every(p => p.pi === 2);
+      if (allIn) benchDoors.forEach(d => d.target = 0);
+      if ((done && allIn) || game.subT > 14) {
+        for (const p of players) { p.noBoards = false; p.path = null; }
+        benchDoors.forEach(d => d.target = 0); startFaceoff();
+      }
+    }
+  } else if (game.sub === 'drive') {
+    for (const p of players) { p.tx = p.path[2].x; p.tz = p.path[2].z; p.face = { x: p.x, z: 0 }; }
+    if (!rs.active) {
+      game.sub = 'return'; game.subT = 0; gateDoors.forEach(d => d.target = 0); benchDoors.forEach(d => d.target = 1);
+      placeForFaceoff();
+      for (const p of players) { const fx = p.tx, fz = p.tz, bp = benchPath(p); p.path = [bp[1], bp[0], { x: fx, z: fz }]; p.pi = 0; p.face = null; p.noBoards = true; p.sepR = 0.5; p.maxS = 5; }
+    }
+  }
+}
+function updateResurfacer(dt) {
+  if (!rs.active) { pathAt(0, _pa); rs.x = _pa.x; rs.z = _pa.z; }
+  else if (rs.wait > 0) rs.wait -= dt;
+  else {
+    const end = rs.cum[rs.cum.length - 1];
+    const v = Math.min(4.2, 1 + rs.s * 0.5, 1 + (end - rs.s) * 0.6);
+    rs.s += v * dt;
+    pathAt(rs.s, _pa); pathAt(rs.s + 0.9, _pb); rs.x = _pa.x; rs.z = _pa.z;
+    if (Math.hypot(_pb.x - _pa.x, _pb.z - _pa.z) > 0.05) {
+      const th = Math.atan2(_pb.z - _pa.z, _pb.x - _pa.x); rs.h = wrapA(rs.h + clamp(wrapA(th - rs.h), -2.6 * dt, 2.6 * dt));
+    }
+    const fx = Math.cos(rs.h), fz = Math.sin(rs.h), rx = rs.x - fx * 1.5, rz = rs.z - fz * 1.5;
+    if (rrSDF(rx, rz, RA, RB, RR) < 0.3) wipe(rx, rz, fx, fz, 0.9);
+    if (rs.s >= end) { rs.active = false; }
+  }
+  resurf.position.set(rs.x, 0, rs.z); resurf.rotation.y = -rs.h;
+}
+
+// ---------- 冰面磨损 ----------
+function addWearPx(x, z, amt) {
+  const i = Math.floor((x + 12) * 20), j = Math.floor((z + 6) * 20);
+  if (i < 0 || j < 0 || i >= WW || j >= WH) return;
+  const k = j * WW + i; if (!inside[k]) return;
+  const v = wear[k * 2], nv = Math.min(255, v + amt); wearSum += nv - v; wear[k * 2] = nv; wearDirty = true;
+}
+function addWear(x, z, rad, amt) {
+  const cx = (x + 12) * 20, cz = (z + 6) * 20, r = Math.max(0.6, rad * 20);
+  for (let j = Math.max(0, Math.floor(cz - r)); j <= Math.min(WH - 1, Math.ceil(cz + r)); j++)
+    for (let i = Math.max(0, Math.floor(cx - r)); i <= Math.min(WW - 1, Math.ceil(cx + r)); i++) {
+      const dx = i + 0.5 - cx, dz = j + 0.5 - cz; if (dx * dx + dz * dz > r * r) continue;
+      const k = j * WW + i; if (!inside[k]) continue;
+      const v = wear[k * 2], nv = Math.min(255, v + amt); wearSum += nv - v; wear[k * 2] = nv;
+    }
+  wearDirty = true;
+}
+function wearLine(x0, z0, x1, z1, amt) {
+  const n = Math.max(1, Math.ceil(Math.hypot(x1 - x0, z1 - z0) / 0.04));
+  for (let k = 1; k <= n; k++) addWearPx(lerp(x0, x1, k / n), lerp(z0, z1, k / n), amt);
+}
+// 浇冰车刮板：清除划痕并留下湿冰
+function wipe(x, z, fx, fz, half) {
+  const sx = -fz, sz = fx, cx = (x + 12) * 20, cz = (z + 6) * 20, r = (half + 0.35) * 20;
+  for (let j = Math.max(0, Math.floor(cz - r)); j <= Math.min(WH - 1, Math.ceil(cz + r)); j++)
+    for (let i = Math.max(0, Math.floor(cx - r)); i <= Math.min(WW - 1, Math.ceil(cx + r)); i++) {
+      const k = j * WW + i; if (!inside[k]) continue;
+      const dx = (i + 0.5) / 20 - 12 - x, dz = (j + 0.5) / 20 - 6 - z;
+      if (Math.abs(dx * sx + dz * sz) < half && Math.abs(dx * fx + dz * fz) < 0.3) { wearSum -= wear[k * 2]; wear[k * 2] = 0; wear[k * 2 + 1] = 255; }
+    }
+  wearDirty = true;
+}
+let dryT = 0, wearUiT = 0, sbDirty = true;
+function updateWear(dt) {
+  for (const p of players) for (let i = 0; i < 2; i++) {
+    const ft = p.rig.feet[i];
+    if (p.rig.lift[i] < 0.03 && rrSDF(ft.x, ft.z, RA, RB, RR) < 0) {
+      const pf = p.prevFeet[i];
+      if (pf) { const d = Math.hypot(ft.x - pf.x, ft.z - pf.z); if (d > 0.02 && d < 1) wearLine(pf.x, pf.z, ft.x, ft.z, p.goalie ? 3 : 6); }
+      p.prevFeet[i] = { x: ft.x, z: ft.z };
+    } else p.prevFeet[i] = null;
+  }
+  if (snowLevel) { // 落雪沉积
+    const n = Math.floor((snowLevel === 1 ? 50 : 180) * dt + Math.random());
+    for (let k = 0; k < n; k++) addWearPx(rand(-12, 12), rand(-6, 6), 5);
+  }
+  dryT += dt;
+  if (dryT > 0.2) { dryT = 0; for (let k = 1; k < wear.length; k += 2) if (wear[k]) { wear[k]--; wearDirty = true; } }
+  if (wearDirty) { wearTex.needsUpdate = true; wearDirty = false; }
+  wearUiT += dt;
+  if (wearUiT > 0.25) { wearUiT = 0; const pc = clamp(Math.round(wearSum / (insideCount * 160) * 100), 0, 100); $('#wearBar').style.width = pc + '%'; $('#wearTxt').textContent = pc + '%'; }
+}
+
+// ---------- 粒子：落雪 / 冰屑 / 炊烟 ----------
+const SNOW_N = 4000, snowArr = new Float32Array(SNOW_N * 3);
+for (let i = 0; i < SNOW_N; i++) { snowArr[i * 3] = rand(-22, 22); snowArr[i * 3 + 1] = rand(0, 16); snowArr[i * 3 + 2] = rand(-16, 16); }
+const snowGeo = new THREE.BufferGeometry(); snowGeo.setAttribute('position', new THREE.BufferAttribute(snowArr, 3)); snowGeo.setDrawRange(0, 0);
+const snowPts = new THREE.Points(snowGeo, new THREE.PointsMaterial({ color: '#ffffff', size: 1, sizeAttenuation: false }));
+snowPts.frustumCulled = false; scene.add(snowPts);
+let snowLevel = 0;
+const SPN = 400, spArr = new Float32Array(SPN * 3).fill(-100), spVel = new Float32Array(SPN * 3), spOn = new Uint8Array(SPN); let spI = 0;
+const spGeo = new THREE.BufferGeometry(); spGeo.setAttribute('position', new THREE.BufferAttribute(spArr, 3));
+const sprayPts = new THREE.Points(spGeo, new THREE.PointsMaterial({ color: '#f2f5f8', size: 1, sizeAttenuation: false }));
+sprayPts.frustumCulled = false; scene.add(sprayPts);
+function spawnSpray(x, z, vx, vz, n) {
+  for (let k = 0; k < n; k++) {
+    const i = spI++ % SPN, s = rand(1.5, 4); spOn[i] = 1;
+    spArr[i * 3] = x; spArr[i * 3 + 1] = 0.06; spArr[i * 3 + 2] = z;
+    spVel[i * 3] = vx * s + rand(-0.8, 0.8); spVel[i * 3 + 1] = rand(0.8, 2.2); spVel[i * 3 + 2] = vz * s + rand(-0.8, 0.8);
+  }
+}
+const SMN = 80, smArr = new Float32Array(SMN * 3), smGeo = new THREE.BufferGeometry();
+smGeo.setAttribute('position', new THREE.BufferAttribute(smArr, 3));
+const smokePts = new THREE.Points(smGeo, new THREE.PointsMaterial({ color: '#aab6c4', size: 2, sizeAttenuation: false }));
+smokePts.frustumCulled = false; scene.add(smokePts);
+function updateParticles(dt) {
+  const n = snowLevel === 0 ? 0 : snowLevel === 1 ? 1200 : SNOW_N; snowGeo.setDrawRange(0, n);
+  for (let i = 0; i < n; i++) {
+    snowArr[i * 3 + 1] -= (1.1 + (i % 7) * 0.12) * (snowLevel === 2 ? 1.4 : 1) * dt;
+    snowArr[i * 3] += (Math.sin(simTime * 0.6 + i) * 0.3 + 0.35) * dt;
+    if (snowArr[i * 3 + 1] < 0) { snowArr[i * 3 + 1] += 16; snowArr[i * 3] = rand(-22, 22); snowArr[i * 3 + 2] = rand(-16, 16); }
+  }
+  snowGeo.attributes.position.needsUpdate = true;
+  for (let i = 0; i < SPN; i++) {
+    if (!spOn[i]) continue;
+    spVel[i * 3 + 1] -= 9.8 * dt;
+    for (let a = 0; a < 3; a++) spArr[i * 3 + a] += spVel[i * 3 + a] * dt;
+    if (spArr[i * 3 + 1] <= 0) { spOn[i] = 0; addWearPx(spArr[i * 3], spArr[i * 3 + 2], 18); spArr[i * 3 + 1] = -100; }
+  }
+  spGeo.attributes.position.needsUpdate = true;
+  for (let i = 0; i < SMN; i++) {
+    const age = (simTime + i * 6 / SMN) % 6;
+    smArr[i * 3] = CHIMNEY.x + age * 0.35 + Math.sin(age * 2 + i) * 0.12 * age;
+    smArr[i * 3 + 1] = CHIMNEY.y + age * 0.75;
+    smArr[i * 3 + 2] = CHIMNEY.z + age * 0.12 + Math.cos(age * 1.7 + i) * 0.1 * age;
+  }
+  smGeo.attributes.position.needsUpdate = true;
+}
+
+// ---------- 光照预设（1.6 秒混合） ----------
+const PRE = {
+  day: { sunCol: '#fff1dc', sunI: 2.7, dir: [0.55, 0.78, 0.4], sky: '#d6ebff', gnd: '#8f9db0', hemiI: 1.5, lamp: 0, glow: 0.2, str: 0, refl: '#bfe3f7', gloss: 0.12 },
+  dusk: { sunCol: '#ffae86', sunI: 1.8, dir: [0.9, 0.3, -0.3], sky: '#c6a8d8', gnd: '#6e5a7a', hemiI: 1.0, lamp: 22, glow: 1, str: 1, refl: '#e8a0a0', gloss: 0.16 },
+  night: { sunCol: '#9fb2ff', sunI: 0.5, dir: [-0.4, 0.8, 0.45], sky: '#34406a', gnd: '#141722', hemiI: 0.55, lamp: 48, glow: 1, str: 1, refl: '#1c2034', gloss: 0.2 },
+};
+const toL = p => ({ sunCol: new THREE.Color(p.sunCol), sunI: p.sunI, dir: new V3(...p.dir).normalize(), sky: new THREE.Color(p.sky), gnd: new THREE.Color(p.gnd),
+  hemiI: p.hemiI, lamp: p.lamp, glow: p.glow, str: p.str, refl: new THREE.Color(p.refl), gloss: p.gloss });
+const cloneL = l => ({ ...l, sunCol: l.sunCol.clone(), dir: l.dir.clone(), sky: l.sky.clone(), gnd: l.gnd.clone(), refl: l.refl.clone() });
+let lightCur = toL(PRE.day), lightFrom = cloneL(lightCur), lightTo = toL(PRE.day), lightT = 1;
+function setLight(name) { lightFrom = cloneL(lightCur); lightTo = toL(PRE[name]); lightT = 0; }
+function updateLight(dt) {
+  lightT = Math.min(1, lightT + dt / 1.6); const k = smooth(0, 1, lightT), a = lightFrom, b = lightTo, c = lightCur;
+  for (const key of ['sunCol', 'sky', 'gnd', 'refl']) c[key].lerpColors(a[key], b[key], k);
+  for (const key of ['sunI', 'hemiI', 'lamp', 'glow', 'str', 'gloss']) c[key] = lerp(a[key], b[key], k);
+  c.dir.lerpVectors(a.dir, b.dir, k).normalize();
+  sun.color.copy(c.sunCol); sun.intensity = c.sunI; sun.position.copy(c.dir).multiplyScalar(50);
+  hemi.color.copy(c.sky); hemi.groundColor.copy(c.gnd); hemi.intensity = c.hemiI;
+  lampLights.forEach(L => L.intensity = c.lamp);
+  iceU.uGloss.value = c.gloss;
+  for (const g of glowMats) {
+    const t = g.key === 'glow' ? c.glow : g.key === 'lamp' ? clamp(c.lamp / 20, 0, 1) : g.key === 'str' ? c.str : (rs.active && Math.sin(simTime * 9) > 0 ? 1 : 0.15);
+    g.m.color.lerpColors(g.dim, g.bright, t);
+  }
+}
+
+// ---------- 主模拟循环 ----------
+function update(dt) {
+  simTime += dt; game.t += dt;
+  for (const d of doors) { d.t = clamp(d.t + (d.target ? 1 : -1) * dt * 1.4, 0, 1); d.g.rotation.y = lerp(d.closed, d.open, smooth(0, 1, d.t)); }
+  if (game.state === 'faceoff') {
+    if (game.t > 2.2) {
+      const w = Math.random() < 0.5 ? 0 : 1;
+      puck.vx = -atk(w) * rand(3, 4.5); puck.vz = rand(-1.5, 1.5); puck.lastTeam = w;
+      for (const p of players) p.face = null;
+      for (const p of skaters) if (Math.abs(p.x) < 1.5) { p.pose = 'pass'; p.poseT = 0; p.cool = 0.25; }
+      game.state = 'play'; game.t = 0;
+    }
+  } else if (game.state === 'play') play(dt);
+  else if (game.state === 'goal') {
+    for (const p of skaters) {
+      p.face = null;
+      if (p.team === game.scorer) { p.tx = atk(p.team) * 6 + (p.id % 2 ? 0.6 : -0.6); p.tz = 2; p.arrive = 1.5; p.pose = 'celebrate'; }
+      else { p.tx = p.x * 0.98; p.tz = p.z; p.maxS = 3; }
+    }
+    if (game.t > 3.4) startFaceoff();
+  } else if (game.state === 'final') { if (game.t > 6) newGame(); }
+  else if (game.state === 'resurface') updateResurface(dt);
+  for (const p of players) {
+    movePlayer(p, dt);
+    bladeTarget(p, T.tmp); p.blade.lerp(T.tmp, Math.min(1, dt * 18));
+    if (p.pose !== 'carry' && p.pose !== 'celebrate' && p.poseT > 0.5 && !p.action) p.pose = 'carry';
+  }
+  stepPuck(dt);
+  puck.mesh.position.set(puck.x, 0.035, puck.z);
+  for (const p of players) p.rig.pose(p);
+  updateWear(dt); updateResurfacer(dt); updateParticles(dt);
+  if (sbDirty || Math.floor(game.clock) !== Math.floor(game.clock + dt)) { drawScoreboard(); sbDirty = false; }
+}
+
+// ---------- 相机：正交、31° 仰角、方位 45°+90°×k、像素对齐 ----------
+const EL = 31 * Math.PI / 180;
+const BB = []; for (const x of [-21, 21]) for (const y of [-6.8, 6]) for (const z of [-15, 15]) BB.push(new V3(x, y, z));
+const camR = new V3(), camU = new V3(), camD = new V3(), camTgt = new V3();
+let wpp = 0.05, free = { x0: 0, y0: 0, x1: 1, y1: 1 };
+function computeFree() {
+  const sr0 = stage.getBoundingClientRect();
+  let top = sr0.top + 8, left = sr0.left + 8, right = sr0.right - 8, bottom = sr0.bottom - 8;
+  for (const el of [$('header'), $('#score')]) { const r = el.getBoundingClientRect(); if (r.width && r.bottom > sr0.top && r.top < sr0.bottom) top = Math.max(top, r.bottom + 6); }
+  const rr = $('#rail').getBoundingClientRect();
+  if (rr.width && rr.top < sr0.bottom && rr.bottom > sr0.top && rr.left > sr0.left + sr0.width * 0.4) right = Math.min(right, rr.left - 8);
+  const how = $('#how'), hr = how.getBoundingClientRect();
+  if (!how.open && hr.width && hr.top < sr0.bottom && hr.bottom > sr0.top && hr.height < 60) bottom = Math.min(bottom, hr.top - 4);
+  if (bottom - top < 80) bottom = sr0.bottom - 8;
+  free = { x0: (left - sr0.left) * dpr, y0: (top - sr0.top) * dpr, x1: (right - sr0.left) * dpr, y1: (bottom - sr0.top) * dpr };
+}
+function updateCamera() {
+  const az = view.az;
+  camD.set(Math.cos(EL) * Math.sin(az), Math.sin(EL), Math.cos(EL) * Math.cos(az));
+  camR.set(Math.cos(az), 0, -Math.sin(az)); camU.crossVectors(camD, camR);
+  let r0 = 1e9, r1 = -1e9, u0 = 1e9, u1 = -1e9;
+  for (const b of BB) { const r = b.dot(camR), u = b.dot(camU); r0 = Math.min(r0, r); r1 = Math.max(r1, r); u0 = Math.min(u0, u); u1 = Math.max(u1, u); }
+  const fw = Math.max(20, (free.x1 - free.x0) / block), fh = Math.max(20, (free.y1 - free.y0) / block);
+  wpp = Math.max((r1 - r0) / fw, (u1 - u0) / fh) * 1.03 / view.zoom;
+  const cxA = ((free.x0 + free.x1) / 2 - offX) / block, cyA = (devH - (free.y0 + free.y1) / 2 - offY) / block;
+  // 世界原点落在整数像素上
+  const ox = Math.round(cxA - (r0 + r1) / 2 / wpp), oy = Math.round(cyA - (u0 + u1) / 2 / wpp);
+  camTgt.set(0, 0, 0).addScaledVector(camR, -(ox - W / 2) * wpp).addScaledVector(camU, -(oy - H / 2) * wpp);
+  camera.position.copy(camTgt).addScaledVector(camD, 120); camera.up.set(0, 1, 0); camera.lookAt(camTgt);
+}
+function setFrustum(pw, ph, w) {
+  camera.left = -pw / 2 * w; camera.right = pw / 2 * w; camera.top = ph / 2 * w; camera.bottom = -ph / 2 * w;
+  camera.updateProjectionMatrix(); camera.updateMatrixWorld();
+}
+
+// ---------- 渲染 ----------
+const bgSRGB = postMat.uniforms.uBg.value, bgColor = new THREE.Color();
+function readBg() {
+  const hex = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim();
+  bgSRGB.set(...hexSRGB(hex)); bgColor.set(hex);
+}
+const mirrorHide = [slab, ice, snowPts, sprayPts, smokePts, lampGroup];
+function render() {
+  const pix = view.mode === 'pixel';
+  updateCamera();
+  if (pix) setFrustum(W, H, wpp); else setFrustum(devW, devH, wpp / block);
+  iceU.uRes.value.set(pix ? W : devW, pix ? H : devH);
+  // PointsMaterial 的 size 会乘以 pixelRatio，这里先除掉，保证 1 个美术像素
+  const ps = (pix ? 1 : block) / dpr; snowPts.material.size = ps; sprayPts.material.size = ps; smokePts.material.size = 2 * ps;
+  // 平面倒影：以冰面为镜像渲染场景
+  mirrorHide.forEach(o => o.visible = false);
+  scene.scale.y = -1;
+  renderer.setRenderTarget(rtRefl); renderer.setClearColor(lightCur.refl, 1); renderer.render(scene, camera);
+  scene.scale.y = 1;
+  mirrorHide.forEach(o => o.visible = true);
+  if (pix) {
+    renderer.setRenderTarget(rtMain); renderer.setClearColor(0x000000, 1); renderer.render(scene, camera);
+    postMat.uniforms.uPalOn.value = view.palette ? 1 : 0; postMat.uniforms.uDith.value = view.dither ? 1 : 0; postMat.uniforms.uOut.value = view.outline ? 1 : 0;
+    renderer.setRenderTarget(rtPost); renderer.render(postScene, quadCam);
+    blitMat.uniforms.uOff.value.set(offX, offY); blitMat.uniforms.uBlock.value = block;
+    renderer.setRenderTarget(null); renderer.render(blitScene, quadCam);
+  } else {
+    renderer.setRenderTarget(null); renderer.setClearColor(bgColor, 1); renderer.render(scene, camera);
+  }
+}
+function resize() {
+  const r = stage.getBoundingClientRect();
+  dpr = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(dpr); renderer.setSize(Math.max(1, r.width), Math.max(1, r.height), false);
+  devW = renderer.domElement.width; devH = renderer.domElement.height;
+  block = Math.max(1, Math.round(view.pxCss * dpr));
+  W = Math.max(16, Math.floor(devW / block)); H = Math.max(16, Math.floor(devH / block));
+  offX = Math.floor((devW - W * block) / 2); offY = Math.floor((devH - H * block) / 2);
+  makeTargets(); computeFree();
+}
+
+// ---------- 交互 ----------
+const cv = renderer.domElement, ptrs = new Map(); let drag = null, pinch = null;
+const snapAz = a => Math.PI / 4 + Math.round((a - Math.PI / 4) / (Math.PI / 2)) * (Math.PI / 2);
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId); ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (ptrs.size === 1) drag = { x0: e.clientX, y0: e.clientY, az0: view.az, moved: false };
+  else if (ptrs.size === 2) { const [a, b] = [...ptrs.values()]; pinch = { d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: view.zoom }; drag = null; }
+});
+cv.addEventListener('pointermove', e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pinch && ptrs.size === 2) { const [a, b] = [...ptrs.values()]; view.zoom = clamp(pinch.z0 * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d0, 0.6, 4); }
+  else if (drag) {
+    const dx = e.clientX - drag.x0;
+    if (Math.abs(dx) > 5 || Math.abs(e.clientY - drag.y0) > 5) drag.moved = true;
+    if (drag.moved) { view.az = drag.az0 - dx * 0.008; view.azT = view.az; view.dragging = true; }
+  }
+});
+function endPtr(e) {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (drag && !drag.moved && e.type === 'pointerup') clickIce(e);
+  if (drag && drag.moved) view.azT = snapAz(view.az);
+  drag = null; view.dragging = false; if (ptrs.size < 2) pinch = null;
+}
+cv.addEventListener('pointerup', endPtr); cv.addEventListener('pointercancel', endPtr);
+cv.addEventListener('wheel', e => { e.preventDefault(); view.zoom = clamp(view.zoom * Math.exp(-e.deltaY * 0.0012), 0.6, 4); }, { passive: false });
+const ray = new THREE.Raycaster(), icePlane = new THREE.Plane(new V3(0, 1, 0), 0), hit = new V3();
+function clickIce(e) {
+  const r = cv.getBoundingClientRect(), px = (e.clientX - r.left) * dpr, py = (e.clientY - r.top) * dpr;
+  const ndc = view.mode === 'pixel'
+    ? new THREE.Vector2((px - offX) / (W * block) * 2 - 1, (devH - py - offY) / (H * block) * 2 - 1)
+    : new THREE.Vector2(px / devW * 2 - 1, 1 - py / devH * 2);
+  ray.setFromCamera(ndc, camera);
+  if (ray.ray.intersectPlane(icePlane, hit) && rrSDF(hit.x, hit.z, RA, RB, RR) < -0.2) dropPuck(hit.x, hit.z);
+}
+function dropPuck(x, z) {
+  if (game.state === 'resurface' || game.state === 'final') return;
+  if (puck.owner) { puck.owner.action = null; puck.owner.cool = 0.5; }
+  Object.assign(puck, { x, z, vx: 0, vz: 0, owner: null, inNet: 0, shooter: null, lastTeam: Math.random() < 0.5 ? 0 : 1 });
+  puck.mesh.visible = true;
+  if (game.state !== 'play') { game.state = 'play'; game.t = 0; for (const p of players) { p.face = null; if (p.pose === 'celebrate') p.pose = 'carry'; } }
+}
+function radio(group, fn) {
+  const btns = document.querySelectorAll(`[data-group="${group}"] button`);
+  btns.forEach(b => b.addEventListener('click', () => { btns.forEach(o => o.classList.toggle('on', o === b)); fn(b.dataset.v); }));
+}
+radio('light', setLight);
+radio('snow', v => snowLevel = +v);
+radio('mode', v => { view.mode = v; resize(); });
+radio('theme', v => { document.documentElement.dataset.theme = v; readBg(); });
+function toggle(id, key) { const b = $(id); b.addEventListener('click', () => { view[key] = !view[key]; b.classList.toggle('on', view[key]); b.setAttribute('aria-pressed', view[key]); }); }
+toggle('#tPal', 'palette'); toggle('#tDith', 'dither'); toggle('#tOut', 'outline');
+$('#bResurf').onclick = startResurface;
+$('#bDrop').onclick = () => dropPuck(rand(-6, 6), rand(-3, 3));
+$('#bPause').onclick = () => { view.paused = !view.paused; const b = $('#bPause'); b.classList.toggle('on', view.paused); b.setAttribute('aria-pressed', view.paused); b.textContent = view.paused ? 'Resume' : 'Pause'; };
+$('#bNew').onclick = () => { if (game.state === 'resurface') { game.score = [0, 0]; game.shots = [0, 0]; game.clock = 300; sbDirty = true; } else newGame(); };
+$('#bLeft').onclick = () => view.azT -= Math.PI / 2;
+$('#bRight').onclick = () => view.azT += Math.PI / 2;
+const pxIn = $('#pxSize'); pxIn.value = view.pxCss; $('#pxTxt').textContent = view.pxCss;
+pxIn.addEventListener('input', () => { view.pxCss = +pxIn.value; $('#pxTxt').textContent = pxIn.value; resize(); });
+$('#how').addEventListener('toggle', computeFree);
+addEventListener('resize', resize);
+new ResizeObserver(resize).observe(stage);
+if (document.fonts) document.fonts.ready.then(computeFree);
+
+let uiCache = '';
+function updateUI() {
+  const t = Math.max(0, Math.ceil(game.clock)), clock = `${t / 60 | 0}:${String(t % 60).padStart(2, '0')}`;
+  const st = game.state === 'faceoff' ? 'Face-off' : game.state === 'goal' ? `GOAL! ${game.scorer ? 'Blue' : 'Red'} scores` :
+    game.state === 'final' ? 'Final' : game.state === 'resurface' ? ({ leave: 'Clearing the ice', drive: 'Resurfacing…', return: 'Players returning' }[game.sub]) :
+    view.paused ? 'Paused' : 'In play';
+  const key = [game.score, game.shots, clock, st].join('|');
+  if (key === uiCache) return; uiCache = key;
+  $('#sH').textContent = game.score[0]; $('#sA').textContent = game.score[1]; $('#clock').textContent = clock;
+  $('#shots').textContent = `Shots ${game.shots[0]} – ${game.shots[1]}`; $('#status').textContent = st;
+}
+
+// ---------- 启动 ----------
+scene.traverse(o => { if (o.isMesh && o.material && !o.material.isMeshBasicMaterial) { o.castShadow = o !== ice; o.receiveShadow = true; } });
+readBg(); resize(); newGame(); drawScoreboard();
+for (const p of players) { p.x = p.tx; p.z = p.tz; p.h = p.team ? Math.PI : 0; bladeTarget(p, p.blade); p.rig.pose(p); }
+let last = performance.now();
+function frame(now) {
+  const dt = Math.min(1 / 30, (now - last) / 1000); last = now;
+  if (!view.dragging) { const d = view.azT - view.az; view.az = Math.abs(d) < 1e-4 ? view.azT : view.az + d * (1 - Math.exp(-dt * 7)); }
+  updateLight(dt);
+  if (!view.paused) update(dt);
+  updateUI(); render();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script>
+<script src="../prompt-panel.js" data-id="ice-rink-kiro-opus"></script>
+</body>
+</html>

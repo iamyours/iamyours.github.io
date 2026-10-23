@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>交互式 3D 涡扇喷气发动机 · 剖视与分解</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #07090d; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; color: #e8edf3; -webkit-user-select: none; user-select: none; }
+  canvas { display: block; position: fixed; inset: 0; touch-action: none; }
+  .label-layer { position: fixed !important; inset: 0; pointer-events: none; z-index: 4; }
+  .title {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 5;
+    pointer-events: none; text-align: center; white-space: nowrap;
+    font-size: 17px; font-weight: 700; letter-spacing: 3px; color: #dfe7f1;
+    text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  }
+  .title small { display: block; margin-top: 3px; font-size: 11px; font-weight: 500; letter-spacing: 2px; color: #8796a8; }
+  #explode {
+    position: fixed; top: 12px; right: 14px; z-index: 20;
+    min-width: 92px; padding: 9px 20px; border-radius: 999px; cursor: pointer;
+    font: 700 15px/1 "PingFang SC", "Microsoft YaHei", system-ui, sans-serif; letter-spacing: 4px;
+    color: #eaf5ff; background: linear-gradient(180deg, rgba(48, 110, 190, 0.9), rgba(26, 64, 120, 0.9));
+    border: 1px solid rgba(140, 200, 255, 0.55);
+    box-shadow: 0 4px 18px rgba(30, 100, 200, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    transition: transform .15s ease, box-shadow .25s ease, background .25s ease;
+  }
+  #explode:hover { transform: translateY(-1px); box-shadow: 0 6px 22px rgba(40, 130, 255, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.3); }
+  #explode:active { transform: translateY(1px); }
+  #explode.on { background: linear-gradient(180deg, rgba(210, 110, 40, 0.92), rgba(150, 62, 20, 0.92)); border-color: rgba(255, 190, 130, 0.6); box-shadow: 0 4px 18px rgba(230, 110, 30, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+  #info {
+    position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10;
+    width: max-content; max-width: min(760px, calc(100vw - 28px)); box-sizing: border-box;
+    padding: 10px 18px; border-radius: 14px; pointer-events: none;
+    background: rgba(12, 17, 25, 0.74); border: 1px solid rgba(140, 170, 210, 0.22);
+    backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+    font-size: 14px; line-height: 1.65; text-align: center; color: #c9d4e0;
+    transition: border-color .25s ease, box-shadow .25s ease;
+  }
+  #info.active { border-color: rgba(100, 180, 255, 0.65); box-shadow: 0 0 26px rgba(60, 150, 255, 0.28); color: #eef5fc; }
+  #info b { color: #86c8ff; margin-right: 8px; }
+  .label { display: flex; flex-direction: column; align-items: center; opacity: 0; transition: opacity .45s ease; pointer-events: none; }
+  .label.show { opacity: 1; }
+  .label .tag {
+    padding: 3px 10px; border-radius: 8px; white-space: nowrap;
+    font-size: 13px; font-weight: 600; letter-spacing: 1px; color: #e8f3ff;
+    background: rgba(12, 18, 28, 0.8); border: 1px solid rgba(124, 196, 255, 0.45);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+    transition: background .2s ease, border-color .2s ease, transform .2s ease;
+  }
+  .label .stem { width: 1px; height: 26px; background: linear-gradient(rgba(124, 196, 255, 0.85), rgba(124, 196, 255, 0.05)); }
+  .label.below .stem { height: 44px; background: linear-gradient(rgba(124, 196, 255, 0.05), rgba(124, 196, 255, 0.85)); }
+  .label.hot .tag { background: rgba(28, 86, 150, 0.92); border-color: #8fd0ff; transform: scale(1.08); }
+  @media (max-width: 640px) {
+    .title { top: 58px; font-size: 15px; }
+    #info { font-size: 13px; bottom: 12px; padding: 8px 14px; }
+    .label .tag { font-size: 11px; padding: 2px 7px; }
+    .label .stem { height: 18px; }
+    .label.below .stem { height: 30px; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<style>/* 避开右下角「📜 提示词」按钮 */@media (max-width:640px){#info{bottom:64px}}</style>
+</head>
+<body>
+<a href="../" style="position:fixed;top:12px;left:12px;z-index:1000;padding:6px 14px;border-radius:999px;background:rgba(251,244,226,0.85);color:#3a2e24;font:600 14px/1.4 'PingFang SC','Noto Sans SC',sans-serif;text-decoration:none;border:1.5px solid rgba(58,46,36,0.4)">← 返回 3D 作品</a>
+<div class="title">涡扇喷气发动机<small>进气 → 压缩 → 燃烧 → 涡轮 → 排气</small></div>
+<button id="explode" type="button">分解</button>
+<div id="info"></div>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const TAU = Math.PI * 2;
+const isTouch = matchMedia('(pointer: coarse)').matches;
+const infoEl = document.getElementById('info');
+const btn = document.getElementById('explode');
+const DEFAULT_INFO = isTouch
+  ? '点按部件查看作用 · 单指拖动旋转 · 双指缩放'
+  : '将鼠标悬停在部件上查看作用 · 拖动旋转 · 滚轮缩放';
+infoEl.textContent = DEFAULT_INFO;
+
+/* ================= 渲染器 / 场景 / 相机 ================= */
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.body.appendChild(renderer.domElement);
+
+const labelRenderer = new CSS2DRenderer();
+labelRenderer.setSize(window.innerWidth, window.innerHeight);
+labelRenderer.domElement.className = 'label-layer';
+document.body.appendChild(labelRenderer.domElement);
+
+const scene = new THREE.Scene();
+
+// 画布工具
+function makeCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  return [c, c.getContext('2d')];
+}
+
+// 背景：竖向渐变
+{
+  const [c, g] = makeCanvas(2, 512);
+  const gr = g.createLinearGradient(0, 0, 0, 512);
+  gr.addColorStop(0, '#1b2636');
+  gr.addColorStop(0.55, '#0c1119');
+  gr.addColorStop(1, '#040507');
+  g.fillStyle = gr; g.fillRect(0, 0, 2, 512);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  scene.background = t;
+}
+
+// 程序化环境贴图，提供金属反射
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+pmrem.dispose();
+
+const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 200);
+const VIEW_DIR = new THREE.Vector3(-0.62, 0.33, 0.72).normalize();
+// 根据需要显示的半长度计算相机距离（兼顾横屏与竖屏）
+function fitDist(halfSpan) {
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const dh = halfSpan / (t * Math.min(camera.aspect, 1.9));
+  const dv = 3.4 / t;
+  return Math.max(dh * 1.15, dv * 1.1);
+}
+camera.position.copy(VIEW_DIR).multiplyScalar(fitDist(6.4));
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.07;
+controls.enablePan = false;
+controls.minDistance = 4;
+controls.maxDistance = 75;
+controls.rotateSpeed = 0.7;
+controls.target.set(0, 0, 0);
+
+// 灯光
+const keyLight = new THREE.DirectionalLight(0xfff2e0, 1.7);
+keyLight.position.set(-6, 10, 8);
+const rimLight = new THREE.DirectionalLight(0x6fa8ff, 1.3);
+rimLight.position.set(8, 3, -8);
+scene.add(keyLight, rimLight, new THREE.HemisphereLight(0x9fb8d8, 0x101318, 0.35));
+
+/* ================= 几何工具 ================= */
+const V2 = (r, x) => new THREE.Vector2(r, x);
+// 旋转体：轮廓点 (半径, 轴向 x)，half=true 时只保留 z<=0 的一半（半剖）
+function lathe(profile, seg = 96, half = true) {
+  const g = half
+    ? new THREE.LatheGeometry(profile, Math.round(seg / 2), Math.PI / 2, Math.PI)
+    : new THREE.LatheGeometry(profile, seg, 0, TAU);
+  g.rotateZ(-Math.PI / 2); // 让旋转轴由 Y 轴变为 X 轴
+  return g;
+}
+// 剖切面：把闭合轮廓放到 z=0 平面的上下两侧
+function capGeo(profile) {
+  const shape = new THREE.Shape(profile.map(p => new THREE.Vector2(p.y, p.x)));
+  const top = new THREE.ShapeGeometry(shape);
+  const bot = top.clone();
+  bot.scale(1, -1, 1);
+  return mergeGeometries([top, bot]);
+}
+// 单片扭转叶片：沿径向 (Y) 展开，弦向在轴向 X 与切向 Z 之间扭转
+function bladeGeo(o) {
+  const { r0, r1, chord, chordTip = chord, twist0, twist1, camber = 0.06, sweep = 0, segU = 3, segV = 8, x = 0 } = o;
+  const g = new THREE.PlaneGeometry(1, 1, segU, segV);
+  const p = g.attributes.position;
+  for (let i = 0; i < p.count; i++) {
+    const u = p.getX(i);          // -0.5..0.5 弦向
+    const v = p.getY(i) + 0.5;    // 0..1 展向
+    const r = r0 + (r1 - r0) * v;
+    const c = chord + (chordTip - chord) * v;
+    const th = twist0 + (twist1 - twist0) * v;
+    const s = u * c;
+    const camb = camber * c * (1 - 4 * u * u);
+    const ax = s * Math.cos(th) - camb * Math.sin(th) + sweep * v * v + x;
+    const tg = s * Math.sin(th) + camb * Math.cos(th);
+    p.setXYZ(i, ax, r, tg);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+// 一圈叶片；half=true 时只保留被剖开后剩下的一半（静子/导向叶片）
+function bladeRing(n, o, half = false, phase = 0) {
+  const base = o.geo || bladeGeo(o);
+  const geos = [];
+  for (let k = 0; k < n; k++) {
+    const a = (phase + k / n * TAU) % TAU;
+    if (half && (a < Math.PI - 1e-4)) continue;
+    const g = base.clone();
+    g.rotateX(a);
+    geos.push(g);
+  }
+  return mergeGeometries(geos);
+}
+// 沿 X 轴的圆柱
+function cylX(r0, r1, len, x, seg = 48, open = false) {
+  const g = new THREE.CylinderGeometry(r1, r0, len, seg, 1, open);
+  g.rotateZ(-Math.PI / 2);
+  g.translate(x, 0, 0);
+  return g;
+}
+
+/* ================= 部件系统 ================= */
+const engine = new THREE.Group();
+scene.add(engine);
+const parts = [];
+const pickables = [];
+const lpSpool = []; // 低压转子（风扇 + 低压压缩机 + 低压涡轮 + 低压轴）
+const hpSpool = []; // 高压转子（高压压缩机 + 高压涡轮 + 高压轴）
+
+function makePart(name, desc, offset, label, opt = {}) {
+  const group = new THREE.Group();
+  engine.add(group);
+  const p = { name, desc, offset, group, mats: [], hl: 0, cur: 0, from: 0, to: 0, t0: 0, anim: false, fade: !!opt.fade, opacity: 1 };
+  const el = document.createElement('div');
+  el.className = 'label' + (label.below ? ' below' : '');
+  const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = name;
+  const stem = document.createElement('div'); stem.className = 'stem';
+  if (label.below) el.append(stem, tag); else el.append(tag, stem);
+  const obj = new CSS2DObject(el);
+  obj.position.set(label.x, label.y, label.z ?? 0);
+  obj.center.set(0.5, label.below ? 0 : 1);
+  group.add(obj);
+  p.labelEl = el;
+  parts.push(p);
+  return p;
+}
+// 每个部件独立的材质，便于单独高亮 / 淡出
+function mat(p, params) {
+  const m = new THREE.MeshStandardMaterial(params);
+  if (p.fade) m.transparent = true;
+  m.userData.baseE = m.emissive.clone();
+  m.userData.baseEI = m.emissiveIntensity;
+  p.mats.push(m);
+  return m;
+}
+function add(p, geo, m, parent = p.group, pick = true) {
+  const mesh = new THREE.Mesh(geo, m);
+  parent.add(mesh);
+  if (pick) { mesh.userData.part = p; pickables.push(mesh); }
+  return mesh;
+}
+function rotor(p, spool) {
+  const g = new THREE.Group();
+  p.group.add(g);
+  spool.push(g);
+  return g;
+}
+
+// 材质预设
+const TI = { color: 0xc4cad2, metalness: 1, roughness: 0.27 };
+const STEEL = { color: 0x9aa1aa, metalness: 1, roughness: 0.36 };
+const DARK = { color: 0x3b4048, metalness: 0.85, roughness: 0.42 };
+const CUT = { color: 0xc8402a, metalness: 0.15, roughness: 0.55, side: THREE.DoubleSide };
+const DS = THREE.DoubleSide;
+
+// 尖锥螺旋纹理（真实发动机上的白色螺旋标记）
+function spiralTex() {
+  const [c, g] = makeCanvas(256, 256);
+  g.fillStyle = '#1f2228'; g.fillRect(0, 0, 256, 256);
+  g.strokeStyle = '#f1f1f1'; g.lineWidth = 16; g.lineCap = 'round';
+  for (const off of [-256, 0, 256]) {
+    g.beginPath();
+    for (let i = 0; i <= 48; i++) {
+      const v = i / 48;
+      const x = off + 30 + v * 190, y = (1 - v) * 256;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
+  return t;
+}
+// 火焰筒自发光贴图：冷却孔透出火光
+function linerTex() {
+  const [c, g] = makeCanvas(512, 256);
+  const bg = g.createLinearGradient(0, 0, 0, 256);
+  bg.addColorStop(0, '#2a0c02'); bg.addColorStop(0.5, '#5a1e05'); bg.addColorStop(1, '#2a0c02');
+  g.fillStyle = bg; g.fillRect(0, 0, 512, 256);
+  for (const vy of [0.12, 0.24, 0.36, 0.64, 0.76, 0.88]) {
+    const y = (1 - vy) * 256;
+    const n = 26;
+    for (let i = 0; i < n; i++) {
+      const x = (i + (vy * 10 % 1) * 0.5 + 0.5) / n * 512;
+      const r = 7;
+      const rg = g.createRadialGradient(x, y, 0, x, y, r);
+      rg.addColorStop(0, '#fff0b0'); rg.addColorStop(0.45, '#ff8a20'); rg.addColorStop(1, 'rgba(255,80,0,0)');
+      g.fillStyle = rg;
+      g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/* ---------- 1. 进气风扇 ---------- */
+const fan = makePart('进气风扇',
+  '巨大的前风扇把大量空气吸入发动机，其中约八到九成绕过核心机从外涵道排出，产生涡扇发动机的大部分推力。',
+  -5.2, { x: -4.6, y: 2.95 });
+{
+  const r = rotor(fan, lpSpool);
+  add(fan, bladeRing(22, { r0: 0.5, r1: 2.27, chord: 0.62, chordTip: 0.94, twist0: 0.45, twist1: 1.12, camber: 0.09, sweep: 0.16, segU: 4, segV: 14, x: -4.6 }),
+    mat(fan, { ...TI, side: DS }), r);
+  // 轮毂
+  add(fan, cylX(0.6, 0.6, 0.7, -4.6, 48), mat(fan, { ...DARK }), r);
+  // 带螺旋标记的整流锥
+  const spin = lathe([V2(0, -5.72), V2(0.12, -5.63), V2(0.27, -5.46), V2(0.4, -5.23), V2(0.5, -4.99), V2(0.57, -4.76), V2(0.605, -4.6)], 64, false);
+  add(fan, spin, mat(fan, { color: 0xffffff, map: spiralTex(), metalness: 0.55, roughness: 0.3 }), r);
+}
+
+/* ---------- 2. 低压压缩机 ---------- */
+const lpc = makePart('低压压缩机',
+  '又称增压级，与风扇同轴转动，对进入核心机的空气进行第一轮增压，再送往高压压缩机。',
+  -3.4, { x: -3.45, y: 1.85 });
+{
+  const r = rotor(lpc, lpSpool);
+  const bm = mat(lpc, { ...STEEL, side: DS });
+  [-3.88, -3.48, -3.08].forEach((x, i) => {
+    add(lpc, bladeRing(34 + i * 2, { r0: 0.56, r1: 1.28, chord: 0.2, twist0: 0.7, twist1: 1.0, camber: 0.07, x }), bm, r);
+  });
+  add(lpc, lathe([V2(0.3, -4.06), V2(0.55, -4.06), V2(0.6, -2.98), V2(0.3, -2.92)], 64, false), mat(lpc, { ...DARK }), r);
+  const sm = mat(lpc, { color: 0x8b929b, metalness: 1, roughness: 0.4, side: DS });
+  [-4.02, -3.68, -3.28].forEach((x, i) => {
+    add(lpc, bladeRing(40, { r0: 0.57, r1: 1.32, chord: 0.14, twist0: -0.45, twist1: -0.7, camber: 0.05, x }, true, i * 0.05), sm);
+  });
+}
+
+/* ---------- 3. 高压压缩机 ---------- */
+const hpc = makePart('高压压缩机',
+  '多级叶片逐级把空气压缩到几十倍大气压，越往后叶片越短小、温度越高，为燃烧提供高压空气。',
+  -1.6, { x: -1.7, y: 1.6 });
+{
+  const casR = x => 1.14 + (x + 2.6) / 1.8 * (0.9 - 1.14);
+  const hubR = x => 0.5 + (x + 2.6) / 1.8 * 0.2;
+  const r = rotor(hpc, hpSpool);
+  const bm = mat(hpc, { color: 0xc0c5cc, metalness: 1, roughness: 0.3, side: DS });
+  const sm = mat(hpc, { color: 0x8d949c, metalness: 1, roughness: 0.4, side: DS });
+  for (let i = 0; i < 6; i++) {
+    const x = -2.45 + i * 0.3;
+    add(hpc, bladeRing(44 + i * 4, { r0: hubR(x), r1: casR(x) - 0.03, chord: 0.14 - i * 0.01, twist0: 0.8, twist1: 1.05, camber: 0.06, segV: 5, x }), bm, r);
+    const xs = x + 0.15;
+    add(hpc, bladeRing(52 + i * 4, { r0: hubR(xs), r1: casR(xs), chord: 0.1, twist0: -0.6, twist1: -0.75, camber: 0.04, segU: 2, segV: 4, x: xs }, true, i * 0.03), sm);
+  }
+  add(hpc, lathe([V2(0.3, -2.62), V2(0.5, -2.62), V2(0.7, -0.8), V2(0.3, -0.8)], 64, false), mat(hpc, { ...DARK }), r);
+}
+
+/* ---------- 4. 燃烧室 ---------- */
+const comb = makePart('燃烧室',
+  '环形燃烧室中，燃油经喷嘴雾化后与高压空气混合燃烧，燃气温度可超过 1500℃，是发动机能量的来源。',
+  0, { x: 0.15, y: 1.8 });
+const linerMat = mat(comb, { color: 0x8c8178, metalness: 0.85, roughness: 0.42, emissive: 0xff7a2a, emissiveMap: linerTex(), emissiveIntensity: 1.6, side: DS });
+const flameMats = [];
+let combLight;
+{
+  // 火焰筒（半剖）
+  add(comb, lathe([V2(0.68, 0.9), V2(0.64, 0.6), V2(0.64, -0.3), V2(0.7, -0.52), V2(0.86, -0.64), V2(1.0, -0.52), V2(1.04, -0.3), V2(1.04, 0.6), V2(1.0, 0.9)], 96, true), linerMat);
+  // 燃油喷嘴
+  const nz = mergeGeometries([
+    new THREE.CylinderGeometry(0.03, 0.045, 0.16, 10).rotateZ(-Math.PI / 2).translate(-0.7, 0.86, 0),
+    new THREE.CylinderGeometry(0.02, 0.02, 0.3, 8).translate(-0.76, 1.0, 0)
+  ]);
+  add(comb, bladeRing(18, { geo: nz }, true, 0.08), mat(comb, { color: 0xb59a6a, metalness: 1, roughness: 0.3 }));
+  // 扩压器内外壁
+  add(comb, lathe([V2(0.72, -0.8), V2(0.66, -0.66)], 64, true), mat(comb, { ...STEEL, side: DS }));
+
+  // 程序化火焰：多层加色混合的流动噪声
+  const flameVS = `
+    varying vec2 vUv;
+    void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`;
+  const flameFS = `
+    uniform float uTime; uniform float uSeed; uniform float uGain;
+    varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p){
+      vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);
+    }
+    float fbm(vec2 p){ float s = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ s += a * noise(p); p *= 2.03; a *= 0.5; } return s; }
+    void main(){
+      // x 环向（首尾相接），y 轴向：火焰由前向后流动
+      vec2 p = vec2(vUv.x * 36.0 + uSeed * 7.0, vUv.y * 4.0 - uTime * 2.6);
+      float n = fbm(p + vec2(fbm(p * 1.6 + uTime * 0.6), 0.0));
+      float along = smoothstep(0.0, 0.18, vUv.y) * (1.0 - smoothstep(0.7, 1.0, vUv.y));
+      float f = pow(n, 1.7) * along * uGain;
+      vec3 col = mix(vec3(1.0, 0.22, 0.02), vec3(1.0, 0.72, 0.28), smoothstep(0.35, 0.75, n));
+      col = mix(col, vec3(0.65, 0.8, 1.0), smoothstep(0.82, 1.0, n) * 0.5);
+      gl_FragColor = vec4(col * f * 2.2, f);
+    }`;
+  [0.74, 0.84, 0.94].forEach((rr, i) => {
+    const m = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uSeed: { value: i * 1.7 }, uGain: { value: 1.0 } },
+      vertexShader: flameVS, fragmentShader: flameFS,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: DS
+    });
+    flameMats.push(m);
+    const g = lathe([V2(rr - 0.05, -0.55), V2(rr, -0.25), V2(rr + 0.01, 0.3), V2(rr - 0.02, 0.88)], 96, false);
+    add(comb, g, m);
+  });
+  combLight = new THREE.PointLight(0xff7a30, 16, 6, 2);
+  combLight.position.set(0.15, 0, 0);
+  comb.group.add(combLight);
+}
+
+/* ---------- 5. 高压涡轮 ---------- */
+const hpt = makePart('高压涡轮',
+  '紧接燃烧室，承受最炽热的燃气冲击，从燃气中提取能量，通过高压轴驱动高压压缩机。',
+  1.6, { x: 1.28, y: 1.45 });
+{
+  const r = rotor(hpt, hpSpool);
+  const hot = mat(hpt, { color: 0xa8835f, metalness: 0.9, roughness: 0.38, emissive: 0xff4a10, emissiveIntensity: 0.22, side: DS });
+  const ngv = mat(hpt, { color: 0x9c7a5a, metalness: 0.85, roughness: 0.45, emissive: 0xff5a14, emissiveIntensity: 0.35, side: DS });
+  add(hpt, bladeRing(32, { r0: 0.63, r1: 1.0, chord: 0.12, twist0: -0.9, twist1: -0.95, camber: 0.05, segV: 5, x: 1.06 }, true), ngv);
+  add(hpt, bladeRing(48, { r0: 0.64, r1: 0.99, chord: 0.11, twist0: 1.0, twist1: 1.1, camber: 0.06, segV: 5, x: 1.22 }), hot, r);
+  add(hpt, bladeRing(36, { r0: 0.63, r1: 1.0, chord: 0.11, twist0: -0.85, twist1: -0.9, camber: 0.05, segV: 5, x: 1.38 }, true, 0.04), ngv);
+  add(hpt, bladeRing(52, { r0: 0.64, r1: 1.0, chord: 0.11, twist0: 1.0, twist1: 1.12, camber: 0.06, segV: 5, x: 1.52 }), hot, r);
+  add(hpt, lathe([V2(0.28, 1.12), V2(0.62, 1.12), V2(0.645, 1.6), V2(0.28, 1.62)], 64, false), mat(hpt, { color: 0x6f6258, metalness: 0.9, roughness: 0.4 }), r);
+}
+
+/* ---------- 6. 低压涡轮 ---------- */
+const lpt = makePart('低压涡轮',
+  '多级低压涡轮继续从燃气中榨取能量，经贯穿发动机的低压轴带动前方的风扇和低压压缩机。',
+  3.2, { x: 2.4, y: 2.05 });
+{
+  const casR = x => 1.02 + (x - 1.55) / 1.6 * 0.46;
+  const r = rotor(lpt, lpSpool);
+  const bm = mat(lpt, { color: 0x9b928a, metalness: 0.95, roughness: 0.4, emissive: 0xff4010, emissiveIntensity: 0.08, side: DS });
+  const sm = mat(lpt, { color: 0x847c75, metalness: 0.9, roughness: 0.45, side: DS });
+  [1.82, 2.2, 2.58, 2.96].forEach((x, i) => {
+    add(lpt, bladeRing(60 + i * 4, { r0: 0.6, r1: casR(x) - 0.03, chord: 0.14, twist0: 1.0, twist1: 1.15, camber: 0.07, segV: 6, x }), bm, r);
+  });
+  [1.68, 2.01, 2.39, 2.77].forEach((x, i) => {
+    add(lpt, bladeRing(56, { r0: 0.6, r1: casR(x), chord: 0.1, twist0: -0.8, twist1: -0.9, camber: 0.05, segU: 2, segV: 5, x }, true, i * 0.03), sm);
+  });
+  add(lpt, lathe([V2(0.14, 1.64), V2(0.6, 1.64), V2(0.6, 3.12), V2(0.14, 3.12)], 64, false), mat(lpt, { ...DARK }), r);
+}
+
+/* ---------- 7. 尾喷管 ---------- */
+const nozzle = makePart('尾喷管',
+  '收敛形喷管把剩余燃气加速向后高速喷出产生推力，中心的尾锥让排气平顺汇合、减少损失。',
+  5.2, { x: 4.4, y: 1.85 });
+const plumeMats = [];
+{
+  const prof = [V2(1.47, 3.2), V2(1.3, 4.1), V2(1.05, 5.0), V2(1.1, 5.03), V2(1.37, 4.1), V2(1.57, 3.2), V2(1.47, 3.2)];
+  add(nozzle, lathe(prof, 96, true), mat(nozzle, { color: 0x77706a, metalness: 1, roughness: 0.33, side: DS }));
+  add(nozzle, capGeo(prof), mat(nozzle, { ...CUT }));
+  add(nozzle, lathe([V2(0, 3.18), V2(0.6, 3.18), V2(0.6, 3.6), V2(0.5, 4.3), V2(0.3, 5.0), V2(0.1, 5.45), V2(0, 5.56)], 64, false),
+    mat(nozzle, { color: 0x5d5853, metalness: 0.95, roughness: 0.38, emissive: 0xff3a00, emissiveIntensity: 0.05 }));
+  // 排气支板
+  add(nozzle, bladeRing(10, { r0: 0.58, r1: 1.48, chord: 0.2, twist0: 0, twist1: 0, camber: 0, x: 3.32 }, true, 0.1), mat(nozzle, { ...STEEL, side: DS }));
+
+  // 尾焰：带马赫环的加色锥体
+  const plumeVS = `
+    varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+    void main(){
+      vUv = uv;
+      vec4 mv = modelViewMatrix * vec4(position, 1.0);
+      vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz);
+      gl_Position = projectionMatrix * mv;
+    }`;
+  const plumeFS = `
+    uniform float uTime; uniform float uGain; uniform vec3 uHot; uniform vec3 uCool;
+    varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+    void main(){
+      float s = vUv.y; // 0 = 喷口，1 = 末端
+      float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6);
+      float fade = pow(1.0 - s, 1.4) * smoothstep(0.0, 0.04, s);
+      float diamonds = pow(abs(sin(s * 15.0 - 0.6)), 8.0) * (1.0 - s);
+      float flick = 0.86 + 0.14 * sin(uTime * 37.0 + s * 26.0) * sin(uTime * 23.0);
+      vec3 col = mix(uHot, uCool, smoothstep(0.0, 0.7, s));
+      float a = edge * fade * (0.4 + diamonds * 1.4) * flick * uGain;
+      gl_FragColor = vec4(col * a, a);
+    }`;
+  const mk = (gain, hot, cool) => {
+    const m = new THREE.ShaderMaterial({
+      uniforms: { uTime: { value: 0 }, uGain: { value: gain }, uHot: { value: new THREE.Color(hot) }, uCool: { value: new THREE.Color(cool) } },
+      vertexShader: plumeVS, fragmentShader: plumeFS,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: DS
+    });
+    plumeMats.push(m);
+    return m;
+  };
+  const outer = new THREE.Mesh(cylX(1.0, 0.42, 4.4, 5.0 + 2.2, 48, true), mk(0.45, 0xff9a50, 0x3a5cff));
+  const inner = new THREE.Mesh(cylX(0.5, 0.06, 2.8, 5.45 + 1.4, 32, true), mk(0.9, 0xffd9a0, 0x6f8cff));
+  nozzle.group.add(outer, inner);
+}
+
+/* ---------- 8. 主轴 ---------- */
+const shaft = makePart('主轴',
+  '同心套装的低压轴与高压轴：内侧细长的低压轴连接风扇与低压涡轮，外侧的高压轴连接高压压缩机与高压涡轮。',
+  0, { x: 1.9, y: -0.3, below: true });
+{
+  const lp = rotor(shaft, lpSpool);
+  const hp = rotor(shaft, hpSpool);
+  const lm = mat(shaft, { color: 0xd3d7dd, metalness: 1, roughness: 0.16 });
+  add(shaft, cylX(0.11, 0.11, 8.2, -0.65, 24), lm, lp);
+  // 花键凸台，让旋转清晰可见
+  const keys = [];
+  for (let k = 0; k < 4; k++) {
+    for (const x of [-4.3, -2.85, 1.85, 2.6, 3.3]) {
+      const b = new THREE.BoxGeometry(0.32, 0.04, 0.05).translate(x, 0.12, 0);
+      b.rotateX(k * Math.PI / 2);
+      keys.push(b);
+    }
+  }
+  add(shaft, mergeGeometries(keys), mat(shaft, { color: 0xb88a3c, metalness: 1, roughness: 0.3 }), lp);
+  add(shaft, cylX(0.25, 0.25, 4.22, -0.49, 32), mat(shaft, { color: 0x8f969f, metalness: 1, roughness: 0.3 }), hp);
+  const flanges = [];
+  for (const x of [-2.4, -0.85, 0.95]) flanges.push(cylX(0.31, 0.31, 0.06, x, 32));
+  add(shaft, mergeGeometries(flanges), mat(shaft, { color: 0x6e757e, metalness: 1, roughness: 0.35 }), hp);
+  // 轴承（静止）
+  const bm = mat(shaft, { color: 0xb08d57, metalness: 1, roughness: 0.32 });
+  for (const [x, r] of [[-4.35, 0.17], [-2.75, 0.32], [1.7, 0.32], [3.3, 0.17]]) {
+    const t = new THREE.TorusGeometry(r, 0.05, 10, 40);
+    t.rotateY(Math.PI / 2);
+    t.translate(x, 0, 0);
+    add(shaft, t, bm);
+  }
+}
+
+/* ---------- 9. 核心机匣（半剖） ---------- */
+const casing = makePart('核心机匣',
+  '包围压缩机、燃烧室和涡轮的承力外壳，固定各级静子叶片，并构成核心气流的通道。',
+  0, { x: -1.2, y: -1.55, below: true }, { fade: true });
+{
+  const prof = [V2(1.33, -4.15), V2(1.32, -2.95), V2(1.14, -2.6), V2(0.9, -0.8), V2(1.12, -0.62), V2(1.12, 0.95), V2(1.02, 1.02), V2(1.02, 1.55),
+    V2(1.48, 3.15), V2(1.56, 3.2), V2(1.62, 2.4), V2(1.5, 0.6), V2(1.5, -1.2), V2(1.58, -2.9), V2(1.5, -3.85), V2(1.33, -4.15)];
+  add(casing, lathe(prof, 112, true), mat(casing, { color: 0x8d949d, metalness: 0.9, roughness: 0.34, side: DS }));
+  add(casing, capGeo(prof), mat(casing, { ...CUT }));
+}
+
+/* ---------- 10. 风扇机匣 / 短舱（半剖） ---------- */
+const nacelle = makePart('风扇机匣',
+  '包裹风扇与外涵道的短舱外壳，内侧的出口导向叶片把旋转的外涵气流整直，机匣还能包容意外断裂的叶片。',
+  -1.0, { x: -2.5, y: 3.3 }, { fade: true });
+{
+  const prof = [V2(2.36, -5.6), V2(2.34, -4.0), V2(2.33, -2.0), V2(2.3, -0.5), V2(2.26, 0.65), V2(2.33, 0.68), V2(2.55, -0.4),
+    V2(2.78, -2.4), V2(2.84, -4.2), V2(2.76, -5.35), V2(2.6, -5.72), V2(2.45, -5.74), V2(2.36, -5.6)];
+  add(nacelle, lathe(prof, 128, true), mat(nacelle, { color: 0xe3e6ea, metalness: 0.35, roughness: 0.3, side: DS }));
+  add(nacelle, capGeo(prof), mat(nacelle, { ...CUT }));
+  // 出口导向叶片
+  add(nacelle, bladeRing(36, { r0: 1.55, r1: 2.34, chord: 0.3, twist0: -0.3, twist1: -0.22, camber: 0.08, segV: 6, x: -3.3 }, true, 0.02),
+    mat(nacelle, { color: 0xa9b0b8, metalness: 1, roughness: 0.35, side: DS }));
+  // 风扇包容环
+  const ring = new THREE.TorusGeometry(2.37, 0.035, 8, 64, Math.PI);
+  ring.rotateY(Math.PI / 2);
+  ring.rotateX(-Math.PI / 2); // 只保留 z<=0 的半圈
+  ring.translate(-4.6, 0, 0);
+  add(nacelle, ring, mat(nacelle, { color: 0x50565e, metalness: 1, roughness: 0.4 }));
+}
+
+/* ================= 展台与地面 ================= */
+const FLOOR_Y = -3.5;
+{
+  const sm = new THREE.MeshStandardMaterial({ color: 0x2a2f37, metalness: 0.7, roughness: 0.45 });
+  const stands = [];
+  for (const [x, top] of [[-2.8, -2.72], [2.2, -1.5]]) {
+    const h = top - FLOOR_Y;
+    stands.push(new THREE.BoxGeometry(0.22, h, 0.9).translate(x, FLOOR_Y + h / 2, 0));
+    stands.push(new THREE.BoxGeometry(1.0, 0.08, 1.4).translate(x, FLOOR_Y + 0.04, 0));
+  }
+  scene.add(new THREE.Mesh(mergeGeometries(stands), sm));
+
+  const [c, g] = makeCanvas(1024, 1024);
+  g.strokeStyle = 'rgba(150,180,220,0.16)'; g.lineWidth = 1.5;
+  for (let i = 0; i <= 1024; i += 32) {
+    g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 1024); g.stroke();
+    g.beginPath(); g.moveTo(0, i); g.lineTo(1024, i); g.stroke();
+  }
+  g.globalCompositeOperation = 'destination-in';
+  const m = g.createRadialGradient(512, 512, 60, 512, 512, 512);
+  m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = m; g.fillRect(0, 0, 1024, 1024);
+  g.globalCompositeOperation = 'source-over';
+  const glow = g.createRadialGradient(512, 512, 0, 512, 512, 512);
+  glow.addColorStop(0, 'rgba(90,120,165,0.22)'); glow.addColorStop(0.6, 'rgba(50,70,100,0.07)'); glow.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, 1024, 1024);
+  g.save(); g.translate(512, 512); g.scale(1, 0.3);
+  const sh = g.createRadialGradient(0, 0, 0, 0, 0, 210);
+  sh.addColorStop(0, 'rgba(0,0,0,0.6)'); sh.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = sh; g.beginPath(); g.arc(0, 0, 210, 0, TAU); g.fill();
+  g.restore();
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 8;
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false }));
+  floor.rotation.x = -Math.PI / 2;
+  floor.position.y = FLOOR_Y;
+  scene.add(floor);
+}
+
+/* ================= 后期：辉光 ================= */
+const composer = new EffectComposer(renderer);
+composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+composer.setSize(window.innerWidth, window.innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.6, 0.45, 0.85);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+/* ================= 交互：悬停 / 点按高亮 ================= */
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let hovered = null;
+let pointerDirty = false;
+let pointerInside = false;
+let dragging = false;
+let downPos = null;
+
+function setNdc(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set((e.clientX - r.left) / r.width * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+}
+function pickPart() {
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObjects(pickables, false);
+  for (const h of hits) {
+    const p = h.object.userData.part;
+    if (p.fade && p.opacity < 0.6) continue; // 淡出的机匣不挡住内部部件
+    return p;
+  }
+  return null;
+}
+function setHovered(p) {
+  if (p === hovered) return;
+  hovered = p;
+  if (p) {
+    infoEl.innerHTML = '';
+    const b = document.createElement('b'); b.textContent = p.name;
+    infoEl.append(b, document.createTextNode(p.desc));
+    infoEl.classList.add('active');
+  } else {
+    infoEl.textContent = DEFAULT_INFO;
+    infoEl.classList.remove('active');
+  }
+  renderer.domElement.style.cursor = p ? 'pointer' : '';
+  for (const q of parts) q.labelEl.classList.toggle('hot', q === p);
+}
+
+const canvasEl = renderer.domElement;
+canvasEl.addEventListener('pointermove', e => {
+  if (e.pointerType !== 'mouse') return;
+  setNdc(e);
+  pointerInside = true;
+  pointerDirty = true;
+  dragging = (e.buttons & 1) === 1;
+});
+canvasEl.addEventListener('pointerleave', e => {
+  if (e.pointerType !== 'mouse') return;
+  pointerInside = false;
+  setHovered(null);
+});
+canvasEl.addEventListener('pointerdown', e => { downPos = { x: e.clientX, y: e.clientY }; });
+canvasEl.addEventListener('pointerup', e => {
+  if (!downPos) return;
+  const moved = Math.hypot(e.clientX - downPos.x, e.clientY - downPos.y);
+  downPos = null;
+  dragging = false;
+  if (e.pointerType === 'mouse' || moved > 8) return;
+  // 触屏：点按选中，再点同一部件或空白处取消
+  setNdc(e);
+  const p = pickPart();
+  setHovered(p === hovered ? null : p);
+});
+
+/* ================= 分解 / 复原 ================= */
+let exploded = false;
+let camPush = 0;
+const DUR = 1.25;
+const easeInOutCubic = k => (k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2);
+const easeOutBack = k => { const c1 = 1.25, c3 = c1 + 1; return 1 + c3 * Math.pow(k - 1, 3) + c1 * Math.pow(k - 1, 2); };
+
+btn.addEventListener('click', () => {
+  exploded = !exploded;
+  btn.textContent = exploded ? '复原' : '分解';
+  btn.classList.toggle('on', exploded);
+  const now = clock.elapsedTime;
+  const order = parts.map((_, i) => i).sort((a, b) => Math.abs(parts[b].offset) - Math.abs(parts[a].offset));
+  // 分解：外侧部件先动；复原：内侧部件先归位
+  (exploded ? order : order.slice().reverse()).forEach((idx, k) => {
+    const p = parts[idx];
+    p.from = p.cur; p.to = exploded ? 1 : 0; p.t0 = now + k * 0.045; p.anim = true;
+  });
+  const d = camera.position.distanceTo(controls.target);
+  const want = fitDist(exploded ? 11.6 : 6.4);
+  camPush = exploded ? Math.max(d, want) : Math.min(d, want);
+});
+controls.addEventListener('start', () => { camPush = 0; });
+
+/* ================= 动画循环 ================= */
+const clock = new THREE.Clock();
+const HL = new THREE.Color(0x3fa9ff);
+const tmpV = new THREE.Vector3();
+const LP_SPEED = 4.2, HP_SPEED = 8.5;
+
+function update(dt, t) {
+  // 转子旋转
+  for (const g of lpSpool) g.rotation.x -= LP_SPEED * dt;
+  for (const g of hpSpool) g.rotation.x -= HP_SPEED * dt;
+
+  // 燃烧闪烁
+  const flick = 0.86 + 0.09 * Math.sin(t * 23.0) + 0.05 * Math.sin(t * 57.0 + 1.3);
+  combLight.intensity = 16 * flick;
+  linerMat.userData.baseEI = 1.6 * flick;
+  for (const m of flameMats) { m.uniforms.uTime.value = t; m.uniforms.uGain.value = 0.9 + 0.2 * flick; }
+  for (const m of plumeMats) m.uniforms.uTime.value = t;
+
+  for (const p of parts) {
+    // 沿轴线滑动
+    if (p.anim) {
+      const k = THREE.MathUtils.clamp((t - p.t0) / DUR, 0, 1);
+      const e = p.to > p.from ? easeInOutCubic(k) : easeOutBack(k);
+      p.cur = p.from + (p.to - p.from) * e;
+      if (k >= 1) { p.cur = p.to; p.anim = false; }
+      p.group.position.x = p.offset * p.cur;
+    }
+    // 机匣在分解时淡出
+    if (p.fade) {
+      const o = 1 - 0.82 * THREE.MathUtils.clamp(p.cur, 0, 1);
+      if (Math.abs(o - p.opacity) > 1e-3 || p.anim) {
+        p.opacity = o;
+        for (const m of p.mats) { m.opacity = o; m.depthWrite = o > 0.98; }
+      }
+    }
+    // 高亮渐变
+    const target = p === hovered ? 1 : 0;
+    p.hl += (target - p.hl) * (1 - Math.exp(-dt * 12));
+    for (const m of p.mats) {
+      m.emissive.copy(m.userData.baseE).multiplyScalar(m.userData.baseEI).lerp(HL, p.hl * 0.55);
+      m.emissiveIntensity = 1;
+    }
+    p.labelEl.classList.toggle('show', exploded && p.cur > 0.6);
+  }
+
+  // 分解/复原时平滑调整相机距离
+  if (camPush) {
+    tmpV.copy(camera.position).sub(controls.target);
+    const d = tmpV.length();
+    const nd = d + (camPush - d) * (1 - Math.exp(-dt * 3));
+    tmpV.setLength(nd);
+    camera.position.copy(controls.target).add(tmpV);
+    if (Math.abs(nd - camPush) < 0.02) camPush = 0;
+  }
+
+  // 鼠标悬停拾取（每帧最多一次）
+  if (pointerDirty && pointerInside && !dragging) {
+    pointerDirty = false;
+    setHovered(pickPart());
+  }
+}
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt, clock.elapsedTime);
+  controls.update();
+  composer.render();
+  labelRenderer.render(scene, camera);
+}
+
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h);
+  composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  composer.setSize(w, h);
+  bloom.resolution.set(w, h);
+  labelRenderer.setSize(w, h);
+});
+
+animate();
+</script>
+<script src="../prompt-panel.js" data-id="jet-engine-kiro-opus"></script>
+</body>
+</html>
