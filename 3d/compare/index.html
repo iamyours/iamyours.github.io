@@ -372,11 +372,18 @@
       pointer-events: auto;
       user-select: none;
       -webkit-user-select: none;
+      max-width: calc(100% - 96px);
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
 
     .badge {
-      display: inline-flex;
-      align-items: center;
+      display: inline-block;
+      vertical-align: middle;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
       padding: 3px 8px;
       border: 1.5px solid var(--ink);
       border-radius: 999px;
@@ -440,6 +447,12 @@
 
     .tile-icon-btn:active {
       transform: translateY(1px);
+    }
+
+    @media (max-width: 640px), (max-height: 500px) {
+      .compare-tile:not(.is-pseudo-fs):not(:fullscreen) .tile-chat-btn {
+        display: none;
+      }
     }
 
     /* 全屏状态 */
@@ -976,11 +989,30 @@
       // 全屏与伪全屏管理
       let activePseudoTile = null;
 
+      function syncEmbedUi() {
+        const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+        document.querySelectorAll('.compare-tile').forEach((tile) => {
+          const isFs = (tile === fsEl) || tile.classList.contains('is-pseudo-fs');
+          const iframe = tile.querySelector('iframe');
+          if (iframe && iframe.contentWindow) {
+            // same-origin: toggle directly so it applies at once even if the scene is busy; postMessage as fallback
+            try {
+              const de = iframe.contentDocument && iframe.contentDocument.documentElement;
+              if (de) de.classList.toggle('pp-embed-hide', !isFs);
+            } catch (err) {}
+            try {
+              iframe.contentWindow.postMessage({ type: 'pp-embed-ui', show: isFs }, '*');
+            } catch (err) {}
+          }
+        });
+      }
+
       function enterPseudoFs(tile) {
         activePseudoTile = tile;
         tile.classList.add('is-pseudo-fs');
         document.body.classList.add('has-pseudo-fs');
         updateTileFsButtons(tile, true);
+        syncEmbedUi();
       }
 
       function exitPseudoFs() {
@@ -990,6 +1022,7 @@
           activePseudoTile = null;
         }
         document.body.classList.remove('has-pseudo-fs');
+        syncEmbedUi();
       }
 
       function updateTileFsButtons(tile, isFs) {
@@ -1032,10 +1065,26 @@
           const isFs = (t === fsEl) || t.classList.contains('is-pseudo-fs');
           updateTileFsButtons(t, isFs);
         });
+        syncEmbedUi();
       }
 
       document.addEventListener('fullscreenchange', onFullscreenChange);
       document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+      window.addEventListener('message', (event) => {
+        if (event.data && event.data.type === 'pp-embed-ready') {
+          const fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+          document.querySelectorAll('.compare-tile').forEach((tile) => {
+            const iframe = tile.querySelector('iframe');
+            if (iframe && iframe.contentWindow === event.source) {
+              const isFs = (tile === fsEl) || tile.classList.contains('is-pseudo-fs');
+              try {
+                iframe.contentWindow.postMessage({ type: 'pp-embed-ui', show: isFs }, '*');
+              } catch (err) {}
+            }
+          });
+        }
+      });
 
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
@@ -1192,11 +1241,12 @@
         // iframe 占满整个 tile
         const iframe = document.createElement('iframe');
         iframe.className = 'tile-frame';
-        iframe.src = '../' + encodeURIComponent(scene.id) + suffix + '/';
+        iframe.src = '../' + encodeURIComponent(scene.id) + suffix + '/?embed=1';
         iframe.loading = 'lazy';
         iframe.allow = 'fullscreen; autoplay';
         iframe.setAttribute('allowfullscreen', '');
         iframe.title = scene.title + ' · ' + (mm.short || mm.badge || m);
+        iframe.addEventListener('load', syncEmbedUi);
         interceptIframeLinks(iframe);
         tile.appendChild(iframe);
 
@@ -1219,7 +1269,7 @@
 
         if (scene.chats && scene.chats[m]) {
           const chatA = document.createElement('a');
-          chatA.className = 'tile-icon-btn';
+          chatA.className = 'tile-icon-btn tile-chat-btn';
           chatA.href = scene.chats[m];
           chatA.target = '_blank';
           chatA.rel = 'noopener';

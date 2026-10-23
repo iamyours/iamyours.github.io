@@ -1,6 +1,137 @@
 (function () {
   'use strict';
 
+  // --- Embed mode support ---
+  var isEmbedMode = false;
+  try {
+    isEmbedMode =
+      window.location.search.indexOf('embed=1') !== -1 &&
+      window.top !== window;
+  } catch (e) {
+    isEmbedMode = false;
+  }
+
+  if (isEmbedMode) {
+    document.documentElement.classList.add('pp-embed-hide');
+
+    var embedStyle = document.createElement('style');
+    embedStyle.textContent =
+      'html.pp-embed-hide [data-pp-hide] { opacity:0 !important; pointer-events:none !important; }\n' +
+      'html.pp-embed-hide [data-pp-hide] * { pointer-events:none !important; }';
+    (document.head || document.documentElement).appendChild(embedStyle);
+
+    var skippedTags = { SCRIPT: 1, STYLE: 1, LINK: 1, TEMPLATE: 1, NOSCRIPT: 1 };
+
+    var markUi = function () {
+      if (!document.body) return;
+
+      var canvases = Array.prototype.slice.call(document.querySelectorAll('canvas'));
+      var areaThreshold = 0.2 * window.innerWidth * window.innerHeight;
+      var mainCanvases = [];
+      for (var i = 0; i < canvases.length; i++) {
+        var rect = canvases[i].getBoundingClientRect();
+        if (rect.width * rect.height >= areaThreshold) {
+          mainCanvases.push(canvases[i]);
+        }
+      }
+      if (mainCanvases.length === 0) {
+        mainCanvases = canvases;
+      }
+
+      function isMainCanvas(el) {
+        return mainCanvases.indexOf(el) !== -1;
+      }
+
+      function containsMainCanvas(el) {
+        for (var j = 0; j < mainCanvases.length; j++) {
+          if (el.contains(mainCanvases[j])) {
+            return true;
+          }
+        }
+        return false;
+      }
+
+      function walk(parent) {
+        var children = parent.children;
+        if (!children) return;
+        for (var k = 0; k < children.length; k++) {
+          var child = children[k];
+          if (skippedTags[child.tagName]) {
+            continue;
+          }
+          if (isMainCanvas(child)) {
+            child.removeAttribute('data-pp-hide');
+          } else if (containsMainCanvas(child)) {
+            child.removeAttribute('data-pp-hide');
+            walk(child);
+          } else {
+            child.setAttribute('data-pp-hide', '');
+          }
+        }
+      }
+
+      walk(document.body);
+    };
+
+    var raf = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+    var markUiRaf = null;
+    var scheduleMarkUi = function () {
+      if (markUiRaf !== null) return;
+      markUiRaf = raf(function () {
+        markUiRaf = null;
+        markUi();
+      });
+    };
+
+    markUi();
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', markUi);
+    }
+    window.addEventListener('load', markUi);
+    window.addEventListener('resize', markUi);
+
+    if (typeof MutationObserver !== 'undefined' && document.documentElement) {
+      var observer = new MutationObserver(function (records) {
+        // only element additions/removals matter (HUD text updates every frame are ignored)
+        for (var r = 0; r < records.length; r++) {
+          var lists = [records[r].addedNodes, records[r].removedNodes];
+          for (var l = 0; l < 2; l++) {
+            for (var n = 0; n < lists[l].length; n++) {
+              if (lists[l][n].nodeType === 1) { scheduleMarkUi(); return; }
+            }
+          }
+        }
+      });
+      observer.observe(document.documentElement, {
+        childList: true,
+        subtree: true
+      });
+    }
+
+    var fallbackCount = 0;
+    var fallbackTimer = setInterval(function () {
+      fallbackCount++;
+      markUi();
+      if (fallbackCount >= 10) {
+        clearInterval(fallbackTimer);
+      }
+    }, 1000);
+
+    window.addEventListener('message', function (event) {
+      if (event.source !== window.parent) return;
+      if (!event.data || event.data.type !== 'pp-embed-ui') return;
+      if (event.data.show) {
+        document.documentElement.classList.remove('pp-embed-hide');
+      } else {
+        document.documentElement.classList.add('pp-embed-hide');
+      }
+    });
+
+    try {
+      window.parent.postMessage({ type: 'pp-embed-ready' }, '*');
+    } catch (e) {}
+  }
+
   var currentScript =
     document.currentScript ||
     document.querySelector('script[src*="prompt-panel.js"][data-id]') ||

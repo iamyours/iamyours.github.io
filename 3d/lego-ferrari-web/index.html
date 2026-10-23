@@ -1,0 +1,2910 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>法拉利超跑工程拆解与动态交互教学系统 - JigSpace 3D实验室</title>
+  <style>
+    :root {
+      --ferrari-red: #e11d24;
+      --ferrari-yellow: #ffeb00;
+      --panel-bg: rgba(16, 18, 24, 0.84);
+      --panel-border: rgba(255, 255, 255, 0.12);
+      --text-main: #f3f5f8;
+      --text-sub: #9aa4b5;
+      --accent: #ff3b30;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #0c0e14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+    }
+
+    /* 左上角返回按钮（按要求半透明奶油色圆角小按钮样式） */
+    .back-btn {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 15px;
+      background: rgba(255, 248, 232, 0.88);
+      color: #2c241b;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(255, 255, 255, 0.65);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-btn:hover {
+      background: rgba(255, 252, 244, 0.98);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.45);
+    }
+
+    /* 顶部品牌与实时遥测状态栏 */
+    .top-bar {
+      position: fixed;
+      top: 16px;
+      left: 162px;
+      right: 16px;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      pointer-events: none;
+      gap: 12px;
+    }
+
+    .brand-header {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 8px 16px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+    }
+
+    .shield-badge {
+      width: 28px;
+      height: 34px;
+      background: var(--ferrari-yellow);
+      border-radius: 4px 4px 14px 14px;
+      border: 1.5px solid #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 2px 0 3px;
+      box-shadow: 0 2px 8px rgba(255, 235, 0, 0.35);
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .tricolor-bar {
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(90deg, #009246 0%, #009246 33.3%, #ffffff 33.3%, #ffffff 66.6%, #ce2b37 66.6%, #ce2b37 100%);
+    }
+
+    .shield-badge span {
+      font-size: 11px;
+      font-weight: 900;
+      color: #000;
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+
+    .brand-title h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.4px;
+      color: #fff;
+    }
+
+    .brand-title p {
+      font-size: 11px;
+      color: var(--text-sub);
+    }
+
+    /* 实时遥测仪表盘 */
+    .telemetry-bar {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 8px 18px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 14px;
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.4);
+    }
+
+    .metric-item {
+      display: flex;
+      flex-direction: column;
+      min-width: 72px;
+    }
+
+    .metric-label {
+      font-size: 10px;
+      color: var(--text-sub);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .metric-val {
+      font-size: 15px;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      color: #fff;
+    }
+
+    .metric-val.highlight {
+      color: #ff4d42;
+    }
+
+    .metric-val.aero {
+      color: #38bdf8;
+    }
+
+    .metric-val.hybrid {
+      color: #4ade80;
+    }
+
+    /* 左侧 JigSpace 教学知识卡片 */
+    .teaching-card {
+      position: fixed;
+      top: 78px;
+      left: 16px;
+      width: 340px;
+      max-height: calc(100vh - 185px);
+      overflow-y: auto;
+      z-index: 20;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 18px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+      transition: transform 0.25s ease, opacity 0.25s ease;
+    }
+
+    .teaching-card::-webkit-scrollbar {
+      width: 4px;
+    }
+    .teaching-card::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .step-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      background: rgba(225, 29, 36, 0.22);
+      border: 1px solid rgba(225, 29, 36, 0.55);
+      color: #ff6b6b;
+      font-size: 11px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+
+    .teaching-card h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: #fff;
+      line-height: 1.3;
+    }
+
+    .teaching-desc {
+      font-size: 13px;
+      line-height: 1.65;
+      color: #d0d7e2;
+      margin-bottom: 14px;
+    }
+
+    .principle-box {
+      background: rgba(255, 255, 255, 0.04);
+      border-left: 3px solid var(--ferrari-red);
+      border-radius: 6px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+    }
+
+    .principle-box h4 {
+      font-size: 11px;
+      color: var(--ferrari-yellow);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      margin-bottom: 4px;
+    }
+
+    .principle-box p {
+      font-size: 12px;
+      color: #b8c2d1;
+      line-height: 1.55;
+    }
+
+    .specs-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .spec-cell {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+
+    .spec-cell .k {
+      font-size: 10px;
+      color: var(--text-sub);
+      display: block;
+    }
+
+    .spec-cell .v {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 2px;
+      display: block;
+    }
+
+    .part-inspect-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 10px;
+      background: rgba(56, 189, 248, 0.12);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      border-radius: 8px;
+      font-size: 12px;
+      color: #bae6fd;
+    }
+
+    /* 右侧交互实验室控制面板 */
+    .control-panel {
+      position: fixed;
+      top: 78px;
+      right: 16px;
+      width: 300px;
+      max-height: calc(100vh - 185px);
+      overflow-y: auto;
+      z-index: 20;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      padding: 16px;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    }
+
+    .control-panel::-webkit-scrollbar {
+      width: 4px;
+    }
+    .control-panel::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 4px;
+    }
+
+    .panel-section {
+      margin-bottom: 14px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .panel-section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .section-title span.sub {
+      font-size: 11px;
+      color: var(--text-sub);
+      font-weight: 500;
+    }
+
+    .control-row {
+      margin-bottom: 10px;
+    }
+
+    .control-row:last-child {
+      margin-bottom: 0;
+    }
+
+    .control-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: #cbd5e1;
+      margin-bottom: 5px;
+    }
+
+    .control-label b {
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.14);
+      border-radius: 999px;
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--ferrari-red);
+      border: 2px solid #fff;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .btn-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .toggle-btn {
+      padding: 8px 10px;
+      border-radius: 9px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      background: rgba(255, 255, 255, 0.05);
+      color: #e2e8f0;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+    }
+
+    .toggle-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+    }
+
+    .toggle-btn.active {
+      background: rgba(225, 29, 36, 0.28);
+      border-color: #ff4d42;
+      color: #fff;
+      box-shadow: 0 0 14px rgba(225, 29, 36, 0.35);
+    }
+
+    .toggle-btn.aero-btn.active {
+      background: rgba(14, 165, 233, 0.26);
+      border-color: #38bdf8;
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.35);
+    }
+
+    /* 车漆颜色选择器 */
+    .color-swatches {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      cursor: pointer;
+      transition: transform 0.15s ease, border-color 0.15s ease;
+    }
+
+    .swatch.active {
+      transform: scale(1.15);
+      border-color: #fff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.6);
+    }
+
+    /* 底部 JigSpace 风格分步导航栏 */
+    .jig-dock {
+      position: fixed;
+      bottom: 18px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 999px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55);
+      max-width: calc(100vw - 24px);
+    }
+
+    .dock-nav-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: rgba(255, 255, 255, 0.08);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s ease;
+      flex-shrink: 0;
+    }
+
+    .dock-nav-btn:hover {
+      background: var(--ferrari-red);
+      border-color: #ff6b6b;
+    }
+
+    .step-pills {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding: 2px 4px;
+    }
+
+    .step-pills::-webkit-scrollbar {
+      display: none;
+    }
+
+    .step-pill {
+      padding: 7px 13px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid transparent;
+      color: var(--text-sub);
+      font-size: 12px;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .step-pill:hover {
+      color: #fff;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .step-pill.active {
+      background: var(--ferrari-red);
+      color: #fff;
+      border-color: rgba(255, 255, 255, 0.35);
+      box-shadow: 0 4px 14px rgba(225, 29, 36, 0.45);
+    }
+
+    /* 3D 空间悬浮标注点 (JigSpace Callouts) */
+    #labels-layer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      overflow: hidden;
+    }
+
+    .callout-pin {
+      position: absolute;
+      transform: translate(-50%, -50%);
+      pointer-events: auto;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 11px 5px 7px;
+      background: rgba(15, 18, 26, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 999px;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 600;
+      white-space: nowrap;
+      backdrop-filter: blur(6px);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+      transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    }
+
+    .callout-pin:hover,
+    .callout-pin.active {
+      border-color: var(--ferrari-yellow);
+      background: rgba(225, 29, 36, 0.9);
+      transform: translate(-50%, -50%) scale(1.08);
+      z-index: 15;
+    }
+
+    .pin-dot {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--ferrari-red);
+      border: 1.5px solid #fff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 800;
+      color: #fff;
+    }
+
+    .callout-pin.active .pin-dot {
+      background: var(--ferrari-yellow);
+      color: #000;
+    }
+
+    /* 移动端折叠切换按钮 */
+    .mobile-toggles {
+      display: none;
+      position: fixed;
+      top: 64px;
+      right: 16px;
+      z-index: 40;
+      gap: 8px;
+    }
+
+    .mob-btn {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      backdrop-filter: blur(8px);
+    }
+
+    @media (max-width: 960px) {
+      .top-bar {
+        left: 152px;
+      }
+      .telemetry-bar {
+        display: none;
+      }
+      .mobile-toggles {
+        display: flex;
+      }
+      .teaching-card {
+        top: 106px;
+        width: 290px;
+        max-height: 46vh;
+      }
+      .control-panel {
+        top: 106px;
+        width: 270px;
+        max-height: 46vh;
+      }
+      .teaching-card.hidden-mobile,
+      .control-panel.hidden-mobile {
+        opacity: 0;
+        pointer-events: none;
+        transform: translateY(-10px);
+      }
+    }
+
+    @media (max-width: 600px) {
+      .brand-title p {
+        display: none;
+      }
+      .teaching-card,
+      .control-panel {
+        left: 12px;
+        right: 12px;
+        width: auto;
+      }
+    }
+  </style>
+
+  <!-- 严格固定版本 Three.js r160 ImportMap -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+<style>/* 避开右下角「📜 提示词」按钮 */.jig-dock{bottom:64px}</style>
+</head>
+<body>
+  <!-- 左上角固定返回链接 -->
+  <a href="../" class="back-btn">← 返回 3D 作品</a>
+
+  <!-- 顶部标题与遥测数据栏 -->
+  <div class="top-bar">
+    <div class="brand-header">
+      <div class="shield-badge">
+        <div class="tricolor-bar"></div>
+        <span>SF</span>
+      </div>
+      <div class="brand-title">
+        <h1>法拉利 LaFerrari 旗舰超跑 · 动态工程拆解教学</h1>
+        <p>JigSpace 交互式 3D 机械原理与空气动力学实验室（支持点击零件与实时工况模拟）</p>
+      </div>
+    </div>
+
+    <div class="telemetry-bar">
+      <div class="metric-item">
+        <span class="metric-label">V12 引擎转速</span>
+        <span class="metric-val highlight" id="tel-rpm">1,200 RPM</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">综合输出功率</span>
+        <span class="metric-val hybrid" id="tel-power">185 PS</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">模拟车速</span>
+        <span class="metric-val" id="tel-speed">0 km/h</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">整车下压力</span>
+        <span class="metric-val aero" id="tel-downforce">0 kgf</span>
+      </div>
+      <div class="metric-item">
+        <span class="metric-label">碳陶刹车盘温</span>
+        <span class="metric-val" id="tel-brake">85 °C</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 移动端面板显隐开关 -->
+  <div class="mobile-toggles">
+    <button class="mob-btn" id="mob-toggle-info">📘 教学卡片</button>
+    <button class="mob-btn" id="mob-toggle-ctrl">🎛️ 控制台</button>
+  </div>
+
+  <!-- 左侧 JigSpace 教学卡片 -->
+  <aside class="teaching-card" id="teaching-card">
+    <div class="step-tag" id="step-badge">STEP 01 / 07 · 整车总览</div>
+    <h2 id="step-title">法拉利旗舰中置混动超跑架构</h2>
+    <p class="teaching-desc" id="step-desc">
+      欢迎来到交互式超跑工程实验室。本教具完整还原了法拉利中置后驱旗舰超跑的六大核心工程模块：主动空气动力学车壳、碳纤维单体壳座舱、6.5L V12 自然吸气引擎、HY-KERS 混动双离合变速箱、F1 推杆式双叉臂悬架以及底盘文丘里通道。
+    </p>
+    <div class="principle-box">
+      <h4 id="principle-title">核心工程原理 · 中置配重与地面效应</h4>
+      <p id="principle-text">
+        将沉重的 V12 引擎与高压电池组布置在座舱后方、后轴之前，实现 41:59 的黄金前后轴荷分配，最大化出弯牵引力并降低整车转动惯量。
+      </p>
+    </div>
+    <div class="specs-grid" id="specs-grid">
+      <div class="spec-cell">
+        <span class="k">动力总成架构</span>
+        <span class="v">6.5L V12 + HY-KERS</span>
+      </div>
+      <div class="spec-cell">
+        <span class="k">综合最大马力</span>
+        <span class="v">963 PS @ 9000rpm</span>
+      </div>
+      <div class="spec-cell">
+        <span class="k">车身配重比</span>
+        <span class="v">前 41% : 后 59%</span>
+      </div>
+      <div class="spec-cell">
+        <span class="k">百公里加速</span>
+        <span class="v">&lt; 2.6 秒</span>
+      </div>
+    </div>
+    <div class="part-inspect-banner" id="inspect-banner">
+      <span>💡 提示：直接点击 3D 部件或悬浮标号可聚焦剖析</span>
+    </div>
+  </aside>
+
+  <!-- 右侧动态交互实验室面板 -->
+  <aside class="control-panel" id="control-panel">
+    <div class="panel-section">
+      <div class="section-title">
+        <span>🔧 JigSpace 结构拆解与透视</span>
+        <span class="sub">实时剖视</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>全车爆炸拆解度 (Explode)</span>
+          <b id="val-explode">0%</b>
+        </div>
+        <input type="range" id="slider-explode" min="0" max="100" value="0" />
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>外覆车壳透视度 (X-Ray)</span>
+          <b id="val-xray">0%</b>
+        </div>
+        <input type="range" id="slider-xray" min="0" max="100" value="0" />
+      </div>
+      <div class="btn-grid" style="margin-top: 8px;">
+        <button class="toggle-btn" id="btn-doors">🦋 蝴蝶门开关</button>
+        <button class="toggle-btn aero-btn" id="btn-wind">💨 气动风洞流线</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">
+        <span>🔥 V12 引擎与底盘动态工况</span>
+        <span class="sub">物理运转</span>
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>V12 引擎转速 (活塞/曲轴/排气热辐射)</span>
+          <b id="val-rpm">1200 RPM</b>
+        </div>
+        <input type="range" id="slider-rpm" min="0" max="9250" step="50" value="1200" />
+      </div>
+      <div class="control-row">
+        <div class="control-label">
+          <span>前轮转向角 (方向盘与转向拉杆联动)</span>
+          <b id="val-steer">0°</b>
+        </div>
+        <input type="range" id="slider-steer" min="-30" max="30" step="1" value="0" />
+      </div>
+      <div class="btn-grid" style="margin-top: 8px;">
+        <button class="toggle-btn" id="btn-bump">〰️ 推杆悬架颠簸</button>
+        <button class="toggle-btn" id="btn-drs">🪽 主动尾翼 DRS</button>
+        <button class="toggle-btn" id="btn-brake">🛑 碳陶全力制动</button>
+        <button class="toggle-btn" id="btn-autorotate">🔄 环绕展示</button>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="section-title">
+        <span>🎨 马拉内罗定制车漆 (Scuderia)</span>
+        <span class="sub" id="paint-name">Rosso Corsa 赛道红</span>
+      </div>
+      <div class="color-swatches">
+        <div class="swatch active" data-color="#d40000" data-name="Rosso Corsa 赛道红" style="background: #d40000;"></div>
+        <div class="swatch" data-color="#f5c400" data-name="Giallo Modena 摩德纳黄" style="background: #f5c400;"></div>
+        <div class="swatch" data-color="#474d54" data-name="Grigio Silverstone 银石灰" style="background: #474d54;"></div>
+        <div class="swatch" data-color="#141619" data-name="Nero Daytona 戴通纳黑" style="background: #141619;"></div>
+        <div class="swatch" data-color="#004225" data-name="Verde British 竞速绿" style="background: #004225;"></div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 底部 JigSpace 分步教学导航栏 -->
+  <nav class="jig-dock">
+    <button class="dock-nav-btn" id="btn-prev" title="上一步">‹</button>
+    <div class="step-pills" id="step-pills">
+      <button class="step-pill active" data-step="0">1. 整车总览</button>
+      <button class="step-pill" data-step="1">2. 主动空气动力学</button>
+      <button class="step-pill" data-step="2">3. 全车爆炸总拆解</button>
+      <button class="step-pill" data-step="3">4. 碳纤维单体壳座舱</button>
+      <button class="step-pill" data-step="4">5. 6.5L V12 引擎</button>
+      <button class="step-pill" data-step="5">6. HY-KERS 混动变速箱</button>
+      <button class="step-pill" data-step="6">7. 推杆悬架与碳陶制动</button>
+    </div>
+    <button class="dock-nav-btn" id="btn-next" title="下一步">›</button>
+  </nav>
+
+  <!-- 3D 悬浮交互标注容器 -->
+  <div id="labels-layer"></div>
+
+  <!-- Three.js 全屏画布容器 -->
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    // ============================================================================
+    // 1. 教学章节数据库 (JigSpace 7 步互动课程配置)
+    // ============================================================================
+    const TEACHING_STEPS = [
+      {
+        badge: 'STEP 01 / 07 · 整车总览',
+        title: '法拉利旗舰中置混动超跑架构',
+        desc: '本教学系统完整还原法拉利旗舰超跑（LaFerrari / SF90 架构）的机械精髓。全车采用中置后驱布局，楔形鲨鱼鼻前脸与飞扶壁车尾兼具低风阻与高下压力。您可以拖动滑块拆解全车，或直接点击 3D 部件查看工作原理。',
+        principleTitle: '核心工程原理 · 41:59 黄金轴荷与低重心设计',
+        principleText: '通过将 V12 发动机、HY-KERS 电池组与 8 速双离合变速箱紧凑布置在座舱与后轴之间，整车重心高度降低 35mm，极大提升弯道极限响应。',
+        specs: [
+          ['动力总成架构', '6.5L V12 + HY-KERS'],
+          ['综合峰值功率', '963 PS @ 9250rpm'],
+          ['前后配重比', '前 41% : 后 59%'],
+          ['百公里加速', '< 2.6 秒']
+        ],
+        camPos: [5.4, 2.3, 5.2],
+        camTarget: [0, 0.55, 0],
+        explode: 0,
+        xray: 0,
+        doorsOpen: false,
+        windTunnel: false,
+        bumpTest: false,
+        drsActive: false,
+        brakeTest: false,
+        rpm: 1200,
+        focusSubsystem: null
+      },
+      {
+        badge: 'STEP 02 / 07 · 空气动力学风洞',
+        title: '主动空气动力学与 S-Duct 导流通道',
+        desc: '现在已开启【风洞流线可视化】。蓝色流线穿过前鼻锥中央的 F1 S-Duct 风道向上排出，消除车头抬升力；绿色底盘高速气流经过车底文丘里通道（Venturi Tunnel）加速，产生强大的地面效应吸附力。',
+        principleTitle: '伯努利方程与主动尾翼 (DRS / Airbrake)',
+        principleText: '车底通道截面积收缩使气流流速剧增、静压降低，将车身牢牢吸向地面。尾部主动扰流板可根据车速与制动状态自动升起并改变攻角。',
+        specs: [
+          ['最大下压力', '530 kgf @ 300km/h'],
+          ['车头导流系统', 'F1 中央 S-Duct 风道'],
+          ['底盘气动结构', '双通道文丘里扩散器'],
+          ['风阻系数 Cd', '0.33 (主动减阻模式)']
+        ],
+        camPos: [4.8, 2.1, -4.6],
+        camTarget: [0, 0.55, 0],
+        explode: 0,
+        xray: 18,
+        doorsOpen: false,
+        windTunnel: true,
+        bumpTest: false,
+        drsActive: true,
+        brakeTest: false,
+        rpm: 5200,
+        focusSubsystem: 'aero'
+      },
+      {
+        badge: 'STEP 03 / 07 · 全车模块化爆炸拆解',
+        title: '六大核心总成三维爆炸视图',
+        desc: '全车按工程装配关系分解为 6 大独立子系统：上层为流体雕塑空气动力学车壳与蝴蝶门；中层为 T800 碳纤维单体壳座舱与 V12 混动动力总成；底层为文丘里碳纤维平整底板与前后推杆式悬架系统。',
+        principleTitle: '模块化传力路径 (Load Path Architecture)',
+        principleText: '单体壳作为全车承力核心，前悬架直接锚定于单体壳前隔舱，后悬架则刚性连接于发动机-变速箱承重副车架上，实现极高的扭转刚度。',
+        specs: [
+          ['单体壳干重', '仅 62 kg (T800/T1000碳纤)'],
+          ['扭转刚度', '51,000 Nm/deg'],
+          ['核心模块数量', '6 大工程总成'],
+          ['紧固件材料', '航空级钛合金螺栓']
+        ],
+        camPos: [6.4, 3.6, 6.2],
+        camTarget: [0, 0.9, 0],
+        explode: 85,
+        xray: 0,
+        doorsOpen: true,
+        windTunnel: false,
+        bumpTest: false,
+        drsActive: true,
+        brakeTest: false,
+        rpm: 2500,
+        focusSubsystem: null
+      },
+      {
+        badge: 'STEP 04 / 07 · 碳纤维单体壳座舱',
+        title: 'F1 级 T800/T1000 碳纤维单体壳与人机座舱',
+        desc: '透视外覆车壳后，可见由法拉利 F1 复合材料部门手工铺层并经高温高压釜固化的碳纤维单体壳（Monocoque）。座椅直接模压在碳纤维底盆上，通过可调节踏板组与方向盘适配驾驶者，实现最低坐姿。',
+        principleTitle: 'Manettino 方向盘与固定式碳纤座盆',
+        principleText: '固定式座椅消除了传统滑轨机构的重量与高度，方向盘集成 Manettino 动态模式旋钮与 LED 换挡提示灯，实现“手不离盘”的赛道操控。',
+        specs: [
+          ['主结构复合材料', 'T800 主体 + T1000 防撞区'],
+          ['底盘加强层', 'Kevlar 芳纶防穿刺底板'],
+          ['座椅结构', '一体成型固定式座盆'],
+          ['固化工艺', 'F1 热压罐 140°C 高压固化']
+        ],
+        camPos: [2.5, 1.8, 2.2],
+        camTarget: [0.1, 0.55, 0],
+        explode: 35,
+        xray: 82,
+        doorsOpen: true,
+        windTunnel: false,
+        bumpTest: false,
+        drsActive: false,
+        brakeTest: false,
+        rpm: 1500,
+        focusSubsystem: 'monocoque'
+      },
+      {
+        badge: 'STEP 05 / 07 · 6.5L V12 自然吸气引擎',
+        title: '65° 夹角 V12 引擎：活塞曲轴运转与等长排气',
+        desc: '请观察透明气缸体内部！12 枚锻造铝合金活塞正以 65° V 型夹角交替高速往复运动，驱动氮化钢曲轴旋转。高达 9250 RPM 的红线转速使 6 合 1 铬镍铁合金（Inconel）排气管呈现炽热的红橙色热辐射！',
+        principleTitle: '可变几何进气道与 13.5:1 超高压缩比',
+        principleText: '顶部 12 根独立进气喇叭口可根据转速连续调节长度，配合高压缩比与干式油底壳润滑系统，压榨出每升 128 匹的自然吸气工程极限。',
+        specs: [
+          ['排量与气缸夹角', '6,496 cc · 65° V12'],
+          ['最高红线转速', '9,250 RPM (断油保护)'],
+          ['单机最大功率', '800 PS @ 9000rpm'],
+          ['排气歧管材质', 'Inconel 625 航空合金']
+        ],
+        camPos: [-2.6, 1.65, 2.1],
+        camTarget: [-0.85, 0.62, 0],
+        explode: 25,
+        xray: 88,
+        doorsOpen: false,
+        windTunnel: false,
+        bumpTest: false,
+        drsActive: false,
+        brakeTest: false,
+        rpm: 8200,
+        focusSubsystem: 'engine'
+      },
+      {
+        badge: 'STEP 06 / 07 · HY-KERS 混动与 DCT 变速箱',
+        title: 'F1 动能回收系统 (HY-KERS) 与 8 速双离合',
+        desc: '在座舱后隔板下方平铺着由 120 块电芯组成的 800V 高压电池包（橙色高压线束连接），后轴搭载磁通电机（MGU-K）与 8 速湿式双离合变速箱（DCT）。电机在低转速瞬时爆发扭矩，彻底消除动力迟滞。',
+        principleTitle: '扭矩矢量填谷 (Torque Fill) 与制动能量回收',
+        principleText: '换挡间隙及出弯低转速区，MGU-K 电机在毫秒级内注入 163 PS 电力驱动；入弯重刹时电机转为发电机，为底盘电池包极速补能。',
+        specs: [
+          ['MGU-K 电机功率', '120 kW (163 PS)'],
+          ['高压电池组位置', '座舱后地板最低重心处'],
+          ['变速箱换挡时间', '< 60 毫秒 (8速 DCT)'],
+          ['差速器控制', 'E-Diff 3 电子限滑差速']
+        ],
+        camPos: [-2.9, 1.4, -2.2],
+        camTarget: [-1.1, 0.45, 0],
+        explode: 45,
+        xray: 88,
+        doorsOpen: false,
+        windTunnel: false,
+        bumpTest: false,
+        drsActive: false,
+        brakeTest: false,
+        rpm: 4600,
+        focusSubsystem: 'hybrid'
+      },
+      {
+        badge: 'STEP 07 / 07 · F1 推杆悬架与碳陶制动',
+        title: 'F1 推杆式双叉臂悬架与 Brembo 碳陶制动',
+        desc: '当前已激活【路面颠簸测试】与【全力制动热模拟】。观察车轮上下跳动时，斜向推杆（Pushrod）推动摇臂旋转，压缩水平布置的螺旋弹簧与磁流变减振器；同时打孔碳陶刹车盘在卡钳夹紧下瞬间炽热发红！',
+        principleTitle: '推杆摇臂机构 (Pushrod Rocker) 与簧下质量优化',
+        principleText: '将沉重的弹簧减振器移至车体内部水平放置，不仅大幅减轻车轮簧下质量、提升贴地性，还缩小了悬架迎风面积，优化底盘气流。',
+        specs: [
+          ['悬架拓扑结构', '双叉臂 + 内置水平推杆减振'],
+          ['减振器技术', 'SCM-E 磁流变电磁减振'],
+          ['前制动盘规格', '398×36mm CCM 碳陶瓷盘'],
+          ['100-0 km/h 制动', '仅 28.5 米 (约 1.35G)']
+        ],
+        camPos: [2.7, 0.95, 2.3],
+        camTarget: [1.35, 0.38, 0.85],
+        explode: 15,
+        xray: 75,
+        doorsOpen: false,
+        windTunnel: false,
+        bumpTest: true,
+        drsActive: true,
+        brakeTest: true,
+        rpm: 6500,
+        focusSubsystem: 'suspension'
+      }
+    ];
+
+    // 子系统独立知识库（点击任意 3D 部件或悬浮标号时展示）
+    const SUBSYSTEM_INFO = {
+      aero: {
+        tag: '部件聚焦 · 主动空气动力学车壳',
+        title: '流体雕塑碳纤维车身与 S-Duct 导流',
+        desc: '全车外覆件均由轻量化预浸碳纤维制成。车头下方配备主动式前唇襟翼，鼻锥中央设有源自 F1 赛车的 S-Duct 导流槽，车侧巨型进气口为中置 V12 散热器与双中冷器提供充沛冷空气。',
+        principleTitle: '主动气动平衡 (Active Aero Balance)',
+        principleText: '车载 ECU 每秒数百次采集车速、纵向/横向加速度与方向盘转角，动态调节前后导流襟翼与主动尾翼角度，在直线极速减阻与弯道高下压力之间无缝切换。'
+      },
+      doors: {
+        tag: '部件聚焦 · 蝶翼式碳纤维车门',
+        title: '双铰链斜向开启蝴蝶门 (Butterfly Doors)',
+        desc: '车门采用一体成型碳纤维内衬框架与侧面进气导流凹槽。开启时沿 A 柱斜向先外移后上扬，不仅带来极具仪式感的视觉冲击，更让驾驶者能轻松跨入深凹的碳纤维单体壳门槛。',
+        principleTitle: '车门侧面气动通道集成',
+        principleText: '蝴蝶门外表面深邃的流道并非单纯装饰，而是将前轮拱排出的乱流重新整流，精准导向后翼子板上方的高压进气口。'
+      },
+      monocoque: {
+        tag: '部件聚焦 · T800/T1000 碳纤维单体壳',
+        title: 'F1 级复合材料安全座舱 (Monocoque Tub)',
+        desc: '座舱底盆、前防火墙与后引擎隔板由四种不同标号的航空碳纤维手工铺叠而成。防撞吸能区采用超高拉伸强度的 T1000 碳纤维，车底护板则混编芳纶纤维（Kevlar）抵御高速碎石冲击。',
+        principleTitle: '人体工程学固定座盆与可调踏板',
+        principleText: '座椅直接作为单体壳结构的一部分固定在底盘最低点，通过移动铝合金数控切削踏板组与碳纤维方向盘管柱来适应不同身高车手。'
+      },
+      engine: {
+        tag: '部件聚焦 · 6.5L 65° V12 自然吸气引擎',
+        title: 'F140 系列巅峰：6.5 升 V12 自然吸气发动机',
+        desc: '标志性的红色结晶烤漆气门室盖（Testa Rossa）下，12 个气缸按 65° 夹角排列。透过半透明缸体可清晰观察锻造活塞、连杆与曲轴的精密往复回转运动，顶部 12 支铝合金进气喇叭口极具机械美感。',
+        principleTitle: '干式油底壳与等长 6 合 1 排气歧管',
+        principleText: '采用干式油底壳设计取消了传统储油盘，使引擎安装位置降低 50mm，同时保证在 1.6G 极限过弯横向加速度下依然拥有稳定的机油润滑压力。'
+      },
+      hybrid: {
+        tag: '部件聚焦 · HY-KERS 混动与 8 速双离合',
+        title: 'F1 动能回收电机 (MGU-K) 与 8 速 DCT 变速箱',
+        desc: '由马拉内罗与法拉利 F1 车队联合研发的 HY-KERS 混动系统，包含平铺于座舱后下方的超薄高压电池组、高功率密度逆变器、橙色高压线束，以及与 8 速双离合变速箱同轴集成的永磁同步电机。',
+        principleTitle: '双离合器奇偶挡位预选啮合',
+        principleText: '奇数挡（1/3/5/7）与偶数挡（2/4/6/8）分别由两组独立湿式多片离合器控制，当前挡位发力时下一挡位齿轮已预先啮合，实现毫秒级零动力中断换挡。'
+      },
+      suspension: {
+        tag: '部件聚焦 · F1 推杆悬架与碳陶制动系统',
+        title: '推杆式双叉臂悬架与 Brembo 碳陶瓷刹车',
+        desc: '上下不等长锻造铝合金 A 字摆臂控制车轮外倾角变化；紫色/红色斜向推杆将车轮跳动传递至车体顶部的三角摇臂，驱动水平对置的螺旋弹簧与磁流变减振器工作。车轮内配备打孔碳陶刹车盘与六活塞卡钳。',
+        principleTitle: 'Brembo CCM 碳陶瓷制动热力学',
+        principleText: '碳纤维增强碳化硅陶瓷刹车盘比传统铸铁盘减重 50%，在高达 900°C 的赛道连续重刹高温下依然不会发生热衰退，摩擦系数始终稳定。'
+      },
+      underbody: {
+        tag: '部件聚焦 · 碳纤维平整底板与文丘里扩散器',
+        title: '地面效应底盘：涡流发生器与尾部四鳍片扩散器',
+        desc: '超跑 60% 以上的下压力并非来自车顶尾翼，而是来自看不见的车底！前底板设有导流涡流发生器，中部形成狭窄的低压文丘里喉道，车尾高耸的四通道扩散器将车底气流快速抽吸膨胀。',
+        principleTitle: '文丘里效应 (Venturi Ground Effect)',
+        principleText: '高速气流通过车底狭窄通道时流速激增、气压骤降，犹如强大的吸盘将整车压向赛道表面，且几乎不增加额外迎风空气阻力。'
+      }
+    };
+
+    // ============================================================================
+    // 2. 全局状态机与交互参数
+    // ============================================================================
+    const state = {
+      currentStep: 0,
+      explode: 0,           // 0 ~ 1
+      targetExplode: 0,
+      xray: 0,              // 0 ~ 1
+      targetXray: 0,
+      doorsOpen: false,
+      doorAngle: 0,         // 0 ~ 1
+      windTunnel: false,
+      bumpTest: false,
+      drsActive: false,
+      drsFactor: 0,         // 0 ~ 1
+      brakeTest: false,
+      brakeHeat: 0,         // 0 ~ 1
+      autoRotate: false,
+      rpm: 1200,
+      targetRpm: 1200,
+      steerAngle: 0,        // 弧度
+      targetSteerAngle: 0,
+      crankPhase: 0,
+      wheelPhase: 0,
+      selectedSubsystem: null,
+      camAnimating: false,
+      camLerpT: 1,
+      camStartPos: new THREE.Vector3(),
+      camEndPos: new THREE.Vector3(),
+      camStartTarget: new THREE.Vector3(),
+      camEndTarget: new THREE.Vector3()
+    };
+
+    // ============================================================================
+    // 3. 程序化纹理生成器 (纯 Canvas 生成，零外部资源依赖)
+    // ============================================================================
+    function createStudioEnvTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      // 棚拍天幕渐变
+      const grad = ctx.createLinearGradient(0, 0, 0, 512);
+      grad.addColorStop(0, '#1e2638');
+      grad.addColorStop(0.42, '#2d3748');
+      grad.addColorStop(0.5, '#0f131c');
+      grad.addColorStop(1, '#05070b');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, 1024, 512);
+
+      // 棚顶长条柔光箱高光带 (让法拉利车漆呈现流光溢彩的反射高光)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 32;
+      ctx.fillRect(100, 65, 340, 26);
+      ctx.fillRect(580, 65, 340, 26);
+      ctx.fillRect(220, 145, 580, 16);
+
+      // 暖红与冷蓝环境装饰反射带
+      ctx.fillStyle = 'rgba(255, 65, 54, 0.55)';
+      ctx.fillRect(60, 210, 380, 18);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.55)';
+      ctx.fillRect(580, 210, 380, 18);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.mapping = THREE.EquirectangularReflectionMapping;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createCarbonFiberTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 128;
+      canvas.height = 128;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#171a20';
+      ctx.fillRect(0, 0, 128, 128);
+
+      const step = 16;
+      for (let y = 0; y < 128; y += step) {
+        for (let x = 0; x < 128; x += step) {
+          const offset = (y / step) % 2 === 0 ? 0 : step / 2;
+          ctx.fillStyle = '#262b34';
+          ctx.fillRect((x + offset) % 128, y, step / 2 - 1, step - 1);
+          ctx.fillStyle = '#101216';
+          ctx.fillRect((x + offset + step / 2) % 128, y, step / 2 - 1, step - 1);
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(18, 18);
+      return tex;
+    }
+
+    function createBrakeDiscTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+      const cx = 256, cy = 256;
+
+      ctx.fillStyle = '#25272c';
+      ctx.fillRect(0, 0, 512, 512);
+
+      // 碳陶纹理同心环
+      for (let r = 90; r < 245; r += 3) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.strokeStyle = r % 6 === 0 ? '#32353d' : '#1f2126';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      // 散热交叉打孔 (Cross-drilled holes)
+      ctx.fillStyle = '#07080a';
+      const numArms = 24;
+      for (let i = 0; i < numArms; i++) {
+        const baseAngle = (i / numArms) * Math.PI * 2;
+        for (let j = 0; j < 4; j++) {
+          const r = 120 + j * 30;
+          const a = baseAngle + j * 0.06;
+          const hx = cx + Math.cos(a) * r;
+          const hy = cy + Math.sin(a) * r;
+          ctx.beginPath();
+          ctx.arc(hx, hy, 5.2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createFerrariShieldTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 320;
+      const ctx = canvas.getContext('2d');
+
+      // 黄色盾牌底
+      ctx.fillStyle = '#ffeb00';
+      ctx.beginPath();
+      ctx.moveTo(24, 20);
+      ctx.lineTo(232, 20);
+      ctx.lineTo(232, 180);
+      ctx.quadraticCurveTo(232, 280, 128, 305);
+      ctx.quadraticCurveTo(24, 280, 24, 180);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 10;
+      ctx.strokeStyle = '#111';
+      ctx.stroke();
+
+      // 顶部意大利三色旗
+      ctx.fillStyle = '#009246';
+      ctx.fillRect(30, 25, 65, 22);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(95, 25, 66, 22);
+      ctx.fillStyle = '#ce2b37';
+      ctx.fillRect(161, 25, 65, 22);
+
+      // 跃马抽象剪影与 SF 标识
+      ctx.fillStyle = '#0a0a0a';
+      ctx.beginPath();
+      ctx.ellipse(128, 155, 28, 52, -0.25, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(144, 96, 18, 24, 0.3, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.font = '900 44px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('S   F', 128, 265);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    function createFloorGridTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 512;
+      canvas.height = 512;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#0d1017';
+      ctx.fillRect(0, 0, 512, 512);
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+      ctx.lineWidth = 1;
+      const subStep = 64;
+      for (let i = 0; i <= 512; i += subStep) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0); ctx.lineTo(i, 512);
+        ctx.moveTo(0, i); ctx.lineTo(512, i);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.13)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(0, 0, 512, 512);
+
+      // 十字刻度靶标
+      ctx.strokeStyle = 'rgba(225, 29, 36, 0.35)';
+      ctx.beginPath();
+      ctx.moveTo(246, 256); ctx.lineTo(266, 256);
+      ctx.moveTo(256, 246); ctx.lineTo(256, 266);
+      ctx.stroke();
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(28, 28);
+      return tex;
+    }
+
+    // ============================================================================
+    // 4. Three.js 场景、相机与渲染器初始化
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#0c0e14');
+    scene.fog = new THREE.FogExp2('#0c0e14', 0.032);
+
+    const envTexture = createStudioEnvTexture();
+    scene.environment = envTexture;
+
+    const camera = new THREE.PerspectiveCamera(40, window.innerWidth / window.innerHeight, 0.1, 120);
+    camera.position.set(5.4, 2.3, 5.2);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.18;
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.492;
+    controls.minDistance = 1.6;
+    controls.maxDistance = 16;
+    controls.target.set(0, 0.55, 0);
+
+    // 摄影棚灯光系统
+    const ambientLight = new THREE.AmbientLight(0xdbeafe, 0.65);
+    scene.add(ambientLight);
+
+    const mainSpot = new THREE.DirectionalLight(0xffffff, 2.4);
+    mainSpot.position.set(6, 10, 5);
+    mainSpot.castShadow = true;
+    mainSpot.shadow.mapSize.set(2048, 2048);
+    mainSpot.shadow.camera.near = 1;
+    mainSpot.shadow.camera.far = 25;
+    const d = 4.2;
+    mainSpot.shadow.camera.left = -d;
+    mainSpot.shadow.camera.right = d;
+    mainSpot.shadow.camera.top = d;
+    mainSpot.shadow.camera.bottom = -d;
+    mainSpot.shadow.bias = -0.0005;
+    scene.add(mainSpot);
+
+    const rimLight1 = new THREE.DirectionalLight(0x60a5fa, 1.1);
+    rimLight1.position.set(-7, 4, -6);
+    scene.add(rimLight1);
+
+    const rimLight2 = new THREE.DirectionalLight(0xff4d42, 0.85);
+    rimLight2.position.set(-5, 3, 6);
+    scene.add(rimLight2);
+
+    // 实验室刻度地面与展台光环
+    const floorMat = new THREE.MeshStandardMaterial({
+      map: createFloorGridTexture(),
+      roughness: 0.55,
+      metalness: 0.25
+    });
+    const floorMesh = new THREE.Mesh(new THREE.PlaneGeometry(70, 70), floorMat);
+    floorMesh.rotation.x = -Math.PI / 2;
+    floorMesh.receiveShadow = true;
+    scene.add(floorMesh);
+
+    const podiumRingGeo = new THREE.RingGeometry(2.65, 2.72, 96);
+    const podiumRingMat = new THREE.MeshBasicMaterial({
+      color: 0xe11d24,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.65
+    });
+    const podiumRing = new THREE.Mesh(podiumRingGeo, podiumRingMat);
+    podiumRing.rotation.x = -Math.PI / 2;
+    podiumRing.position.y = 0.004;
+    scene.add(podiumRing);
+
+    const innerRing = new THREE.Mesh(
+      new THREE.RingGeometry(2.1, 2.12, 96),
+      new THREE.MeshBasicMaterial({ color: 0x38bdf8, side: THREE.DoubleSide, transparent: true, opacity: 0.3 })
+    );
+    innerRing.rotation.x = -Math.PI / 2;
+    innerRing.position.y = 0.004;
+    scene.add(innerRing);
+
+    // ============================================================================
+    // 5. 核心材质库定义
+    // ============================================================================
+    const carbonTex = createCarbonFiberTexture();
+    const brakeDiscTex = createBrakeDiscTexture();
+    const shieldTex = createFerrariShieldTexture();
+
+    const materials = {
+      bodyPaint: new THREE.MeshPhysicalMaterial({
+        color: new THREE.Color('#d40000'),
+        metalness: 0.35,
+        roughness: 0.16,
+        clearcoat: 1.0,
+        clearcoatRoughness: 0.05,
+        envMapIntensity: 1.5,
+        transparent: false,
+        opacity: 1.0
+      }),
+      bodyGlass: new THREE.MeshPhysicalMaterial({
+        color: 0x111926,
+        metalness: 0.1,
+        roughness: 0.06,
+        transmission: 0.55,
+        transparent: true,
+        opacity: 0.72,
+        envMapIntensity: 1.6
+      }),
+      carbon: new THREE.MeshStandardMaterial({
+        color: 0x22262e,
+        map: carbonTex,
+        bumpMap: carbonTex,
+        bumpScale: 0.006,
+        roughness: 0.32,
+        metalness: 0.45
+      }),
+      matteBlack: new THREE.MeshStandardMaterial({
+        color: 0x14161b,
+        roughness: 0.7,
+        metalness: 0.25
+      }),
+      aluminum: new THREE.MeshStandardMaterial({
+        color: 0xd6dde6,
+        roughness: 0.22,
+        metalness: 0.88
+      }),
+      chrome: new THREE.MeshStandardMaterial({
+        color: 0xf8fafc,
+        roughness: 0.08,
+        metalness: 0.96
+      }),
+      titanium: new THREE.MeshStandardMaterial({
+        color: 0x94a3b8,
+        roughness: 0.3,
+        metalness: 0.82
+      }),
+      ferrariRedHead: new THREE.MeshStandardMaterial({
+        color: 0xd9141d,
+        roughness: 0.38,
+        metalness: 0.25
+      }),
+      engineBlockGlass: new THREE.MeshPhysicalMaterial({
+        color: 0x94a3b8,
+        roughness: 0.15,
+        metalness: 0.1,
+        transparent: true,
+        opacity: 0.38
+      }),
+      exhaustHeader: new THREE.MeshStandardMaterial({
+        color: 0x7c6f64,
+        roughness: 0.35,
+        metalness: 0.78,
+        emissive: new THREE.Color(0xff3300),
+        emissiveIntensity: 0.0
+      }),
+      hybridOrange: new THREE.MeshStandardMaterial({
+        color: 0xff6b00,
+        roughness: 0.28,
+        metalness: 0.3,
+        emissive: new THREE.Color(0xff5500),
+        emissiveIntensity: 0.18
+      }),
+      batteryPack: new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        roughness: 0.35,
+        metalness: 0.5
+      }),
+      alcantaraRed: new THREE.MeshStandardMaterial({
+        color: 0x991b1b,
+        roughness: 0.85,
+        metalness: 0.05
+      }),
+      brakeDisc: new THREE.MeshStandardMaterial({
+        color: 0x646870,
+        map: brakeDiscTex,
+        bumpMap: brakeDiscTex,
+        bumpScale: 0.008,
+        roughness: 0.45,
+        metalness: 0.65,
+        emissive: new THREE.Color(0xff2a00),
+        emissiveIntensity: 0.0
+      }),
+      caliperYellow: new THREE.MeshPhysicalMaterial({
+        color: 0xffd500,
+        roughness: 0.2,
+        metalness: 0.3,
+        clearcoat: 0.8
+      }),
+      tireRubber: new THREE.MeshStandardMaterial({
+        color: 0x15171c,
+        roughness: 0.82,
+        metalness: 0.08
+      }),
+      headlightGlow: new THREE.MeshBasicMaterial({
+        color: 0xf0f9ff
+      }),
+      taillightGlow: new THREE.MeshBasicMaterial({
+        color: 0xff1e1e
+      }),
+      pushrodPurple: new THREE.MeshStandardMaterial({
+        color: 0xe11d48,
+        roughness: 0.25,
+        metalness: 0.75
+      }),
+      springYellow: new THREE.MeshStandardMaterial({
+        color: 0xfacc15,
+        roughness: 0.25,
+        metalness: 0.4
+      })
+    };
+
+    // ============================================================================
+    // 6. 构建法拉利 6 大工程总成与动态机械结构
+    //    坐标系约定：X 轴向前 (+X 为车头，-X 为车尾)，Y 轴向上，Z 轴向右 (+Z 右侧，-Z 左侧)
+    // ============================================================================
+    const carRoot = new THREE.Group();
+    scene.add(carRoot);
+
+    // 子系统分组字典（带爆炸偏移向量与引用）
+    const subsystems = {};
+    const clickableMeshes = [];
+
+    function registerSubsystem(key, group, explodeVec) {
+      group.userData.subsystemKey = key;
+      group.userData.basePos = group.position.clone();
+      group.userData.explodeVec = explodeVec;
+      subsystems[key] = group;
+      carRoot.add(group);
+    }
+
+    function tagClickable(rootGroup, key) {
+      rootGroup.traverse((child) => {
+        if (child.isMesh) {
+          child.userData.subsystemKey = key;
+          child.castShadow = true;
+          child.receiveShadow = true;
+          clickableMeshes.push(child);
+        }
+      });
+    }
+
+    // 通用两点连杆更新辅助函数（用于活塞连杆、推杆、上下叉臂等精确运动学）
+    const _upVec = new THREE.Vector3(0, 1, 0);
+    const _dirVec = new THREE.Vector3();
+    function alignRodBetweenPoints(mesh, pA, pB, radius = 0.015) {
+      _dirVec.subVectors(pB, pA);
+      const len = _dirVec.length();
+      mesh.position.copy(pA).addScaledVector(_dirVec, 0.5);
+      mesh.scale.set(radius, len, radius);
+      mesh.quaternion.setFromUnitVectors(_upVec, _dirVec.normalize());
+    }
+
+    // ----------------------------------------------------------------------------
+    // 模块 1：底盘文丘里通道与尾部扩散器 (Underbody & Venturi Floor)
+    // ----------------------------------------------------------------------------
+    const underbodyGroup = new THREE.Group();
+    registerSubsystem('underbody', underbodyGroup, new THREE.Vector3(0, -0.78, 0));
+
+    // 主碳纤维平整底板
+    const floorPlate = new THREE.Mesh(new THREE.BoxGeometry(4.15, 0.035, 1.88), materials.carbon);
+    floorPlate.position.set(-0.02, 0.14, 0);
+    underbodyGroup.add(floorPlate);
+
+    // 前唇分流器 (Front Splitter)
+    const frontSplitter = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.028, 1.92), materials.carbon);
+    frontSplitter.position.set(1.98, 0.13, 0);
+    underbodyGroup.add(frontSplitter);
+
+    // 中央鼻锥下方 T 型导流板
+    const noseStrut = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.14, 0.08), materials.carbon);
+    noseStrut.position.set(2.05, 0.21, 0);
+    underbodyGroup.add(noseStrut);
+
+    // 两侧空气动力学侧裙 (Aero Side Skirts)
+    [-0.95, 0.95].forEach((z) => {
+      const skirt = new THREE.Mesh(new THREE.BoxGeometry(2.3, 0.05, 0.12), materials.carbon);
+      skirt.position.set(0.05, 0.15, z);
+      underbodyGroup.add(skirt);
+    });
+
+    // 文丘里隧道导流隔板与尾部 4 鳍片扩散器 (Rear Diffuser)
+    const diffuserHousing = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.18, 1.82), materials.carbon);
+    diffuserHousing.position.set(-1.95, 0.24, 0);
+    diffuserHousing.rotation.z = -0.18;
+    underbodyGroup.add(diffuserHousing);
+
+    [-0.72, -0.36, 0, 0.36, 0.72].forEach((z) => {
+      const fin = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.19, 0.022), materials.carbon);
+      fin.position.set(-1.85, 0.21, z);
+      fin.rotation.z = -0.14;
+      underbodyGroup.add(fin);
+    });
+
+    tagClickable(underbodyGroup, 'underbody');
+
+    // ----------------------------------------------------------------------------
+    // 模块 2：T800/T1000 碳纤维单体壳座舱与内饰 (Carbon Monocoque & Cockpit)
+    // ----------------------------------------------------------------------------
+    const monocoqueGroup = new THREE.Group();
+    registerSubsystem('monocoque', monocoqueGroup, new THREE.Vector3(0, 0.12, 0));
+
+    // 碳纤维底盆主池与高门槛梁
+    const tubFloor = new THREE.Mesh(new THREE.BoxGeometry(1.75, 0.08, 1.38), materials.carbon);
+    tubFloor.position.set(0.28, 0.21, 0);
+    monocoqueGroup.add(tubFloor);
+
+    [-0.66, 0.66].forEach((z) => {
+      const sill = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.28, 0.15), materials.carbon);
+      sill.position.set(0.28, 0.34, z);
+      monocoqueGroup.add(sill);
+    });
+
+    // 前防火墙与后引擎碳纤维隔舱壁
+    const frontBulkhead = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.56, 1.36), materials.carbon);
+    frontBulkhead.position.set(1.02, 0.46, 0);
+    monocoqueGroup.add(frontBulkhead);
+
+    const rearBulkhead = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.78, 1.38), materials.carbon);
+    rearBulkhead.position.set(-0.48, 0.56, 0);
+    monocoqueGroup.add(rearBulkhead);
+
+    // 防滚架 A 柱与车顶碳纤维安全笼框架
+    [-0.56, 0.56].forEach((z) => {
+      const aPillar = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.038, 0.88, 12), materials.carbon);
+      aPillar.position.set(0.75, 0.86, z);
+      aPillar.rotation.z = 0.85;
+      aPillar.rotation.x = z > 0 ? -0.18 : 0.18;
+      monocoqueGroup.add(aPillar);
+    });
+    const roofHeader = new THREE.Mesh(new THREE.BoxGeometry(0.65, 0.045, 1.02), materials.carbon);
+    roofHeader.position.set(0.12, 1.11, 0);
+    monocoqueGroup.add(roofHeader);
+
+    // 双一体成型红色 Alcantara 桶形赛车座椅
+    [-0.31, 0.31].forEach((z) => {
+      const seatCushion = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.08, 0.44), materials.alcantaraRed);
+      seatCushion.position.set(0.15, 0.28, z);
+      seatCushion.rotation.z = 0.12;
+      monocoqueGroup.add(seatCushion);
+
+      const seatBack = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.68, 0.44), materials.alcantaraRed);
+      seatBack.position.set(-0.18, 0.58, z);
+      seatBack.rotation.z = 0.34;
+      monocoqueGroup.add(seatBack);
+
+      const headrest = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.22, 0.26), materials.carbon);
+      headrest.position.set(-0.31, 0.91, z);
+      headrest.rotation.z = 0.25;
+      monocoqueGroup.add(headrest);
+    });
+
+    // 中控碳纤维换挡桥与仪表台
+    const centerBridge = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.12, 0.14), materials.carbon);
+    centerBridge.position.set(0.35, 0.36, 0);
+    centerBridge.rotation.z = -0.12;
+    monocoqueGroup.add(centerBridge);
+
+    const dashCluster = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.18, 1.24), materials.matteBlack);
+    dashCluster.position.set(0.78, 0.68, 0);
+    monocoqueGroup.add(dashCluster);
+
+    // F1 平底方向盘（带 Manettino 旋钮，与前轮转向角实时联动！）
+    const steeringWheelAssembly = new THREE.Group();
+    steeringWheelAssembly.position.set(0.56, 0.68, -0.32); // 左舵驾驶位
+    steeringWheelAssembly.rotation.z = -0.35;
+    monocoqueGroup.add(steeringWheelAssembly);
+
+    const steeringColumn = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.028, 0.34, 12), materials.titanium);
+    steeringColumn.rotation.z = Math.PI / 2;
+    steeringColumn.position.x = 0.16;
+    steeringWheelAssembly.add(steeringColumn);
+
+    const steeringRimPivot = new THREE.Group();
+    steeringWheelAssembly.add(steeringRimPivot);
+
+    const wheelRim = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.022, 12, 28), materials.carbon);
+    wheelRim.rotation.y = Math.PI / 2;
+    steeringRimPivot.add(wheelRim);
+
+    const wheelHub = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.03, 16), materials.ferrariRedHead);
+    wheelHub.rotation.z = Math.PI / 2;
+    steeringRimPivot.add(wheelHub);
+
+    // 铝合金数控踏板组
+    [-0.42, -0.32].forEach((z, idx) => {
+      const pedal = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.14, 0.06), materials.aluminum);
+      pedal.position.set(0.82, 0.32, z);
+      pedal.rotation.z = -0.45;
+      monocoqueGroup.add(pedal);
+    });
+
+    tagClickable(monocoqueGroup, 'monocoque');
+
+    // ----------------------------------------------------------------------------
+    // 模块 3：6.5L 65° V12 自然吸气引擎总成 (含透明缸体、12 个动态活塞连杆与热辐射排气)
+    // ----------------------------------------------------------------------------
+    const engineGroup = new THREE.Group();
+    registerSubsystem('engine', engineGroup, new THREE.Vector3(-0.45, 0.88, 0));
+
+    const engineCenter = new THREE.Group();
+    engineCenter.position.set(-0.92, 0.48, 0);
+    engineGroup.add(engineCenter);
+
+    // 干式油底壳与下曲轴箱
+    const oilPan = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.12, 0.46), materials.titanium);
+    oilPan.position.set(0, -0.14, 0);
+    engineCenter.add(oilPan);
+
+    // 半透明铝合金 V12 气缸体（让学生能直接看到内部活塞高速往复）
+    const vAngle = (32.5 * Math.PI) / 180; // 65° V 型夹角的一半
+    [-1, 1].forEach((side) => {
+      const bankBlock = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.28, 0.22), materials.engineBlockGlass);
+      bankBlock.position.set(0, 0.08, side * 0.14);
+      bankBlock.rotation.x = side * vAngle;
+      engineCenter.add(bankBlock);
+
+      // 法拉利标志性红色结晶气门室盖 (Testa Rossa Valve Covers)
+      const headCover = new THREE.Mesh(new THREE.BoxGeometry(0.78, 0.075, 0.24), materials.ferrariRedHead);
+      headCover.position.set(0, 0.22, side * 0.23);
+      headCover.rotation.x = side * vAngle;
+      engineCenter.add(headCover);
+    });
+
+    // 旋转曲轴总成 (Crankshaft)
+    const crankshaftGroup = new THREE.Group();
+    crankshaftGroup.position.set(0, -0.05, 0);
+    engineCenter.add(crankshaftGroup);
+
+    const crankMainShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.032, 0.032, 0.84, 16), materials.chrome);
+    crankMainShaft.rotation.z = Math.PI / 2;
+    crankshaftGroup.add(crankMainShaft);
+
+    // 12 气缸活塞、连杆、曲柄销与顶部进气喇叭口
+    const pistonsData = [];
+    const pistonGeo = new THREE.CylinderGeometry(0.044, 0.044, 0.052, 16);
+    const conRodGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
+    const stackGeo = new THREE.CylinderGeometry(0.034, 0.024, 0.11, 14);
+    const crankWebGeo = new THREE.CylinderGeometry(0.062, 0.062, 0.018, 14);
+
+    // V12 点火相位间隔
+    const v12Phases = [0, 2.09, 4.18, 5.23, 1.04, 3.14];
+
+    for (let i = 0; i < 6; i++) {
+      const xPos = -0.30 + i * 0.12;
+      const phase = v12Phases[i];
+
+      // 曲轴平衡块
+      const web = new THREE.Mesh(crankWebGeo, materials.titanium);
+      web.rotation.z = Math.PI / 2;
+      web.position.set(xPos, Math.sin(phase) * 0.025, Math.cos(phase) * 0.025);
+      crankshaftGroup.add(web);
+
+      // 左右两侧气缸组 (Left & Right Banks)
+      [-1, 1].forEach((bankSide) => {
+        const bankAngle = bankSide * vAngle;
+        const axisDir = new THREE.Vector3(0, Math.cos(bankAngle), Math.sin(bankAngle)).normalize();
+
+        const pistonMesh = new THREE.Mesh(pistonGeo, materials.chrome);
+        // 让活塞沿气缸轴线方向对齐
+        pistonMesh.quaternion.setFromUnitVectors(_upVec, axisDir);
+        engineCenter.add(pistonMesh);
+
+        const rodMesh = new THREE.Mesh(conRodGeo, materials.aluminum);
+        engineCenter.add(rodMesh);
+
+        // 顶部 12 支金属进气喇叭口 (Velocity Stacks)
+        const stack = new THREE.Mesh(stackGeo, materials.chrome);
+        stack.position.set(xPos + bankSide * 0.018, 0.31, bankSide * 0.095);
+        stack.rotation.x = -bankSide * 0.18;
+        engineCenter.add(stack);
+
+        pistonsData.push({
+          xPos: xPos + bankSide * 0.015,
+          phase: phase + (bankSide === 1 ? 0 : 1.13),
+          axisDir,
+          pistonMesh,
+          rodMesh
+        });
+      });
+
+      // 6 合 1 铬镍铁合金排气歧管 (Inconel Exhaust Headers)
+      [-1, 1].forEach((bankSide) => {
+        const headerPipe = new THREE.Mesh(
+          new THREE.TorusGeometry(0.11, 0.019, 10, 20, Math.PI * 0.85),
+          materials.exhaustHeader
+        );
+        headerPipe.position.set(xPos, 0.11, bankSide * 0.25);
+        headerPipe.rotation.y = Math.PI / 2;
+        headerPipe.rotation.x = bankSide > 0 ? 0.4 : Math.PI - 0.4;
+        engineCenter.add(headerPipe);
+      });
+    }
+
+    // 两侧主集气排气管与尾部四出尾喉
+    [-1, 1].forEach((side) => {
+      const collector = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.034, 0.85, 14), materials.exhaustHeader);
+      collector.rotation.z = Math.PI / 2;
+      collector.position.set(-0.22, 0.06, side * 0.34);
+      engineCenter.add(collector);
+
+      // 双边共四出运动排气尾管
+      [0.44, 0.56].forEach((zOff) => {
+        const tailpipe = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.22, 18), materials.chrome);
+        tailpipe.rotation.z = Math.PI / 2;
+        tailpipe.position.set(-1.12, 0.04, side * zOff);
+        engineCenter.add(tailpipe);
+      });
+    });
+
+    tagClickable(engineGroup, 'engine');
+
+    // ----------------------------------------------------------------------------
+    // 模块 4：HY-KERS 混动系统与 8 速 DCT 双离合变速箱 (Hybrid & Gearbox)
+    // ----------------------------------------------------------------------------
+    const hybridGroup = new THREE.Group();
+    registerSubsystem('hybrid', hybridGroup, new THREE.Vector3(-0.95, 0.22, 0));
+
+    // 座舱后下方平铺的 800V 超薄高压电池组
+    const batteryBox = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.11, 1.18), materials.batteryPack);
+    batteryBox.position.set(-0.36, 0.24, 0);
+    hybridGroup.add(batteryBox);
+
+    // 橙色高压电力控制单元 (Inverter / HV-ECU)
+    const inverterUnit = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.14, 0.36), materials.hybridOrange);
+    inverterUnit.position.set(-0.62, 0.62, 0);
+    hybridGroup.add(inverterUnit);
+
+    // MGU-K 永磁同步驱动电机（高光混动橙）
+    const mgukMotor = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.14, 0.24, 24), materials.hybridOrange);
+    mgukMotor.rotation.z = Math.PI / 2;
+    mgukMotor.position.set(-1.36, 0.36, 0);
+    hybridGroup.add(mgukMotor);
+
+    // 8 速湿式双离合变速箱壳体 (8-Speed DCT Transaxle)
+    const gearboxHousing = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.32, 0.44), materials.titanium);
+    gearboxHousing.position.set(-1.62, 0.41, 0);
+    hybridGroup.add(gearboxHousing);
+
+    // 变速箱外露可视化旋转齿轮组
+    const dctGears = [];
+    [-0.12, 0.12].forEach((yOff, idx) => {
+      const gear = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 0.05, 16), materials.chrome);
+      gear.rotation.x = Math.PI / 2;
+      gear.position.set(-1.62 + idx * 0.12, 0.42 + yOff * 0.45, 0.23);
+      hybridGroup.add(gear);
+      dctGears.push(gear);
+    });
+
+    // 高压橙色动力电缆
+    [-0.22, 0.22].forEach((zOff) => {
+      const cableCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.36, 0.28, zOff),
+        new THREE.Vector3(-0.62, 0.58, zOff * 0.6),
+        new THREE.Vector3(-1.35, 0.38, zOff * 0.4)
+      ]);
+      const cableMesh = new THREE.Mesh(new THREE.TubeGeometry(cableCurve, 20, 0.018, 8, false), materials.hybridOrange);
+      hybridGroup.add(cableMesh);
+    });
+
+    tagClickable(hybridGroup, 'hybrid');
+
+    // ----------------------------------------------------------------------------
+    // 模块 5：F1 推杆式双叉臂悬架、转向机构与 Brembo 碳陶制动系统
+    // ----------------------------------------------------------------------------
+    const suspensionGroup = new THREE.Group();
+    registerSubsystem('suspension', suspensionGroup, new THREE.Vector3(0, -0.36, 0));
+
+    // 前桥转向齿轮齿条横拉杆
+    const steeringRackBar = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.38, 12), materials.aluminum);
+    steeringRackBar.rotation.x = Math.PI / 2;
+    steeringRackBar.position.set(1.46, 0.31, 0);
+    suspensionGroup.add(steeringRackBar);
+
+    // 顶部内置水平对置螺旋弹簧与磁流变减振器 (Inboard Horizontal Coilovers)
+    const inboardDamperRefs = [];
+    [1.36, -1.36].forEach((axleX) => {
+      [-1, 1].forEach((side) => {
+        const damperPivot = new THREE.Group();
+        damperPivot.position.set(axleX, 0.59, side * 0.22);
+        suspensionGroup.add(damperPivot);
+
+        const coilSpring = new THREE.Mesh(new THREE.CylinderGeometry(0.042, 0.042, 0.24, 14), materials.springYellow);
+        coilSpring.rotation.x = Math.PI / 2;
+        damperPivot.add(coilSpring);
+
+        const damperShaft = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.32, 10), materials.chrome);
+        damperShaft.rotation.x = Math.PI / 2;
+        damperPivot.add(damperShaft);
+
+        // 三角推杆摇臂 (Rocker Arm)
+        const rockerArm = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.09, 0.035), materials.aluminum);
+        rockerArm.position.set(0, -0.02, side * 0.14);
+        damperPivot.add(rockerArm);
+
+        inboardDamperRefs.push({ coilSpring, rockerArm, side });
+      });
+    });
+
+    // 四轮总成构建（含转向节、碳陶刹车盘、固定式卡钳、法拉利五辐星形锻造轮毂、倍耐力轮胎、上下叉臂、斜向推杆）
+    const wheelAssemblies = [];
+    const wheelConfigs = [
+      { name: 'FL', x: 1.36, z: -0.84, side: -1, isFront: true },
+      { name: 'FR', x: 1.36, z: 0.84, side: 1, isFront: true },
+      { name: 'RL', x: -1.36, z: -0.86, side: -1, isFront: false },
+      { name: 'RR', x: -1.36, z: 0.86, side: 1, isFront: false }
+    ];
+
+    const armRodGeo = new THREE.CylinderGeometry(1, 1, 1, 10);
+
+    wheelConfigs.forEach((cfg, idx) => {
+      const wheelRadius = cfg.isFront ? 0.35 : 0.37;
+      const tireWidth = cfg.isFront ? 0.28 : 0.34;
+      const baseHubY = wheelRadius;
+
+      // 车轮跳动 + 转向总节点 (随悬架上下跳动，前轮随方向盘左右转向，但刹车卡钳保持不自转！)
+      const uprightNode = new THREE.Group();
+      uprightNode.position.set(cfg.x, baseHubY, cfg.z);
+      suspensionGroup.add(uprightNode);
+
+      // 铝合金羊角转向节 (Steering Knuckle / Upright)
+      const knuckle = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.08, 16), materials.aluminum);
+      knuckle.rotation.x = Math.PI / 2;
+      uprightNode.add(knuckle);
+
+      // 黄色 Brembo 六活塞固定式制动卡钳（固定在羊角上，不随车轮旋转！）
+      const caliper = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.24, 0.12), materials.caliperYellow);
+      caliper.position.set(cfg.isFront ? -0.19 : 0.19, 0.05, -cfg.side * 0.03);
+      caliper.rotation.z = cfg.isFront ? 0.25 : -0.25;
+      uprightNode.add(caliper);
+
+      // 旋转车轮节点（包含打孔碳陶刹车盘、五辐星形锻造轮毂、锁止螺母与轮胎）
+      const spinNode = new THREE.Group();
+      uprightNode.add(spinNode);
+
+      // Brembo 打孔碳陶刹车盘 (随车轮旋转，并在重刹时呈现炽热红光)
+      const brakeDiscMesh = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.25, 0.25, 0.032, 32),
+        materials.brakeDisc
+      );
+      brakeDiscMesh.rotation.x = Math.PI / 2;
+      brakeDiscMesh.position.z = -cfg.side * 0.03;
+      spinNode.add(brakeDiscMesh);
+
+      // 倍耐力 P-Zero 宽体低扁平比轮胎
+      const tireBody = new THREE.Mesh(
+        new THREE.CylinderGeometry(wheelRadius, wheelRadius, tireWidth, 36, 1, true),
+        materials.tireRubber
+      );
+      tireBody.rotation.x = Math.PI / 2;
+      spinNode.add(tireBody);
+
+      // 轮胎内外侧壁与红色赛道条纹
+      [-1, 1].forEach((sideSign) => {
+        const sidewall = new THREE.Mesh(
+          new THREE.RingGeometry(wheelRadius * 0.66, wheelRadius, 36),
+          materials.tireRubber
+        );
+        sidewall.position.z = sideSign * (tireWidth / 2);
+        sidewall.rotation.y = sideSign > 0 ? 0 : Math.PI;
+        spinNode.add(sidewall);
+
+        if (sideSign === cfg.side) {
+          const redStripe = new THREE.Mesh(
+            new THREE.RingGeometry(wheelRadius * 0.78, wheelRadius * 0.81, 36),
+            new THREE.MeshBasicMaterial({ color: 0xe11d24, side: THREE.DoubleSide })
+          );
+          redStripe.position.z = sideSign * (tireWidth / 2 + 0.002);
+          spinNode.add(redStripe);
+        }
+      });
+
+      // 法拉利经典双五辐星形锻造轮毂 (5-Twin-Spoke Forged Rim)
+      const rimBarrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(wheelRadius * 0.67, wheelRadius * 0.67, tireWidth * 0.92, 32, 1, true),
+        materials.titanium
+      );
+      rimBarrel.rotation.x = Math.PI / 2;
+      spinNode.add(rimBarrel);
+
+      for (let s = 0; s < 5; s++) {
+        const angle = (s / 5) * Math.PI * 2;
+        [-0.09, 0.09].forEach((subAngle) => {
+          const spoke = new THREE.Mesh(
+            new THREE.BoxGeometry(0.022, wheelRadius * 0.64, 0.025),
+            materials.aluminum
+          );
+          const a = angle + subAngle;
+          spoke.position.set(
+            Math.cos(a) * wheelRadius * 0.32,
+            Math.sin(a) * wheelRadius * 0.32,
+            cfg.side * (tireWidth * 0.36)
+          );
+          spoke.rotation.z = a - Math.PI / 2;
+          spinNode.add(spoke);
+        });
+      }
+
+      // 中央 F1 红色单螺母锁止中心盖与跃马黄标
+      const centerLock = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.052, 0.052, 0.05, 18),
+        materials.ferrariRedHead
+      );
+      centerLock.rotation.x = Math.PI / 2;
+      centerLock.position.z = cfg.side * (tireWidth * 0.38);
+      spinNode.add(centerLock);
+
+      // 双叉臂上下 A 字摆臂与斜向推杆 (Upper/Lower Wishbones & Diagonal Pushrod)
+      const upperArmA = new THREE.Mesh(armRodGeo, materials.aluminum);
+      const upperArmB = new THREE.Mesh(armRodGeo, materials.aluminum);
+      const lowerArmA = new THREE.Mesh(armRodGeo, materials.aluminum);
+      const lowerArmB = new THREE.Mesh(armRodGeo, materials.aluminum);
+      const pushrodMesh = new THREE.Mesh(armRodGeo, materials.pushrodPurple);
+
+      suspensionGroup.add(upperArmA, upperArmB, lowerArmA, lowerArmB, pushrodMesh);
+
+      wheelAssemblies.push({
+        cfg,
+        baseHubY,
+        uprightNode,
+        spinNode,
+        upperArmA,
+        upperArmB,
+        lowerArmA,
+        lowerArmB,
+        pushrodMesh,
+        damperRef: inboardDamperRefs[idx]
+      });
+    });
+
+    // 更新悬架几何连杆位置函数（支持颠簸测试实时解算）
+    const _pChassis1 = new THREE.Vector3();
+    const _pChassis2 = new THREE.Vector3();
+    const _pHub = new THREE.Vector3();
+    const _pRocker = new THREE.Vector3();
+
+    function updateSuspensionKinematics(time, bumpActive) {
+      wheelAssemblies.forEach((w, idx) => {
+        const { cfg, baseHubY, uprightNode, upperArmA, upperArmB, lowerArmA, lowerArmB, pushrodMesh, damperRef } = w;
+        const bumpOffset = bumpActive
+          ? Math.sin(time * 8.5 + idx * 1.4) * 0.055 + Math.cos(time * 15.0 + idx) * 0.018
+          : 0;
+
+        const currentY = baseHubY + bumpOffset;
+        uprightNode.position.y = currentY;
+
+        if (cfg.isFront) {
+          uprightNode.rotation.y = state.steerAngle;
+        }
+
+        const innerZ = cfg.side * 0.42;
+        const hubInnerZ = cfg.z - cfg.side * 0.08;
+
+        // 上叉臂 (Upper A-Arm)
+        _pChassis1.set(cfg.x + 0.16, 0.46, innerZ);
+        _pChassis2.set(cfg.x - 0.16, 0.46, innerZ);
+        _pHub.set(cfg.x, currentY + 0.11, hubInnerZ);
+        alignRodBetweenPoints(upperArmA, _pChassis1, _pHub, 0.014);
+        alignRodBetweenPoints(upperArmB, _pChassis2, _pHub, 0.014);
+
+        // 下叉臂 (Lower A-Arm)
+        _pChassis1.set(cfg.x + 0.19, 0.23, innerZ);
+        _pChassis2.set(cfg.x - 0.19, 0.23, innerZ);
+        _pHub.set(cfg.x, currentY - 0.11, hubInnerZ);
+        alignRodBetweenPoints(lowerArmA, _pChassis1, _pHub, 0.016);
+        alignRodBetweenPoints(lowerArmB, _pChassis2, _pHub, 0.016);
+
+        // 斜向推杆 (F1 Pushrod：从下摆臂轮端斜向上连接至车体内侧水平减振器摇臂)
+        _pHub.set(cfg.x, currentY - 0.08, hubInnerZ);
+        _pRocker.set(cfg.x, 0.58 + bumpOffset * 0.25, cfg.side * 0.35);
+        alignRodBetweenPoints(pushrodMesh, _pHub, _pRocker, 0.016);
+
+        // 水平螺旋弹簧压缩与摇臂旋转联动
+        if (damperRef) {
+          damperRef.coilSpring.scale.y = 1.0 - bumpOffset * 2.8;
+          damperRef.rockerArm.rotation.x = cfg.side * bumpOffset * 4.5;
+        }
+      });
+    }
+    updateSuspensionKinematics(0, false);
+    tagClickable(suspensionGroup, 'suspension');
+
+    // ----------------------------------------------------------------------------
+    // 模块 6：法拉利流线型空气动力学车壳、蝴蝶门与主动尾翼 (Aero Bodywork & Doors)
+    // ----------------------------------------------------------------------------
+    const aeroGroup = new THREE.Group();
+    registerSubsystem('aero', aeroGroup, new THREE.Vector3(0, 1.38, 0));
+
+    // 6.1 鲨鱼鼻前盖与中央 S-Duct 导流通道 (Front Nose Cone & S-Duct)
+    const noseShape = new THREE.Shape();
+    noseShape.moveTo(0.85, 0.22);
+    noseShape.lineTo(2.26, 0.18);
+    noseShape.quadraticCurveTo(2.32, 0.29, 2.15, 0.36);
+    noseShape.quadraticCurveTo(1.65, 0.55, 0.95, 0.72);
+    noseShape.lineTo(0.85, 0.22);
+
+    const noseGeo = new THREE.ExtrudeGeometry(noseShape, {
+      depth: 0.72,
+      bevelEnabled: true,
+      bevelThickness: 0.06,
+      bevelSize: 0.05,
+      bevelSegments: 5
+    });
+    noseGeo.translate(0, 0, -0.36);
+    const noseConeMesh = new THREE.Mesh(noseGeo, materials.bodyPaint);
+    aeroGroup.add(noseConeMesh);
+
+    // 鼻锥中央深凹 S-Duct 碳纤维导流槽
+    const sDuctVent = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.08, 0.48), materials.carbon);
+    sDuctVent.position.set(1.42, 0.54, 0);
+    sDuctVent.rotation.z = -0.26;
+    aeroGroup.add(sDuctVent);
+
+    // 车头跃马鼻标
+    const frontBadge = new THREE.Mesh(
+      new THREE.PlaneGeometry(0.09, 0.11),
+      new THREE.MeshBasicMaterial({ map: shieldTex, transparent: true })
+    );
+    frontBadge.position.set(2.14, 0.37, 0);
+    frontBadge.rotation.y = Math.PI / 2;
+    frontBadge.rotation.z = -0.35;
+    aeroGroup.add(frontBadge);
+
+    // 6.2 肌肉感前后隆起翼子板 (Sculpted Front & Rear Fenders)
+    const frontFenderShape = new THREE.Shape();
+    frontFenderShape.moveTo(0.65, 0.20);
+    frontFenderShape.lineTo(2.16, 0.20);
+    frontFenderShape.quadraticCurveTo(2.22, 0.44, 1.92, 0.58);
+    frontFenderShape.quadraticCurveTo(1.36, 0.84, 0.78, 0.74);
+    frontFenderShape.lineTo(0.65, 0.20);
+
+    const frontFenderGeo = new THREE.ExtrudeGeometry(frontFenderShape, {
+      depth: 0.42,
+      bevelEnabled: true,
+      bevelThickness: 0.08,
+      bevelSize: 0.06,
+      bevelSegments: 6
+    });
+    frontFenderGeo.translate(0, 0, -0.21);
+
+    const rearFenderShape = new THREE.Shape();
+    rearFenderShape.moveTo(-2.12, 0.26);
+    rearFenderShape.lineTo(-0.35, 0.22);
+    rearFenderShape.lineTo(-0.25, 0.78);
+    rearFenderShape.quadraticCurveTo(-1.25, 0.98, -1.96, 0.76);
+    rearFenderShape.lineTo(-2.12, 0.42);
+    rearFenderShape.closePath();
+
+    const rearFenderGeo = new THREE.ExtrudeGeometry(rearFenderShape, {
+      depth: 0.46,
+      bevelEnabled: true,
+      bevelThickness: 0.09,
+      bevelSize: 0.07,
+      bevelSegments: 6
+    });
+    rearFenderGeo.translate(0, 0, -0.23);
+
+    [-1, 1].forEach((side) => {
+      // 前翼子板
+      const fFender = new THREE.Mesh(frontFenderGeo, materials.bodyPaint);
+      fFender.position.z = side * 0.72;
+      aeroGroup.add(fFender);
+
+      // 前轮拱黑色内衬罩
+      const fWell = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.40, 0.40, 0.52, 24, 1, false, 0, Math.PI),
+        materials.matteBlack
+      );
+      fWell.rotation.x = Math.PI / 2;
+      fWell.position.set(1.36, 0.35, side * 0.74);
+      aeroGroup.add(fWell);
+
+      // 翼子板法拉利 Scuderia 盾形队标
+      const fenderShield = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.11, 0.14),
+        new THREE.MeshBasicMaterial({ map: shieldTex, transparent: true, side: THREE.DoubleSide })
+      );
+      fenderShield.position.set(0.92, 0.62, side * 0.99);
+      fenderShield.rotation.y = side > 0 ? 0 : Math.PI;
+      aeroGroup.add(fenderShield);
+
+      // 锐利回旋镖式 LED 前大灯
+      const headlight = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.045, 0.18), materials.headlightGlow);
+      headlight.position.set(1.86, 0.54, side * 0.74);
+      headlight.rotation.z = -0.32;
+      headlight.rotation.y = -side * 0.25;
+      aeroGroup.add(headlight);
+
+      // 后翼子板与侧进气口导流罩 (Rear Haunches & Sidepod Intakes)
+      const rFender = new THREE.Mesh(rearFenderGeo, materials.bodyPaint);
+      rFender.position.z = side * 0.74;
+      aeroGroup.add(rFender);
+
+      const rWell = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.42, 0.54, 24, 1, false, 0, Math.PI),
+        materials.matteBlack
+      );
+      rWell.rotation.x = Math.PI / 2;
+      rWell.position.set(-1.36, 0.37, side * 0.76);
+      aeroGroup.add(rWell);
+
+      // 中置引擎侧面大型进气口黑框
+      const sideIntake = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.36, 0.18), materials.carbon);
+      sideIntake.position.set(-0.42, 0.56, side * 0.88);
+      sideIntake.rotation.y = side * 0.22;
+      aeroGroup.add(sideIntake);
+
+      // 飞扶壁空气动力学桥柱 (Flying Buttresses)
+      const buttressCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.18, 1.09, side * 0.46),
+        new THREE.Vector3(-0.92, 0.94, side * 0.58),
+        new THREE.Vector3(-1.72, 0.76, side * 0.64)
+      ]);
+      const buttressMesh = new THREE.Mesh(
+        new THREE.TubeGeometry(buttressCurve, 20, 0.055, 12, false),
+        materials.bodyPaint
+      );
+      aeroGroup.add(buttressMesh);
+    });
+
+    // 6.3 水滴形全景玻璃座舱盖与透明 V12 引擎盖 (Teardrop Canopy & Louvered Engine Cover)
+    const windshield = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.035, 1.18), materials.bodyGlass);
+    windshield.position.set(0.68, 0.92, 0);
+    windshield.rotation.z = -0.46;
+    aeroGroup.add(windshield);
+
+    // 单雨刷器
+    const wiper = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.02, 0.03), materials.matteBlack);
+    wiper.position.set(0.72, 0.95, -0.18);
+    wiper.rotation.z = -0.46;
+    wiper.rotation.y = 0.28;
+    aeroGroup.add(wiper);
+
+    const roofCanopy = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.04, 1.06), materials.bodyPaint);
+    roofCanopy.position.set(0.02, 1.14, 0);
+    aeroGroup.add(roofCanopy);
+
+    // 透明百叶窗式 V12 引擎展示盖
+    const engineGlassCover = new THREE.Mesh(new THREE.BoxGeometry(1.18, 0.03, 0.76), materials.bodyGlass);
+    engineGlassCover.position.set(-0.96, 0.94, 0);
+    engineGlassCover.rotation.z = 0.26;
+    aeroGroup.add(engineGlassCover);
+
+    // 引擎盖中央脊椎鳍片與散热百叶腮孔
+    const spineFin = new THREE.Mesh(new THREE.BoxGeometry(1.15, 0.06, 0.04), materials.bodyPaint);
+    spineFin.position.set(-0.98, 0.96, 0);
+    spineFin.rotation.z = 0.26;
+    aeroGroup.add(spineFin);
+
+    for (let l = 0; l < 5; l++) {
+      [-0.26, 0.26].forEach((zOff) => {
+        const louver = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 0.24), materials.carbon);
+        louver.position.set(-0.56 - l * 0.18, 1.03 - l * 0.046, zOff);
+        louver.rotation.z = 0.12;
+        aeroGroup.add(louver);
+      });
+    }
+
+    // 6.4 车尾格栅与法拉利经典圆环 LED 尾灯 + F1 中置领航雾灯
+    const rearGrille = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.26, 1.72), materials.matteBlack);
+    rearGrille.position.set(-2.06, 0.58, 0);
+    aeroGroup.add(rearGrille);
+
+    [-0.78, -0.56, 0.56, 0.78].forEach((zPos) => {
+      const tailRing = new THREE.Mesh(new THREE.TorusGeometry(0.068, 0.018, 12, 24), materials.taillightGlow);
+      tailRing.rotation.y = Math.PI / 2;
+      tailRing.position.set(-2.09, 0.62, zPos);
+      aeroGroup.add(tailRing);
+    });
+
+    // F1 赛用方形闪烁雨雾灯
+    const f1RainLight = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.07, 0.09), materials.taillightGlow);
+    f1RainLight.position.set(-2.08, 0.28, 0);
+    aeroGroup.add(f1RainLight);
+
+    // 6.5 主动式空气动力学尾翼 (Active DRS / Airbrake Rear Wing)
+    const activeWingGroup = new THREE.Group();
+    activeWingGroup.position.set(-1.98, 0.76, 0);
+    aeroGroup.add(activeWingGroup);
+
+    const wingBlade = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.032, 1.68), materials.bodyPaint);
+    activeWingGroup.add(wingBlade);
+
+    const wingGurneyFlap = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.04, 1.66), materials.carbon);
+    wingGurneyFlap.position.set(-0.15, 0.02, 0);
+    activeWingGroup.add(wingGurneyFlap);
+
+    [-0.84, 0.84].forEach((z) => {
+      const endplate = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.14, 0.025), materials.carbon);
+      endplate.position.set(-0.02, 0.02, z);
+      activeWingGroup.add(endplate);
+    });
+
+    const wingStruts = [];
+    [-0.38, 0.38].forEach((z) => {
+      const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.26, 12), materials.chrome);
+      strut.position.set(-1.94, 0.66, z);
+      strut.rotation.z = -0.25;
+      aeroGroup.add(strut);
+      wingStruts.push(strut);
+    });
+
+    tagClickable(aeroGroup, 'aero');
+
+    // ----------------------------------------------------------------------------
+    // 模块 6B：可独立交互开启的双铰链蝴蝶门 (Interactive Butterfly Doors)
+    // ----------------------------------------------------------------------------
+    const doorsGroup = new THREE.Group();
+    registerSubsystem('doors', doorsGroup, new THREE.Vector3(0.18, 0.72, 0));
+
+    const doorPivots = [];
+    [-1, 1].forEach((side) => {
+      const hingePivot = new THREE.Group();
+      // 铰链定位在 A 柱前端根部
+      hingePivot.position.set(0.78, 0.68, side * 0.76);
+      doorsGroup.add(hingePivot);
+
+      // 车门外板与侧面导流深槽
+      const doorOuter = new THREE.Mesh(new THREE.BoxGeometry(1.12, 0.44, 0.09), materials.bodyPaint);
+      doorOuter.position.set(-0.52, -0.14, side * 0.09);
+      hingePivot.add(doorOuter);
+
+      const doorScoop = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.16, 0.095), materials.carbon);
+      doorScoop.position.set(-0.56, -0.12, side * 0.07);
+      doorScoop.rotation.z = -0.12;
+      hingePivot.add(doorScoop);
+
+      // 车门侧窗玻璃
+      const doorWindow = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.32, 0.025), materials.bodyGlass);
+      doorWindow.position.set(-0.48, 0.21, -side * 0.04);
+      doorWindow.rotation.x = side * 0.34;
+      hingePivot.add(doorWindow);
+
+      // 碳纤维长杆空气动力学后视镜
+      const mirrorStalk = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.028, 0.16), materials.carbon);
+      mirrorStalk.position.set(-0.14, 0.08, side * 0.19);
+      mirrorStalk.rotation.y = -side * 0.35;
+      hingePivot.add(mirrorStalk);
+
+      const mirrorHousing = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.08, 0.12), materials.bodyPaint);
+      mirrorHousing.position.set(-0.19, 0.10, side * 0.27);
+      hingePivot.add(mirrorHousing);
+
+      doorPivots.push({ hingePivot, side });
+    });
+
+    tagClickable(doorsGroup, 'doors');
+
+    // ============================================================================
+    // 7. 空气动力学风洞动态流线系统 (Wind Tunnel Streamlines & Vortex Ribbons)
+    // ============================================================================
+    const windTunnelGroup = new THREE.Group();
+    windTunnelGroup.visible = false;
+    carRoot.add(windTunnelGroup);
+
+    const streamTrackCurves = [
+      // 中央 S-Duct 鼻锥穿出跃过车顶与尾翼的主流线
+      {
+        color: 0x38bdf8,
+        points: [
+          [3.2, 0.22, 0], [2.15, 0.26, 0], [1.45, 0.62, 0], [0.75, 1.02, 0],
+          [0.0, 1.24, 0], [-1.0, 1.12, 0], [-1.98, 0.96, 0], [-3.1, 1.28, 0]
+        ]
+      },
+      // 左右前翼子板与飞扶壁气流
+      {
+        color: 0x38bdf8,
+        points: [
+          [3.2, 0.28, -0.58], [1.9, 0.64, -0.68], [0.5, 0.88, -0.66],
+          [-0.6, 0.98, -0.58], [-1.95, 0.92, -0.62], [-3.1, 1.18, -0.65]
+        ]
+      },
+      {
+        color: 0x38bdf8,
+        points: [
+          [3.2, 0.28, 0.58], [1.9, 0.64, 0.68], [0.5, 0.88, 0.66],
+          [-0.6, 0.98, 0.58], [-1.95, 0.92, 0.62], [-3.1, 1.18, 0.65]
+        ]
+      },
+      // 车门导流槽喂入中置引擎侧进气口的高压冷却气流
+      {
+        color: 0xfacc15,
+        points: [
+          [3.1, 0.34, -0.92], [1.5, 0.44, -0.98], [0.2, 0.54, -0.92],
+          [-0.48, 0.58, -0.82], [-1.5, 0.68, -0.78], [-2.9, 0.78, -0.84]
+        ]
+      },
+      {
+        color: 0xfacc15,
+        points: [
+          [3.1, 0.34, 0.92], [1.5, 0.44, 0.98], [0.2, 0.54, 0.92],
+          [-0.48, 0.58, 0.82], [-1.5, 0.68, 0.78], [-2.9, 0.78, 0.84]
+        ]
+      },
+      // 车底文丘里通道地面效应高速吸附气流与尾部扩散器上扬抽吸流 (绿色)
+      {
+        color: 0x4ade80,
+        points: [
+          [3.2, 0.08, -0.36], [1.8, 0.09, -0.36], [0.0, 0.08, -0.32],
+          [-1.5, 0.10, -0.36], [-2.15, 0.32, -0.42], [-3.1, 0.64, -0.48]
+        ]
+      },
+      {
+        color: 0x4ade80,
+        points: [
+          [3.2, 0.08, 0.36], [1.8, 0.09, 0.36], [0.0, 0.08, 0.32],
+          [-1.5, 0.10, 0.36], [-2.15, 0.32, 0.42], [-3.1, 0.64, 0.48]
+        ]
+      }
+    ];
+
+    const windPulseCapsules = [];
+    const pulseGeo = new THREE.CapsuleGeometry(0.022, 0.24, 6, 10);
+    pulseGeo.rotateZ(Math.PI / 2);
+
+    streamTrackCurves.forEach((track) => {
+      const curve = new THREE.CatmullRomCurve3(track.points.map((p) => new THREE.Vector3(...p)));
+
+      // 半透明基准流线轨迹管道
+      const guideTube = new THREE.Mesh(
+        new THREE.TubeGeometry(curve, 64, 0.008, 8, false),
+        new THREE.MeshBasicMaterial({ color: track.color, transparent: true, opacity: 0.28 })
+      );
+      windTunnelGroup.add(guideTube);
+
+      // 每条流线上生成 5 个高速流动的气流脉冲胶囊
+      const pulseMat = new THREE.MeshBasicMaterial({ color: track.color });
+      for (let k = 0; k < 5; k++) {
+        const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+        windTunnelGroup.add(pulse);
+        windPulseCapsules.push({
+          mesh: pulse,
+          curve,
+          offset: k / 5
+        });
+      }
+    });
+
+    // ============================================================================
+    // 8. 3D 空间悬浮标注点 (JigSpace Interactive Callout Pins)
+    // ============================================================================
+    const CALLOUT_CONFIGS = [
+      { key: 'aero', num: '01', label: 'S-Duct 前导流与主动气动壳', localPos: new THREE.Vector3(1.55, 0.62, 0) },
+      { key: 'doors', num: '02', label: '蝶翼式碳纤维车门', localPos: new THREE.Vector3(0.22, 0.72, 0.92) },
+      { key: 'monocoque', num: '03', label: 'T800 碳纤维单体壳座舱', localPos: new THREE.Vector3(0.28, 0.92, -0.35) },
+      { key: 'engine', num: '04', label: '6.5L 65° V12 自然吸气引擎', localPos: new THREE.Vector3(-0.92, 0.85, 0) },
+      { key: 'hybrid', num: '05', label: 'HY-KERS 混动与 8速 DCT', localPos: new THREE.Vector3(-1.55, 0.52, -0.32) },
+      { key: 'suspension', num: '06', label: 'F1 推杆悬架与碳陶制动', localPos: new THREE.Vector3(1.36, 0.45, 0.88) },
+      { key: 'underbody', num: '07', label: '文丘里底板与四通道扩散器', localPos: new THREE.Vector3(-1.95, 0.28, 0.55) }
+    ];
+
+    const labelsLayer = document.getElementById('labels-layer');
+    const calloutElements = [];
+
+    CALLOUT_CONFIGS.forEach((item) => {
+      const pin = document.createElement('div');
+      pin.className = 'callout-pin';
+      pin.innerHTML = `<span class="pin-dot">${item.num}</span><span>${item.label}</span>`;
+      pin.addEventListener('click', (e) => {
+        e.stopPropagation();
+        inspectSubsystem(item.key);
+      });
+      labelsLayer.appendChild(pin);
+      calloutElements.push({ ...item, el: pin });
+    });
+
+    const _projVec = new THREE.Vector3();
+    function updateCalloutPositions() {
+      const halfW = window.innerWidth / 2;
+      const halfH = window.innerHeight / 2;
+
+      calloutElements.forEach((item) => {
+        const subGroup = subsystems[item.key];
+        if (!subGroup) return;
+
+        _projVec.copy(item.localPos).add(subGroup.position);
+        _projVec.project(camera);
+
+        // 判断是否在相机视野前方
+        if (_projVec.z > 1) {
+          item.el.style.display = 'none';
+          return;
+        }
+
+        const x = _projVec.x * halfW + halfW;
+        const y = -_projVec.y * halfH + halfH;
+        item.el.style.display = 'flex';
+        item.el.style.left = `${x}px`;
+        item.el.style.top = `${y}px`;
+        item.el.classList.toggle('active', state.selectedSubsystem === item.key);
+      });
+    }
+
+    // ============================================================================
+    // 9. UI 控件联动与 JigSpace 步骤切换逻辑
+    // ============================================================================
+    const sliderExplode = document.getElementById('slider-explode');
+    const sliderXray = document.getElementById('slider-xray');
+    const sliderRpm = document.getElementById('slider-rpm');
+    const sliderSteer = document.getElementById('slider-steer');
+
+    const valExplode = document.getElementById('val-explode');
+    const valXray = document.getElementById('val-xray');
+    const valRpm = document.getElementById('val-rpm');
+    const valSteer = document.getElementById('val-steer');
+
+    const btnDoors = document.getElementById('btn-doors');
+    const btnWind = document.getElementById('btn-wind');
+    const btnBump = document.getElementById('btn-bump');
+    const btnDrs = document.getElementById('btn-drs');
+    const btnBrake = document.getElementById('btn-brake');
+    const btnAutoRotate = document.getElementById('btn-autorotate');
+
+    function syncControlPanelUI() {
+      const expPct = Math.round(state.targetExplode * 100);
+      sliderExplode.value = expPct;
+      valExplode.textContent = `${expPct}%`;
+
+      const xrayPct = Math.round(state.targetXray * 100);
+      sliderXray.value = xrayPct;
+      valXray.textContent = `${xrayPct}%`;
+
+      sliderRpm.value = state.targetRpm;
+      valRpm.textContent = `${Math.round(state.targetRpm)} RPM`;
+
+      const steerDeg = Math.round((state.targetSteerAngle * 180) / Math.PI);
+      sliderSteer.value = steerDeg;
+      valSteer.textContent = `${steerDeg}°`;
+
+      btnDoors.classList.toggle('active', state.doorsOpen);
+      btnWind.classList.toggle('active', state.windTunnel);
+      btnBump.classList.toggle('active', state.bumpTest);
+      btnDrs.classList.toggle('active', state.drsActive);
+      btnBrake.classList.toggle('active', state.brakeTest);
+      btnAutoRotate.classList.toggle('active', state.autoRotate);
+    }
+
+    function applyTeachingStep(stepIndex) {
+      const count = TEACHING_STEPS.length;
+      state.currentStep = ((stepIndex % count) + count) % count;
+      const cfg = TEACHING_STEPS[state.currentStep];
+
+      // 更新左侧教学卡片文本
+      document.getElementById('step-badge').textContent = cfg.badge;
+      document.getElementById('step-title').textContent = cfg.title;
+      document.getElementById('step-desc').textContent = cfg.desc;
+      document.getElementById('principle-title').textContent = cfg.principleTitle;
+      document.getElementById('principle-text').textContent = cfg.principleText;
+
+      const specsGrid = document.getElementById('specs-grid');
+      specsGrid.innerHTML = cfg.specs
+        .map(([k, v]) => `<div class="spec-cell"><span class="k">${k}</span><span class="v">${v}</span></div>`)
+        .join('');
+
+      document.getElementById('inspect-banner').innerHTML =
+        `<span>💡 当前章节：<b>${cfg.badge.split('·')[1].trim()}</b>（支持点击部件深入剖析）</span>`;
+
+      // 更新底部胶囊高亮
+      document.querySelectorAll('.step-pill').forEach((pill, i) => {
+        pill.classList.toggle('active', i === state.currentStep);
+      });
+
+      // 应用章节工况预设
+      state.targetExplode = cfg.explode / 100;
+      state.targetXray = cfg.xray / 100;
+      state.doorsOpen = cfg.doorsOpen;
+      state.windTunnel = cfg.windTunnel;
+      state.bumpTest = cfg.bumpTest;
+      state.drsActive = cfg.drsActive;
+      state.brakeTest = cfg.brakeTest;
+      state.targetRpm = cfg.rpm;
+      state.selectedSubsystem = cfg.focusSubsystem;
+
+      windTunnelGroup.visible = state.windTunnel;
+      syncControlPanelUI();
+
+      // 启动平滑相机过渡动画
+      state.camStartPos.copy(camera.position);
+      state.camEndPos.set(...cfg.camPos);
+      state.camStartTarget.copy(controls.target);
+      state.camEndTarget.set(...cfg.camTarget);
+      state.camLerpT = 0;
+      state.camAnimating = true;
+    }
+
+    function inspectSubsystem(subKey) {
+      const info = SUBSYSTEM_INFO[subKey];
+      if (!info) return;
+
+      state.selectedSubsystem = subKey;
+      document.getElementById('step-badge').textContent = info.tag;
+      document.getElementById('step-title').textContent = info.title;
+      document.getElementById('step-desc').textContent = info.desc;
+      document.getElementById('principle-title').textContent = info.principleTitle;
+      document.getElementById('principle-text').textContent = info.principleText;
+      document.getElementById('inspect-banner').innerHTML =
+        `<span>🎯 已选中子系统：<b>${info.title.split('(')[0]}</b></span>`;
+
+      // 若点击的是内部隐藏结构且当前未开启透视或拆解，自动开启适度车壳透视便于观察
+      if (['monocoque', 'engine', 'hybrid', 'suspension'].includes(subKey) && state.targetXray < 0.5 && state.targetExplode < 0.3) {
+        state.targetXray = 0.78;
+        syncControlPanelUI();
+      }
+      if (subKey === 'doors' && !state.doorsOpen) {
+        state.doorsOpen = true;
+        syncControlPanelUI();
+      }
+    }
+
+    // 绑定滑块与按钮事件
+    sliderExplode.addEventListener('input', (e) => {
+      state.targetExplode = parseFloat(e.target.value) / 100;
+      valExplode.textContent = `${e.target.value}%`;
+    });
+
+    sliderXray.addEventListener('input', (e) => {
+      state.targetXray = parseFloat(e.target.value) / 100;
+      valXray.textContent = `${e.target.value}%`;
+    });
+
+    sliderRpm.addEventListener('input', (e) => {
+      state.targetRpm = parseFloat(e.target.value);
+      valRpm.textContent = `${e.target.value} RPM`;
+    });
+
+    sliderSteer.addEventListener('input', (e) => {
+      const deg = parseFloat(e.target.value);
+      state.targetSteerAngle = (deg * Math.PI) / 180;
+      valSteer.textContent = `${deg}°`;
+    });
+
+    btnDoors.addEventListener('click', () => {
+      state.doorsOpen = !state.doorsOpen;
+      syncControlPanelUI();
+    });
+
+    btnWind.addEventListener('click', () => {
+      state.windTunnel = !state.windTunnel;
+      windTunnelGroup.visible = state.windTunnel;
+      syncControlPanelUI();
+    });
+
+    btnBump.addEventListener('click', () => {
+      state.bumpTest = !state.bumpTest;
+      syncControlPanelUI();
+    });
+
+    btnDrs.addEventListener('click', () => {
+      state.drsActive = !state.drsActive;
+      syncControlPanelUI();
+    });
+
+    btnBrake.addEventListener('click', () => {
+      state.brakeTest = !state.brakeTest;
+      syncControlPanelUI();
+    });
+
+    btnAutoRotate.addEventListener('click', () => {
+      state.autoRotate = !state.autoRotate;
+      controls.autoRotate = state.autoRotate;
+      controls.autoRotateSpeed = 1.6;
+      syncControlPanelUI();
+    });
+
+    // 车漆颜色切换
+    document.querySelectorAll('.swatch').forEach((swatch) => {
+      swatch.addEventListener('click', () => {
+        document.querySelectorAll('.swatch').forEach((s) => s.classList.remove('active'));
+        swatch.classList.add('active');
+        materials.bodyPaint.color.set(swatch.dataset.color);
+        document.getElementById('paint-name').textContent = swatch.dataset.name;
+      });
+    });
+
+    // 底部步骤导航绑定
+    document.querySelectorAll('.step-pill').forEach((pill) => {
+      pill.addEventListener('click', () => {
+        applyTeachingStep(parseInt(pill.dataset.step, 10));
+      });
+    });
+
+    document.getElementById('btn-prev').addEventListener('click', () => {
+      applyTeachingStep(state.currentStep - 1);
+    });
+    document.getElementById('btn-next').addEventListener('click', () => {
+      applyTeachingStep(state.currentStep + 1);
+    });
+
+    // 移动端面板切换
+    const teachingCardEl = document.getElementById('teaching-card');
+    const controlPanelEl = document.getElementById('control-panel');
+    document.getElementById('mob-toggle-info').addEventListener('click', () => {
+      teachingCardEl.classList.toggle('hidden-mobile');
+      controlPanelEl.classList.add('hidden-mobile');
+    });
+    document.getElementById('mob-toggle-ctrl').addEventListener('click', () => {
+      controlPanelEl.classList.toggle('hidden-mobile');
+      teachingCardEl.classList.add('hidden-mobile');
+    });
+
+    // ============================================================================
+    // 10. 鼠标点击 3D 部件射线拾取 (Raycasting Part Inspection)
+    // ============================================================================
+    const raycaster = new THREE.Raycaster();
+    const pointerDownPos = new THREE.Vector2();
+    const pointerNDC = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('pointerdown', (e) => {
+      pointerDownPos.set(e.clientX, e.clientY);
+      // 用户手动拖拽画面时中断相机预设动画
+      state.camAnimating = false;
+    });
+
+    renderer.domElement.addEventListener('pointerup', (e) => {
+      const dist = Math.hypot(e.clientX - pointerDownPos.x, e.clientY - pointerDownPos.y);
+      if (dist > 6) return; // 拖动旋转不触发点击
+
+      pointerNDC.x = (e.clientX / window.innerWidth) * 2 - 1;
+      pointerNDC.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+      raycaster.setFromCamera(pointerNDC, camera);
+      const intersects = raycaster.intersectObjects(clickableMeshes, false);
+
+      for (let i = 0; i < intersects.length; i++) {
+        const hitMesh = intersects[i].object;
+        const subKey = hitMesh.userData.subsystemKey;
+        // 当车壳处于高透视状态时，穿透外覆车壳优先拾取内部机械总成
+        if ((subKey === 'aero' || subKey === 'doors') && state.xray > 0.45) {
+          continue;
+        }
+        if (subKey) {
+          inspectSubsystem(subKey);
+          break;
+        }
+      }
+    });
+
+    // 窗口自适应
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    });
+
+    // ============================================================================
+    // 11. 主物理仿真与渲染循环 (60FPS 实时更新活塞、悬架、流线、热辐射与遥测)
+    // ============================================================================
+    const clock = new THREE.Clock();
+    const _pCrankPin = new THREE.Vector3();
+    const _pWristPin = new THREE.Vector3();
+
+    const telRpmEl = document.getElementById('tel-rpm');
+    const telPowerEl = document.getElementById('tel-power');
+    const telSpeedEl = document.getElementById('tel-speed');
+    const telDownforceEl = document.getElementById('tel-downforce');
+    const telBrakeEl = document.getElementById('tel-brake');
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      // 1. 相机平滑插值过渡 (Cubic Ease-Out)
+      if (state.camAnimating) {
+        state.camLerpT = Math.min(1, state.camLerpT + dt * 1.45);
+        const ease = 1 - Math.pow(1 - state.camLerpT, 3);
+        camera.position.lerpVectors(state.camStartPos, state.camEndPos, ease);
+        controls.target.lerpVectors(state.camStartTarget, state.camEndTarget, ease);
+        if (state.camLerpT >= 1) state.camAnimating = false;
+      }
+
+      // 2. 爆炸拆解度与透视度平滑过渡
+      state.explode = THREE.MathUtils.lerp(state.explode, state.targetExplode, dt * 6);
+      state.xray = THREE.MathUtils.lerp(state.xray, state.targetXray, dt * 6);
+      state.rpm = THREE.MathUtils.lerp(state.rpm, state.targetRpm, dt * 5);
+      state.steerAngle = THREE.MathUtils.lerp(state.steerAngle, state.targetSteerAngle, dt * 8);
+
+      // 更新 6 大总成模块的爆炸位移
+      for (const key in subsystems) {
+        const grp = subsystems[key];
+        grp.position.copy(grp.userData.basePos).addScaledVector(grp.userData.explodeVec, state.explode);
+      }
+
+      // 更新外覆车壳 X-Ray 透视材质
+      if (state.xray > 0.01) {
+        materials.bodyPaint.transparent = true;
+        materials.bodyPaint.opacity = THREE.MathUtils.clamp(1.0 - state.xray * 0.86, 0.14, 1.0);
+        materials.bodyPaint.depthWrite = state.xray < 0.35;
+      } else {
+        materials.bodyPaint.transparent = false;
+        materials.bodyPaint.opacity = 1.0;
+        materials.bodyPaint.depthWrite = true;
+      }
+
+      // 3. 蝴蝶门双铰链开合运动
+      const targetDoor = state.doorsOpen ? 1 : 0;
+      state.doorAngle = THREE.MathUtils.lerp(state.doorAngle, targetDoor, dt * 5.5);
+      doorPivots.forEach(({ hingePivot, side }) => {
+        hingePivot.rotation.x = -side * state.doorAngle * 0.92;
+        hingePivot.rotation.z = state.doorAngle * 0.45;
+      });
+
+      // 4. 主动式尾翼 DRS / 空气制动升降与攻角调节
+      const targetDrs = state.drsActive ? 1 : 0;
+      state.drsFactor = THREE.MathUtils.lerp(state.drsFactor, targetDrs, dt * 5);
+      activeWingGroup.position.y = 0.76 + state.drsFactor * 0.15;
+      activeWingGroup.rotation.z = state.brakeTest ? 0.48 : state.drsFactor * 0.24;
+      wingStruts.forEach((s) => {
+        s.scale.y = 1 + state.drsFactor * 0.55;
+      });
+
+      // 5. V12 引擎曲轴、12 气缸活塞连杆运动学与排气管热辐射
+      const crankOmega = (state.rpm / 60) * 0.42; // 视觉可辨识的高速旋转角速度
+      state.crankPhase += crankOmega * dt;
+      crankshaftGroup.rotation.x = state.crankPhase;
+
+      pistonsData.forEach((p) => {
+        const theta = state.crankPhase + p.phase;
+        const crankR = 0.026;
+        const pinY = -0.05 + Math.sin(theta) * crankR;
+        const pinZ = Math.cos(theta) * crankR;
+        _pCrankPin.set(p.xPos, pinY, pinZ);
+
+        // 活塞沿 65° V 型气缸轴线往复行程
+        const strokeOffset = Math.sin(theta) * 0.042;
+        const distAlongBank = 0.145 + strokeOffset;
+        _pWristPin.set(
+          p.xPos,
+          -0.05 + p.axisDir.y * distAlongBank,
+          p.axisDir.z * distAlongBank
+        );
+
+        p.pistonMesh.position.copy(_pWristPin);
+        alignRodBetweenPoints(p.rodMesh, _pCrankPin, _pWristPin, 0.0085);
+      });
+
+      // 变速箱外露齿轮同步旋转
+      dctGears.forEach((g, idx) => {
+        g.rotation.y = state.crankPhase * (idx === 0 ? 1.2 : -1.5);
+      });
+
+      // 排气管高转速红橙色热辐射 (RPM > 4500 时逐渐发红)
+      const headerHeat = THREE.MathUtils.clamp((state.rpm - 4000) / 5250, 0, 1);
+      materials.exhaustHeader.emissiveIntensity = headerHeat * 2.2;
+
+      // 6. 碳陶刹车盘重刹炽热发光与车轮旋转联动
+      const targetBrakeHeat = state.brakeTest ? 1.0 : 0.0;
+      state.brakeHeat = THREE.MathUtils.lerp(state.brakeHeat, targetBrakeHeat, dt * 3.5);
+      materials.brakeDisc.emissiveIntensity = state.brakeHeat * 2.6;
+
+      const wheelSpeed = state.brakeTest ? crankOmega * 0.15 : crankOmega * 0.55;
+      state.wheelPhase -= wheelSpeed * dt;
+      wheelAssemblies.forEach((w) => {
+        w.spinNode.rotation.z = state.wheelPhase;
+      });
+
+      // 方向盘与转向齿条实时联动
+      steeringRimPivot.rotation.x = -state.steerAngle * 3.2;
+      steeringRackBar.position.z = state.steerAngle * 0.16;
+
+      // 7. 推杆式双叉臂悬架运动学更新
+      updateSuspensionKinematics(elapsed, state.bumpTest);
+
+      // 8. 空气动力学风洞流线脉冲粒子高速流动
+      if (state.windTunnel) {
+        const flowSpeed = 0.45 + (state.rpm / 9250) * 0.85;
+        windPulseCapsules.forEach((item) => {
+          const t = (elapsed * flowSpeed + item.offset) % 1;
+          const pos = item.curve.getPointAt(t);
+          const tangent = item.curve.getTangentAt(t);
+          item.mesh.position.copy(pos);
+          item.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), tangent);
+        });
+      }
+
+      // 9. 更新顶部实时遥测仪表盘
+      const rpmInt = Math.round(state.rpm);
+      const powerPs = rpmInt === 0 ? 0 : Math.round(110 + Math.pow(state.rpm / 9250, 1.35) * 853);
+      const simSpeed = rpmInt === 0 ? 0 : Math.round((state.rpm / 9250) * 352 * (state.brakeTest ? 0.35 : 1));
+      const downforceKg = Math.round(Math.pow(simSpeed / 300, 2) * (380 + state.drsFactor * 150));
+      const brakeTemp = Math.round(85 + (simSpeed * 0.65) + state.brakeHeat * 760);
+
+      telRpmEl.textContent = `${rpmInt.toLocaleString()} RPM`;
+      telPowerEl.textContent = `${powerPs} PS`;
+      telSpeedEl.textContent = `${simSpeed} km/h`;
+      telDownforceEl.textContent = `${downforceKg} kgf`;
+      telBrakeEl.textContent = `${brakeTemp} °C`;
+      telBrakeEl.style.color = brakeTemp > 500 ? '#ff4d42' : '#ffffff';
+
+      controls.update();
+      updateCalloutPositions();
+      renderer.render(scene, camera);
+    }
+
+    // 启动初始第 1 步并进入渲染循环
+    applyTeachingStep(0);
+    animate();
+  </script>
+  <script src="../prompt-panel.js" data-id="lego-ferrari-web"></script>
+</body>
+</html>

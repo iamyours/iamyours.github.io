@@ -36,25 +36,25 @@ window.GALLERY_MODELS = {
   "opus": {
     "key": "opus",
     "badge": "Antigravity · Opus 5.5",
-    "short": "Opus",
+    "short": "Antigravity Opus",
     "badgeClass": "is-opus",
     "note": "同一提示词，在 Antigravity CLI 里改用 Claude Opus 5.5 (High) 生成。",
     "suffix": "-opus"
   },
   "kiro-opus": {
     "key": "kiro-opus",
-    "badge": "Kiro · Opus 5.5",
-    "short": "Kiro",
+    "badge": "Opus 5.5",
+    "short": "Opus 5.5",
     "badgeClass": "is-kiro",
-    "note": "同一提示词，在 Kiro 里用 Claude Opus 5.5 生成。",
+    "note": "同一提示词，用 Claude Opus 5.5 生成。",
     "suffix": "-kiro-opus"
   },
   "kiro-opus-v1": {
     "key": "kiro-opus-v1",
-    "badge": "Kiro · Opus 5.5（初版）",
-    "short": "Kiro 初版",
+    "badge": "Opus 5.5（初版）",
+    "short": "Opus 5.5 初版",
     "badgeClass": "is-kiro",
-    "note": "同一场景的早一版：Kiro 里的 Claude Opus 5.5 按较早的提示词草稿生成。草稿原文没有保留，这里展示的是定稿提示词。",
+    "note": "同一场景的早一版：Claude Opus 5.5 按较早的提示词草稿生成。草稿原文没有保留，这里展示的是定稿提示词。",
     "suffix": "-kiro-opus-v1"
   }
 };
@@ -207,20 +207,28 @@ window.GALLERY_CATEGORIES = [
         "title": "体素王国",
         "description": "中央是带护城河的城堡，四周是村庄与田野。",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/xueyu1125/status/2093936066114032007"
+        "source": "https://x.com/xueyu1125/status/2093936066114032007",
+        "chats": {
+          "web": "https://share.gemini.google/AqpYYt80fIRr"
+        }
       },
       {
         "id": "jp-garden",
         "title": "日式庭园 · 飞龙",
         "description": "宝塔、小村民和盘旋的飞龙，还有可以互动的小细节。",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/marcthecreatorr/status/2103486103831339269"
+        "source": "https://x.com/marcthecreatorr/status/2103486103831339269",
+        "chats": {
+          "web": "https://share.gemini.google/g0m6wAno0hgN"
+        }
       },
       {
         "id": "steam-train",
@@ -257,20 +265,28 @@ window.GALLERY_CATEGORIES = [
         "title": "擎天柱变形",
         "description": "按 T 在卡车头和人形之间变形，WASD 操控行驶和行走。",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/CyberSp14440918/status/2049066100361666888"
+        "source": "https://x.com/CyberSp14440918/status/2049066100361666888",
+        "chats": {
+          "web": "https://share.gemini.google/v8X3RCKO6abp"
+        }
       },
       {
         "id": "lego-ferrari",
         "title": "法拉利拆解教学",
         "description": "类似 JigSpace 的交互教学展示，拆开看法拉利的核心部件。",
         "models": [
+          "web",
           "deepseek",
           "kiro-opus"
         ],
-        "source": "https://x.com/Lonely__MH/status/2088248656998851063"
+        "source": "https://x.com/Lonely__MH/status/2088248656998851063",
+        "chats": {
+          "web": "https://share.gemini.google/evjqvt5gQ4tF"
+        }
       },
       {
         "id": "skyraider",
@@ -392,7 +408,7 @@ window.GALLERY_CATEGORIES = [
     "id": "opus-new",
     "emoji": "🎬",
     "title": "新场景 · Opus 5.5",
-    "description": "两条新写的长提示词：一镜到底的云海列车和像素风冰球场，主要由 Kiro 里的 Claude Opus 5.5 生成，云海列车另有 DeepSeek 版。",
+    "description": "两条新写的长提示词：一镜到底的云海列车和像素风冰球场，主要由 Claude Opus 5.5 生成，云海列车另有 DeepSeek 版。",
     "scenes": [
       {
         "id": "sky-arc-train",

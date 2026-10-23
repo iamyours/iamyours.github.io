@@ -1,0 +1,2277 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>擎天柱：红蓝灰机械变形 3D 模拟器 | Three.js</title>
+  <style>
+    :root {
+      --red: #d9232a;
+      --blue: #1b3d82;
+      --cyan: #00e5ff;
+      --amber: #ffaa00;
+      --panel-bg: rgba(15, 21, 32, 0.76);
+      --panel-border: rgba(255, 255, 255, 0.14);
+      --text-main: #f3f6fa;
+      --text-dim: #9aa8bc;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #dce4ee;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: var(--text-main);
+    }
+
+    #canvas-container {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      outline: none;
+    }
+
+    /* 左上角固定返回按钮：半透明奶油色圆角小按钮样式 */
+    .back-link {
+      position: fixed;
+      top: 16px;
+      left: 16px;
+      z-index: 100;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 15px;
+      background: rgba(255, 250, 240, 0.88);
+      color: #2c3545;
+      text-decoration: none;
+      font-size: 13.5px;
+      font-weight: 600;
+      border-radius: 999px;
+      border: 1px solid rgba(210, 195, 170, 0.65);
+      box-shadow: 0 4px 14px rgba(20, 30, 45, 0.12);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .back-link:hover {
+      background: rgba(255, 252, 245, 0.98);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(20, 30, 45, 0.18);
+    }
+
+    .back-link:active {
+      transform: translateY(0);
+    }
+
+    /* 顶部状态仪表板 */
+    .hud-top {
+      position: fixed;
+      top: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 20px;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px rgba(10, 18, 30, 0.22);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      pointer-events: auto;
+    }
+
+    .mode-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .mode-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--cyan);
+      box-shadow: 0 0 10px var(--cyan);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .hud-divider {
+      width: 1px;
+      height: 22px;
+      background: rgba(255, 255, 255, 0.16);
+    }
+
+    .telemetry {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 12.5px;
+      color: var(--text-dim);
+    }
+
+    .telemetry strong {
+      color: #fff;
+      font-variant-numeric: tabular-nums;
+      font-size: 13.5px;
+    }
+
+    /* 变形进度条横幅 */
+    .transform-banner {
+      position: fixed;
+      top: 74px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-8px);
+      z-index: 89;
+      width: min(420px, 88vw);
+      padding: 10px 16px;
+      background: rgba(12, 18, 28, 0.86);
+      border: 1px solid rgba(0, 229, 255, 0.35);
+      border-radius: 12px;
+      backdrop-filter: blur(12px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease, transform 0.25s ease;
+    }
+
+    .transform-banner.active {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .transform-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      margin-bottom: 6px;
+      color: #d6ecff;
+      font-weight: 600;
+    }
+
+    .transform-bar-bg {
+      width: 100%;
+      height: 6px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .transform-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #d9232a, #ffaa00, #00e5ff);
+      border-radius: 999px;
+      transition: width 0.04s linear;
+    }
+
+    /* 底部操控面板 */
+    .hud-bottom {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 90;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      width: min(760px, 94vw);
+      pointer-events: none;
+    }
+
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .btn-action {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 9px 16px;
+      border-radius: 11px;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      background: var(--panel-bg);
+      color: #f0f4f8;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      box-shadow: 0 6px 18px rgba(10, 16, 28, 0.22);
+      transition: all 0.18s ease;
+    }
+
+    .btn-action:hover {
+      background: rgba(28, 40, 62, 0.88);
+      border-color: rgba(255, 255, 255, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-action:active {
+      transform: translateY(0);
+    }
+
+    .btn-action.primary {
+      background: linear-gradient(135deg, rgba(217, 35, 42, 0.92), rgba(27, 61, 130, 0.92));
+      border-color: rgba(0, 229, 255, 0.5);
+      box-shadow: 0 6px 22px rgba(217, 35, 42, 0.32);
+    }
+
+    .btn-action.primary:hover {
+      box-shadow: 0 8px 26px rgba(0, 229, 255, 0.4);
+      border-color: #00e5ff;
+    }
+
+    .btn-action.active-toggle {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: rgba(12, 32, 54, 0.88);
+    }
+
+    .kbd {
+      display: inline-block;
+      padding: 2px 6px;
+      font-size: 11px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 5px;
+      color: #fff;
+      line-height: 1.1;
+    }
+
+    .controls-hint {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 14px;
+      padding: 8px 18px;
+      background: rgba(15, 21, 32, 0.68);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 999px;
+      font-size: 12px;
+      color: #cdd8e6;
+      backdrop-filter: blur(10px);
+      pointer-events: auto;
+    }
+
+    .controls-hint span {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    /* 移动端虚拟方向盘按键 */
+    .touch-pad {
+      position: fixed;
+      bottom: 110px;
+      left: 20px;
+      z-index: 92;
+      display: none;
+      grid-template-columns: repeat(3, 46px);
+      grid-template-rows: repeat(2, 46px);
+      gap: 6px;
+    }
+
+    .touch-btn {
+      background: rgba(15, 22, 34, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 10px;
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(8px);
+      touch-action: manipulation;
+    }
+
+    .touch-btn:active {
+      background: rgba(0, 229, 255, 0.35);
+      border-color: var(--cyan);
+    }
+
+    @media (max-width: 768px) {
+      .hud-top {
+        top: 58px;
+        padding: 8px 14px;
+        gap: 10px;
+      }
+      .transform-banner {
+        top: 112px;
+      }
+      .controls-hint {
+        display: none;
+      }
+      .touch-pad {
+        display: grid;
+      }
+      .hud-bottom {
+        bottom: 12px;
+      }
+      .btn-action {
+        padding: 8px 11px;
+        font-size: 12px;
+      }
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 左上角固定返回链接 -->
+  <a href="../" class="back-link">← 返回 3D 作品</a>
+
+  <!-- 顶部状态栏 -->
+  <div class="hud-top">
+    <div class="mode-badge">
+      <span class="mode-dot" id="mode-dot"></span>
+      <span id="mode-title">重型卡车形态</span>
+    </div>
+    <div class="hud-divider"></div>
+    <div class="telemetry">
+      <span>速度 <strong id="speed-val">0.0</strong> km/h</span>
+      <span>变形度 <strong id="morph-val">0%</strong></span>
+    </div>
+  </div>
+
+  <!-- 变形阶段进度横幅 -->
+  <div class="transform-banner" id="transform-banner">
+    <div class="transform-header">
+      <span id="transform-stage-text">[1/5] 底盘解锁与悬挂抬升</span>
+      <span id="transform-timer-text">0.0s / 4.5s</span>
+    </div>
+    <div class="transform-bar-bg">
+      <div class="transform-bar-fill" id="transform-bar-fill"></div>
+    </div>
+  </div>
+
+  <!-- 移动端触控方向键 -->
+  <div class="touch-pad" id="touch-pad">
+    <div></div>
+    <button class="touch-btn" data-key="KeyW">▲</button>
+    <div></div>
+    <button class="touch-btn" data-key="KeyA">◀</button>
+    <button class="touch-btn" data-key="KeyS">▼</button>
+    <button class="touch-btn" data-key="KeyD">▶</button>
+  </div>
+
+  <!-- 底部交互栏 -->
+  <div class="hud-bottom">
+    <div class="action-row">
+      <button class="btn-action primary" id="btn-transform">
+        <span class="kbd">T</span> 机械变形 (4.5s)
+      </button>
+      <button class="btn-action" id="btn-weapon">
+        <span class="kbd">J</span> 切换武器：<span id="weapon-name">收起</span>
+      </button>
+      <button class="btn-action" id="btn-attack">
+        <span class="kbd">F</span> <span id="attack-label">鸣笛 / 远光</span>
+      </button>
+      <button class="btn-action" id="btn-matrix">
+        <span class="kbd">K</span> 领导模块
+      </button>
+      <button class="btn-action active-toggle" id="btn-camera">
+        <span class="kbd">C</span> 视角：<span id="cam-mode-name">自由跟随</span>
+      </button>
+      <button class="btn-action active-toggle" id="btn-sound">
+        🔊 音效
+      </button>
+    </div>
+
+    <div class="controls-hint" id="controls-hint">
+      <span><kbd class="kbd">W</kbd><kbd class="kbd">A</kbd><kbd class="kbd">S</kbd><kbd class="kbd">D</kbd> 驾驶行驶 / 机甲行走</span>
+      <span><kbd class="kbd">Shift</kbd> 氮气加速 / 推进疾跑</span>
+      <span><kbd class="kbd">Space</kbd> 手刹漂移 / 腾空跳跃</span>
+      <span><kbd class="kbd">T</kbd> 5阶段机械变形</span>
+      <span>鼠标拖动旋转 · 滚轮缩放</span>
+    </div>
+  </div>
+
+  <div id="canvas-container"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+    import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+
+    // ============================================================================
+    // 1. 程序化音效合成器 (Web Audio API，纯代码生成机械变形音、引擎声、脚步与脉冲炮)
+    // ============================================================================
+    class CybertronAudio {
+      constructor() {
+        this.ctx = null;
+        this.enabled = true;
+        this.lastStepPhase = 0;
+      }
+
+      init() {
+        if (!this.ctx) {
+          const AudioCtx = window.AudioContext || window.webkitAudioContext;
+          if (AudioCtx) {
+            this.ctx = new AudioCtx();
+          }
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+
+      // 经典五段式变频机械变形音效
+      playTransformStep(stageIndex, toRobot = true) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const notes = toRobot ? [190, 240, 310, 270, 390] : [390, 290, 320, 220, 160];
+        const freq = notes[stageIndex % notes.length];
+
+        // 机械伺服锯齿波 + 滤波器调制
+        const osc = this.ctx.createOscillator();
+        const sub = this.ctx.createOscillator();
+        const filter = this.ctx.createBiquadFilter();
+        const gain = this.ctx.createGain();
+
+        osc.type = 'sawtooth';
+        sub.type = 'square';
+        osc.frequency.setValueAtTime(freq * 0.75, now);
+        osc.frequency.exponentialRampToValueAtTime(freq * 1.35, now + 0.16);
+        osc.frequency.exponentialRampToValueAtTime(freq, now + 0.35);
+
+        sub.frequency.setValueAtTime(freq * 0.5, now);
+        sub.frequency.exponentialRampToValueAtTime(freq * 0.68, now + 0.32);
+
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(650, now);
+        filter.frequency.exponentialRampToValueAtTime(1800, now + 0.18);
+        filter.Q.value = 3.2;
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.14, now + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+
+        osc.connect(filter);
+        sub.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.ctx.destination);
+
+        osc.start(now);
+        sub.start(now);
+        osc.stop(now + 0.44);
+        sub.stop(now + 0.44);
+      }
+
+      // 沉重机甲脚步声
+      playFootstep() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(95, now);
+        osc.frequency.exponentialRampToValueAtTime(32, now + 0.16);
+
+        gain.gain.setValueAtTime(0.14, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.19);
+      }
+
+      // 卡车气喇叭
+      playHorn() {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        [185, 233].forEach((f) => {
+          const osc = this.ctx.createOscillator();
+          const filter = this.ctx.createBiquadFilter();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(f, now);
+          filter.type = 'lowpass';
+          filter.frequency.value = 950;
+
+          gain.gain.setValueAtTime(0.001, now);
+          gain.gain.linearRampToValueAtTime(0.09, now + 0.04);
+          gain.gain.setValueAtTime(0.09, now + 0.35);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+
+          osc.connect(filter);
+          filter.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.56);
+        });
+      }
+
+      // 离子脉冲炮/能量战斧音效
+      playWeapon(isAxe = false) {
+        if (!this.enabled) return;
+        this.init();
+        if (!this.ctx) return;
+
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        if (isAxe) {
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(280, now);
+          osc.frequency.exponentialRampToValueAtTime(75, now + 0.28);
+          gain.gain.setValueAtTime(0.14, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.31);
+        } else {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(980, now);
+          osc.frequency.exponentialRampToValueAtTime(140, now + 0.22);
+          gain.gain.setValueAtTime(0.16, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now);
+          osc.stop(now + 0.25);
+        }
+      }
+    }
+
+    const sound = new CybertronAudio();
+
+    // ============================================================================
+    // 2. 工具函数与程序化 Canvas 贴图生成
+    // ============================================================================
+    const clamp = (v, min, max) => Math.max(min, Math.min(max, v));
+    const lerp = (a, b, t) => a + (b - a) * t;
+    const smoothstep = (edge0, edge1, x) => {
+      const t = clamp((x - edge0) / (edge1 - edge0), 0, 1);
+      return t * t * (3 - 2 * t);
+    };
+    const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+    // 创建汽车人风格几何徽章贴图 (程序化 Canvas 绘制)
+    function createAutobotBadgeTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#b91c22';
+      ctx.fillRect(0, 0, 256, 256);
+
+      // 银白外盾框
+      ctx.strokeStyle = '#f2f5fa';
+      ctx.fillStyle = '#e8eef5';
+      ctx.lineWidth = 10;
+
+      ctx.beginPath();
+      ctx.moveTo(128, 22);
+      ctx.lineTo(216, 56);
+      ctx.lineTo(196, 174);
+      ctx.lineTo(128, 234);
+      ctx.lineTo(60, 174);
+      ctx.lineTo(40, 56);
+      ctx.closePath();
+      ctx.stroke();
+
+      // 内部机械面甲几何线条
+      ctx.beginPath();
+      ctx.moveTo(128, 40);
+      ctx.lineTo(168, 82);
+      ctx.lineTo(128, 108);
+      ctx.lineTo(88, 82);
+      ctx.closePath();
+      ctx.fill();
+
+      // 双眼与面罩条纹
+      ctx.fillStyle = '#00e5ff';
+      ctx.fillRect(68, 104, 42, 16);
+      ctx.fillRect(146, 104, 42, 16);
+
+      ctx.fillStyle = '#f2f5fa';
+      ctx.fillRect(92, 134, 72, 14);
+      ctx.fillRect(102, 158, 52, 14);
+      ctx.fillRect(112, 182, 32, 24);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 创建卡车头散热格栅贴图
+    function createGrilleTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#1e242d';
+      ctx.fillRect(0, 0, 256, 256);
+
+      for (let y = 12; y < 244; y += 18) {
+        const grad = ctx.createLinearGradient(0, y, 0, y + 11);
+        grad.addColorStop(0, '#ffffff');
+        grad.addColorStop(0.5, '#b8c2ce');
+        grad.addColorStop(1, '#586270');
+        ctx.fillStyle = grad;
+        ctx.fillRect(16, y, 224, 11);
+      }
+
+      // 中央竖梁
+      ctx.fillStyle = '#dce3ec';
+      ctx.fillRect(120, 8, 16, 240);
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // 创建极简高品质测试场地地面贴图
+    function createGroundTexture() {
+      const canvas = document.createElement('canvas');
+      canvas.width = 1024;
+      canvas.height = 1024;
+      const ctx = canvas.getContext('2d');
+
+      ctx.fillStyle = '#d5dde7';
+      ctx.fillRect(0, 0, 1024, 1024);
+
+      // 细腻网格线
+      ctx.strokeStyle = 'rgba(70, 90, 115, 0.14)';
+      ctx.lineWidth = 2;
+      const step = 64;
+      for (let i = 0; i <= 1024; i += step) {
+        ctx.beginPath();
+        ctx.moveTo(i, 0);
+        ctx.lineTo(i, 1024);
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(0, i);
+        ctx.lineTo(1024, i);
+        ctx.stroke();
+      }
+
+      // 主十字准星线
+      ctx.strokeStyle = 'rgba(27, 61, 130, 0.22)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(512, 0);
+      ctx.lineTo(512, 1024);
+      ctx.moveTo(0, 512);
+      ctx.lineTo(1024, 512);
+      ctx.stroke();
+
+      const tex = new THREE.CanvasTexture(canvas);
+      tex.wrapS = THREE.RepeatWrapping;
+      tex.wrapT = THREE.RepeatWrapping;
+      tex.repeat.set(18, 18);
+      tex.anisotropy = 8;
+      tex.colorSpace = THREE.SRGBColorSpace;
+      return tex;
+    }
+
+    // ============================================================================
+    // 3. 初始化场景、相机、渲染器与柔和自然环境光
+    // ============================================================================
+    const container = document.getElementById('canvas-container');
+    const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.shadowMap.enabled = true;
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.08;
+    container.appendChild(renderer.domElement);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xdce5f0);
+    scene.fog = new THREE.FogExp2(0xdce5f0, 0.0085);
+
+    // 使用 RoomEnvironment 生成柔和自然的金属与车漆环境反射
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    scene.environment = pmremGenerator.fromScene(new RoomEnvironment(), 0.04).texture;
+    scene.environmentIntensity = 0.85;
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 300);
+    camera.position.set(7.5, 4.8, 9.5);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.06;
+    controls.maxPolarAngle = Math.PI * 0.485;
+    controls.minDistance = 4.0;
+    controls.maxDistance = 28.0;
+    controls.target.set(0, 1.8, 0);
+
+    // 自然柔和的三点式环境布光
+    const hemiLight = new THREE.HemisphereLight(0xf4f8ff, 0x8d99a8, 0.95);
+    hemiLight.position.set(0, 40, 0);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfff9ee, 2.2);
+    sunLight.position.set(24, 38, 26);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.set(2048, 2048);
+    sunLight.shadow.camera.near = 2;
+    sunLight.shadow.camera.far = 110;
+    const d = 32;
+    sunLight.shadow.camera.left = -d;
+    sunLight.shadow.camera.right = d;
+    sunLight.shadow.camera.top = d;
+    sunLight.shadow.camera.bottom = -d;
+    sunLight.shadow.bias = -0.0004;
+    scene.add(sunLight);
+
+    const rimLight = new THREE.DirectionalLight(0x90caf9, 0.75);
+    rimLight.position.set(-22, 16, -20);
+    scene.add(rimLight);
+
+    // ============================================================================
+    // 4. 材质库定义（红、蓝、灰银、高光镀铬、橡胶、发光能量晶）
+    // ============================================================================
+    const badgeTex = createAutobotBadgeTexture();
+    const grilleTex = createGrilleTexture();
+
+    const mats = {
+      redPaint: new THREE.MeshStandardMaterial({
+        color: 0xd41e26,
+        metalness: 0.42,
+        roughness: 0.24,
+      }),
+      bluePaint: new THREE.MeshStandardMaterial({
+        color: 0x183a7a,
+        metalness: 0.48,
+        roughness: 0.26,
+      }),
+      silverMetal: new THREE.MeshStandardMaterial({
+        color: 0xc8d0da,
+        metalness: 0.78,
+        roughness: 0.22,
+      }),
+      darkSteel: new THREE.MeshStandardMaterial({
+        color: 0x363d47,
+        metalness: 0.68,
+        roughness: 0.36,
+      }),
+      chrome: new THREE.MeshStandardMaterial({
+        color: 0xf4f8fc,
+        metalness: 0.95,
+        roughness: 0.08,
+      }),
+      whiteStripe: new THREE.MeshStandardMaterial({
+        color: 0xf2f5f8,
+        metalness: 0.25,
+        roughness: 0.3,
+      }),
+      tireRubber: new THREE.MeshStandardMaterial({
+        color: 0x1b1e23,
+        metalness: 0.1,
+        roughness: 0.82,
+      }),
+      glassWindshield: new THREE.MeshPhysicalMaterial({
+        color: 0x0a2e46,
+        emissive: 0x002b44,
+        emissiveIntensity: 0.35,
+        metalness: 0.15,
+        roughness: 0.08,
+        transmission: 0.55,
+        transparent: true,
+        opacity: 0.86,
+      }),
+      cyanGlow: new THREE.MeshStandardMaterial({
+        color: 0x80f4ff,
+        emissive: 0x00e5ff,
+        emissiveIntensity: 2.6,
+        roughness: 0.15,
+      }),
+      amberGlow: new THREE.MeshStandardMaterial({
+        color: 0xffcc44,
+        emissive: 0xff9900,
+        emissiveIntensity: 1.8,
+        roughness: 0.2,
+      }),
+      headlightGlow: new THREE.MeshStandardMaterial({
+        color: 0xffffff,
+        emissive: 0xfff3cc,
+        emissiveIntensity: 2.2,
+        roughness: 0.1,
+      }),
+      energonAxe: new THREE.MeshStandardMaterial({
+        color: 0xffaa00,
+        emissive: 0xff6d00,
+        emissiveIntensity: 2.4,
+        transparent: true,
+        opacity: 0.88,
+        roughness: 0.15,
+      }),
+      badgeMat: new THREE.MeshStandardMaterial({
+        map: badgeTex,
+        metalness: 0.45,
+        roughness: 0.28,
+      }),
+      grilleMat: new THREE.MeshStandardMaterial({
+        map: grilleTex,
+        metalness: 0.85,
+        roughness: 0.2,
+      }),
+    };
+
+    // ============================================================================
+    // 5. 构建擎天柱：红蓝灰卡车头 + 人形一体化变形总成 (Unified Articulated Rig)
+    //    t = 0.0 为紧凑平头重卡形态；t = 1.0 为高大威猛人形机甲形态
+    //    所有部件在两形态间通过五阶段真实机械轨迹翻转、滑移、锁定，体量严格一致！
+    // ============================================================================
+    function createWheelAssembly() {
+      const wheelGroup = new THREE.Group();
+      const spinGroup = new THREE.Group();
+      wheelGroup.add(spinGroup);
+
+      // 轮胎外圈 (半径 0.58，宽 0.42)
+      const tireGeo = new THREE.CylinderGeometry(0.58, 0.58, 0.42, 28);
+      tireGeo.rotateZ(Math.PI / 2);
+      const tire = new THREE.Mesh(tireGeo, mats.tireRubber);
+      tire.castShadow = true;
+      tire.receiveShadow = true;
+      spinGroup.add(tire);
+
+      // 镀铬轮毂
+      const rimGeo = new THREE.CylinderGeometry(0.36, 0.36, 0.44, 20);
+      rimGeo.rotateZ(Math.PI / 2);
+      const rim = new THREE.Mesh(rimGeo, mats.chrome);
+      spinGroup.add(rim);
+
+      // 轮毂中央轴承盖与辐条孔细节
+      const capGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.48, 12);
+      capGeo.rotateZ(Math.PI / 2);
+      const cap = new THREE.Mesh(capGeo, mats.darkSteel);
+      spinGroup.add(cap);
+
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const bolt = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.06, 0.06), mats.silverMetal);
+        bolt.position.set(0, Math.cos(angle) * 0.24, Math.sin(angle) * 0.24);
+        spinGroup.add(bolt);
+      }
+
+      wheelGroup.userData.spinGroup = spinGroup;
+      return wheelGroup;
+    }
+
+    function buildOptimusPrime() {
+      const root = new THREE.Group();
+      const chassis = new THREE.Group();
+      root.add(chassis);
+
+      const parts = {};
+
+      // ------------------------------------------------------------------------
+      // A. 躯干/红色平头车头主舱 (torsoGroup)
+      // ------------------------------------------------------------------------
+      const torsoGroup = new THREE.Group();
+      chassis.add(torsoGroup);
+      parts.torsoGroup = torsoGroup;
+
+      // 红色主胸腔车壳
+      const cabCore = new THREE.Mesh(
+        new RoundedBoxGeometry(2.24, 1.54, 1.66, 4, 0.08),
+        mats.redPaint
+      );
+      cabCore.castShadow = true;
+      cabCore.receiveShadow = true;
+      torsoGroup.add(cabCore);
+
+      // 经典银白车身腰线装饰条
+      const stripeL = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.18, 1.68), mats.whiteStripe);
+      stripeL.position.set(1.12, -0.35, 0);
+      const stripeR = stripeL.clone();
+      stripeR.position.x = -1.12;
+      torsoGroup.add(stripeL, stripeR);
+
+      // 车门银色把手与踏板细节
+      [-1, 1].forEach((side) => {
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, 0.24), mats.chrome);
+        handle.position.set(side * 1.13, -0.1, 0.22);
+        torsoGroup.add(handle);
+
+        const mirrorArm = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.04, 0.04), mats.chrome);
+        mirrorArm.position.set(side * 1.22, 0.32, 0.72);
+        const mirrorPlate = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.36, 0.14), mats.chrome);
+        mirrorPlate.position.set(side * 1.34, 0.32, 0.72);
+        torsoGroup.add(mirrorArm, mirrorPlate);
+      });
+
+      // 车顶导流板与 5 颗琥珀色车顶示廓灯
+      const roofVisor = new THREE.Mesh(
+        new RoundedBoxGeometry(2.12, 0.12, 0.38, 2, 0.03),
+        mats.redPaint
+      );
+      roofVisor.position.set(0, 0.81, 0.62);
+      torsoGroup.add(roofVisor);
+
+      for (let i = -2; i <= 2; i++) {
+        const cabLight = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.07, 0.08), mats.amberGlow);
+        cabLight.position.set(i * 0.38, 0.85, 0.81);
+        torsoGroup.add(cabLight);
+      }
+
+      // ------------------------------------------------------------------------
+      // B. 左右对开式前挡风玻璃胸甲门 (chestDoorL / chestDoorR) + 内部领导模块 (Matrix)
+      // ------------------------------------------------------------------------
+      const chestDoorL = new THREE.Group();
+      chestDoorL.position.set(1.08, 0.22, 0.83);
+      torsoGroup.add(chestDoorL);
+
+      const chestDoorR = new THREE.Group();
+      chestDoorR.position.set(-1.08, 0.22, 0.83);
+      torsoGroup.add(chestDoorR);
+      parts.chestDoorL = chestDoorL;
+      parts.chestDoorR = chestDoorR;
+
+      function populateChestWindow(doorGroup, isLeft) {
+        const offsetX = isLeft ? -0.52 : 0.52;
+        const frame = new THREE.Mesh(
+          new RoundedBoxGeometry(1.04, 0.78, 0.12, 3, 0.03),
+          mats.redPaint
+        );
+        frame.position.set(offsetX, 0, 0);
+        frame.castShadow = true;
+        doorGroup.add(frame);
+
+        const glass = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.56, 0.14), mats.glassWindshield);
+        glass.position.set(offsetX, 0.02, 0.01);
+        doorGroup.add(glass);
+
+        // 银色雨刷器
+        const wiper = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.035, 0.04), mats.silverMetal);
+        wiper.position.set(offsetX, -0.22, 0.08);
+        wiper.rotation.z = isLeft ? 0.15 : -0.15;
+        doorGroup.add(wiper);
+      }
+
+      populateChestWindow(chestDoorL, true);
+      populateChestWindow(chestDoorR, false);
+
+      // 胸腔内部领导模块 (Matrix of Leadership)
+      const matrixGroup = new THREE.Group();
+      matrixGroup.position.set(0, 0.22, 0.52);
+      torsoGroup.add(matrixGroup);
+      parts.matrixGroup = matrixGroup;
+
+      const matrixHousing = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.36, 0.36, 0.24, 16),
+        mats.amberGlow
+      );
+      matrixHousing.rotation.z = Math.PI / 2;
+      matrixGroup.add(matrixHousing);
+
+      const matrixCore = new THREE.Mesh(new THREE.OctahedronGeometry(0.22, 2), mats.cyanGlow);
+      matrixGroup.add(matrixCore);
+      parts.matrixCore = matrixCore;
+
+      const matrixLight = new THREE.PointLight(0x00e5ff, 0.4, 5);
+      matrixGroup.add(matrixLight);
+      parts.matrixLight = matrixLight;
+
+      // ------------------------------------------------------------------------
+      // C. 腹肌散热格栅 (grilleGroup) 与前保险杠大灯总成 (bumperGroup)
+      // ------------------------------------------------------------------------
+      const grilleGroup = new THREE.Group();
+      torsoGroup.add(grilleGroup);
+      parts.grilleGroup = grilleGroup;
+
+      const grilleMesh = new THREE.Mesh(
+        new RoundedBoxGeometry(1.06, 0.78, 0.22, 3, 0.04),
+        mats.grilleMat
+      );
+      grilleMesh.castShadow = true;
+      grilleGroup.add(grilleMesh);
+
+      const grilleTrim = new THREE.Mesh(
+        new RoundedBoxGeometry(1.16, 0.84, 0.18, 3, 0.04),
+        mats.chrome
+      );
+      grilleTrim.position.z = -0.02;
+      grilleGroup.add(grilleTrim);
+
+      const bumperGroup = new THREE.Group();
+      torsoGroup.add(bumperGroup);
+      parts.bumperGroup = bumperGroup;
+
+      const bumperBeam = new THREE.Mesh(
+        new RoundedBoxGeometry(2.38, 0.36, 0.34, 4, 0.06),
+        mats.chrome
+      );
+      bumperBeam.castShadow = true;
+      bumperGroup.add(bumperBeam);
+
+      // 左右矩形前大灯 + 转向灯 + 聚光灯束
+      [-0.86, 0.86].forEach((xPos) => {
+        const hlBezel = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.22, 0.08), mats.darkSteel);
+        hlBezel.position.set(xPos, 0.02, 0.16);
+        bumperGroup.add(hlBezel);
+
+        const hlLens = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.16, 0.1), mats.headlightGlow);
+        hlLens.position.set(xPos, 0.02, 0.165);
+        bumperGroup.add(hlLens);
+
+        const blinker = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.16, 0.1), mats.amberGlow);
+        blinker.position.set(xPos + (xPos > 0 ? 0.24 : -0.24), 0.02, 0.165);
+        bumperGroup.add(blinker);
+      });
+
+      // ------------------------------------------------------------------------
+      // D. 车顶翻盖与擎天柱经典头部总成 (headGroup)
+      // ------------------------------------------------------------------------
+      const roofHatch = new THREE.Mesh(
+        new RoundedBoxGeometry(1.05, 0.08, 0.92, 2, 0.02),
+        mats.redPaint
+      );
+      roofHatch.position.set(0, 0.78, 0.02);
+      torsoGroup.add(roofHatch);
+      parts.roofHatch = roofHatch;
+
+      const headGroup = new THREE.Group();
+      torsoGroup.add(headGroup);
+      parts.headGroup = headGroup;
+
+      // 蓝色头盔主体
+      const helmet = new THREE.Mesh(
+        new RoundedBoxGeometry(0.76, 0.82, 0.78, 4, 0.1),
+        mats.bluePaint
+      );
+      helmet.castShadow = true;
+      headGroup.add(helmet);
+
+      // 额头银色中央冠饰
+      const crest = new THREE.Mesh(
+        new RoundedBoxGeometry(0.18, 0.42, 0.84, 2, 0.04),
+        mats.silverMetal
+      );
+      crest.position.set(0, 0.3, 0.04);
+      headGroup.add(crest);
+
+      // 额头两侧银色散热格栅
+      [-0.22, 0.22].forEach((x) => {
+        const browVent = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.12, 0.06), mats.silverMetal);
+        browVent.position.set(x, 0.26, 0.39);
+        headGroup.add(browVent);
+      });
+
+      // 标志性银色战斗面罩 (V字折角造型)
+      const maskL = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.16), mats.silverMetal);
+      maskL.position.set(0.14, -0.14, 0.36);
+      maskL.rotation.y = -0.22;
+      const maskR = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.38, 0.16), mats.silverMetal);
+      maskR.position.set(-0.14, -0.14, 0.36);
+      maskR.rotation.y = 0.22;
+      headGroup.add(maskL, maskR);
+
+      // 发光青色电子光学眼
+      const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.1, 0.08), mats.cyanGlow);
+      eyeL.position.set(0.17, 0.09, 0.38);
+      const eyeR = eyeL.clone();
+      eyeR.position.x = -0.17;
+      headGroup.add(eyeL, eyeR);
+
+      // 两侧长耳天线
+      [-0.43, 0.43].forEach((x) => {
+        const earBase = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.38, 0.24), mats.bluePaint);
+        earBase.position.set(x, 0.02, 0);
+        const antenna = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.05, 0.56, 10), mats.silverMetal);
+        antenna.position.set(x, 0.36, -0.02);
+        headGroup.add(earBase, antenna);
+      });
+
+      // ------------------------------------------------------------------------
+      // E. 左右机械臂总成 + 镀铬双排气管 + 离子脉冲步枪 / 能量战斧 (armL / armR)
+      // ------------------------------------------------------------------------
+      function createArm(isLeft) {
+        const s = isLeft ? 1 : -1;
+        const shoulderGroup = new THREE.Group();
+        chassis.add(shoulderGroup);
+
+        // 红色厚重肩甲 (卡车形态下严丝合缝构成车头后侧壁)
+        const shoulderBlock = new THREE.Mesh(
+          new RoundedBoxGeometry(0.76, 0.88, 0.86, 4, 0.07),
+          mats.redPaint
+        );
+        shoulderBlock.castShadow = true;
+        shoulderBlock.receiveShadow = true;
+        shoulderGroup.add(shoulderBlock);
+
+        // 肩部外侧汽车人徽章牌
+        const badgePlate = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.46, 0.46), mats.badgeMat);
+        badgePlate.position.set(s * 0.39, 0.04, 0);
+        shoulderGroup.add(badgePlate);
+
+        // 肩部外侧高耸双镀铬排气管 (Smokestacks)
+        const stackGroup = new THREE.Group();
+        stackGroup.position.set(s * 0.42, 0.35, -0.18);
+        shoulderGroup.add(stackGroup);
+
+        const lowerPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.095, 0.095, 1.15, 16), mats.chrome);
+        lowerPipe.castShadow = true;
+        stackGroup.add(lowerPipe);
+
+        const upperPipe = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.09, 0.55, 16), mats.chrome);
+        upperPipe.position.set(0, 0.78, -0.04);
+        upperPipe.rotation.x = -0.25;
+        stackGroup.add(upperPipe);
+
+        // 银色上臂与肘关节
+        const elbowPivot = new THREE.Group();
+        elbowPivot.position.set(0, -0.66, 0);
+        shoulderGroup.add(elbowPivot);
+
+        const bicep = new THREE.Mesh(
+          new RoundedBoxGeometry(0.5, 0.62, 0.5, 3, 0.05),
+          mats.silverMetal
+        );
+        bicep.position.set(0, 0.22, 0);
+        bicep.castShadow = true;
+        elbowPivot.add(bicep);
+
+        // 红色前臂护甲
+        const forearmGroup = new THREE.Group();
+        forearmGroup.position.set(0, -0.52, 0);
+        elbowPivot.add(forearmGroup);
+
+        const forearmMesh = new THREE.Mesh(
+          new RoundedBoxGeometry(0.64, 0.92, 0.66, 4, 0.06),
+          mats.redPaint
+        );
+        forearmMesh.castShadow = true;
+        forearmMesh.receiveShadow = true;
+        forearmGroup.add(forearmMesh);
+
+        // 前臂金色机械箭头涂装细节
+        const wristTrim = new THREE.Mesh(new THREE.BoxGeometry(0.67, 0.14, 0.36), mats.amberGlow);
+        wristTrim.position.set(0, -0.28, 0.16);
+        forearmGroup.add(wristTrim);
+
+        // 蓝色机械拳头
+        const handGroup = new THREE.Group();
+        handGroup.position.set(0, -0.6, 0.04);
+        forearmGroup.add(handGroup);
+
+        const palm = new THREE.Mesh(
+          new RoundedBoxGeometry(0.42, 0.36, 0.42, 3, 0.05),
+          mats.bluePaint
+        );
+        handGroup.add(palm);
+
+        const fingers = new THREE.Mesh(
+          new RoundedBoxGeometry(0.38, 0.22, 0.26, 2, 0.04),
+          mats.bluePaint
+        );
+        fingers.position.set(0, -0.14, 0.12);
+        handGroup.add(fingers);
+
+        return {
+          shoulderGroup,
+          stackGroup,
+          elbowPivot,
+          forearmGroup,
+          handGroup,
+        };
+      }
+
+      parts.armL = createArm(true);
+      parts.armR = createArm(false);
+
+      // 右手专属武器：1) 离子脉冲步枪 (Ion Blaster)  2) 高能能量战斧 (Energon Axe)
+      const blasterGroup = new THREE.Group();
+      blasterGroup.position.set(0, -0.12, 0.55);
+      blasterGroup.scale.setScalar(0.001);
+      blasterGroup.visible = false;
+      parts.armR.handGroup.add(blasterGroup);
+      parts.blasterGroup = blasterGroup;
+
+      const gunBody = new THREE.Mesh(
+        new RoundedBoxGeometry(0.28, 0.38, 1.25, 3, 0.04),
+        mats.darkSteel
+      );
+      gunBody.castShadow = true;
+      blasterGroup.add(gunBody);
+
+      const gunBarrel = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.075, 0.09, 0.95, 14),
+        mats.silverMetal
+      );
+      gunBarrel.rotation.x = Math.PI / 2;
+      gunBarrel.position.set(0, 0.08, 0.88);
+      blasterGroup.add(gunBarrel);
+
+      const gunCore = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.55), mats.cyanGlow);
+      gunCore.position.set(0, 0.08, 0.15);
+      blasterGroup.add(gunCore);
+
+      // 能量战斧 (从右腕直接投射)
+      const axeGroup = new THREE.Group();
+      axeGroup.position.set(0, -0.62, 0.15);
+      axeGroup.scale.setScalar(0.001);
+      axeGroup.visible = false;
+      parts.armR.forearmGroup.add(axeGroup);
+      parts.axeGroup = axeGroup;
+
+      const axeHandle = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.72, 12), mats.amberGlow);
+      axeHandle.rotation.x = Math.PI / 2;
+      axeHandle.position.z = 0.24;
+      axeGroup.add(axeHandle);
+
+      const axeBlade = new THREE.Mesh(new THREE.ConeGeometry(0.62, 1.15, 4), mats.energonAxe);
+      axeBlade.scale.set(0.22, 1, 1.1);
+      axeBlade.rotation.x = Math.PI / 2;
+      axeBlade.position.set(0, -0.18, 0.72);
+      axeGroup.add(axeBlade);
+
+      // ------------------------------------------------------------------------
+      // F. 腰部骨盆总成 (waistGroup) 与前转向轮 (frontWheelL / frontWheelR)
+      // ------------------------------------------------------------------------
+      const waistGroup = new THREE.Group();
+      chassis.add(waistGroup);
+      parts.waistGroup = waistGroup;
+
+      const pelvisCore = new THREE.Mesh(
+        new RoundedBoxGeometry(1.68, 0.58, 0.94, 3, 0.06),
+        mats.silverMetal
+      );
+      pelvisCore.castShadow = true;
+      waistGroup.add(pelvisCore);
+
+      const crotchPlate = new THREE.Mesh(
+        new RoundedBoxGeometry(0.56, 0.68, 1.02, 3, 0.05),
+        mats.darkSteel
+      );
+      crotchPlate.position.y = -0.08;
+      waistGroup.add(crotchPlate);
+
+      // 腰部两侧金色装甲块
+      [-0.58, 0.58].forEach((x) => {
+        const waistPad = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.26, 0.98), mats.amberGlow);
+        waistPad.position.set(x, 0.06, 0);
+        waistGroup.add(waistPad);
+      });
+
+      // 前转向车轮 (卡车态位于车头前轮拱，人形态翻折收纳于腰侧装甲)
+      const frontWheelL = createWheelAssembly();
+      const frontWheelR = createWheelAssembly();
+      chassis.add(frontWheelL, frontWheelR);
+      parts.frontWheelL = frontWheelL;
+      parts.frontWheelR = frontWheelR;
+
+      // ------------------------------------------------------------------------
+      // G. 左右双腿总成 + 4个后驱动轮 + 镀铬圆筒油箱 (legL / legR)
+      //    卡车形态下双腿向后水平翻折 90° 并拢，直接构成重卡后半底盘车架、后四轮与尾灯梁！
+      // ------------------------------------------------------------------------
+      function createLeg(isLeft) {
+        const s = isLeft ? 1 : -1;
+        const hipGroup = new THREE.Group();
+        chassis.add(hipGroup);
+
+        // 银色大腿 (卡车态构成重卡中段钢制车架纵梁)
+        const thighMesh = new THREE.Mesh(
+          new RoundedBoxGeometry(0.68, 1.15, 0.72, 4, 0.06),
+          mats.silverMetal
+        );
+        thighMesh.position.set(0, -0.52, 0);
+        thighMesh.castShadow = true;
+        thighMesh.receiveShadow = true;
+        hipGroup.add(thighMesh);
+
+        // 膝关节与深蓝色小腿装甲 (卡车态构成重卡后拖挂鞍座车床)
+        const kneeGroup = new THREE.Group();
+        kneeGroup.position.set(0, -1.08, 0);
+        hipGroup.add(kneeGroup);
+
+        const shinMesh = new THREE.Mesh(
+          new RoundedBoxGeometry(0.84, 1.44, 0.88, 4, 0.07),
+          mats.bluePaint
+        );
+        shinMesh.position.set(0, -0.68, 0);
+        shinMesh.castShadow = true;
+        shinMesh.receiveShadow = true;
+        kneeGroup.add(shinMesh);
+
+        // 银色护膝与小腿正面银色进气格栅
+        const kneePad = new THREE.Mesh(
+          new RoundedBoxGeometry(0.66, 0.34, 0.22, 3, 0.04),
+          mats.silverMetal
+        );
+        kneePad.position.set(0, -0.06, 0.44);
+        kneeGroup.add(kneePad);
+
+        for (let v = 0; v < 3; v++) {
+          const shinVent = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.1, 0.08), mats.silverMetal);
+          shinVent.position.set(0, -0.52 - v * 0.22, 0.44);
+          kneeGroup.add(shinVent);
+        }
+
+        // 外侧镀铬圆筒燃油箱 (随变形在大腿/小腿外侧滑移)
+        const fuelTank = new THREE.Mesh(
+          new THREE.CylinderGeometry(0.24, 0.24, 0.96, 18),
+          mats.chrome
+        );
+        fuelTank.castShadow = true;
+        kneeGroup.add(fuelTank);
+
+        // 小腿外侧挂载的 2 个后驱动车轮 (卡车态刚好垂直落于地面 Z=-1.15 与 Z=-2.35)
+        const midWheel = createWheelAssembly();
+        const rearWheel = createWheelAssembly();
+        kneeGroup.add(midWheel, rearWheel);
+
+        // 蓝红配色的脚掌总成 (卡车态收折构成车尾挡泥板与红色尾灯横梁)
+        const ankleGroup = new THREE.Group();
+        ankleGroup.position.set(0, -1.42, 0.08);
+        kneeGroup.add(ankleGroup);
+
+        const footBase = new THREE.Mesh(
+          new RoundedBoxGeometry(0.82, 0.36, 1.18, 4, 0.06),
+          mats.bluePaint
+        );
+        footBase.position.set(0, -0.14, 0.24);
+        footBase.castShadow = true;
+        footBase.receiveShadow = true;
+        ankleGroup.add(footBase);
+
+        const toeCap = new THREE.Mesh(
+          new RoundedBoxGeometry(0.74, 0.26, 0.44, 3, 0.04),
+          mats.redPaint
+        );
+        toeCap.position.set(0, -0.18, 0.68);
+        ankleGroup.add(toeCap);
+
+        return {
+          hipGroup,
+          kneeGroup,
+          ankleGroup,
+          fuelTank,
+          midWheel,
+          rearWheel,
+        };
+      }
+
+      parts.legL = createLeg(true);
+      parts.legR = createLeg(false);
+
+      return { root, chassis, parts };
+    }
+
+    const optimus = buildOptimusPrime();
+    scene.add(optimus.root);
+
+    // ============================================================================
+    // 6. 构建极简高质感测试广场、斜坡跳台与可撞击物理能量块
+    // ============================================================================
+    const groundGeo = new THREE.CircleGeometry(130, 64);
+    groundGeo.rotateX(-Math.PI / 2);
+    const groundMat = new THREE.MeshStandardMaterial({
+      map: createGroundTexture(),
+      roughness: 0.78,
+      metalness: 0.08,
+    });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // 赛博坦科技感地面同心刻度环
+    [8, 16, 26].forEach((radius, idx) => {
+      const ringGeo = new THREE.RingGeometry(radius - 0.08, radius, 96);
+      ringGeo.rotateX(-Math.PI / 2);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: idx === 0 ? 0x00bcd4 : 0x62758a,
+        transparent: true,
+        opacity: idx === 0 ? 0.45 : 0.22,
+      });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.y = 0.015;
+      scene.add(ring);
+    });
+
+    // 变形落地冲击波光环
+    const shockwaveGeo = new THREE.RingGeometry(0.6, 1.15, 48);
+    shockwaveGeo.rotateX(-Math.PI / 2);
+    const shockwaveMat = new THREE.MeshBasicMaterial({
+      color: 0x00e5ff,
+      transparent: true,
+      opacity: 0,
+      side: THREE.DoubleSide,
+    });
+    const shockwaveRing = new THREE.Mesh(shockwaveGeo, shockwaveMat);
+    shockwaveRing.position.y = 0.04;
+    scene.add(shockwaveRing);
+
+    // 可互动物理能量方块与路障箱 (支持卡车撞击、脉冲步枪射击、战斧劈砍)
+    const physicsCrates = [];
+    const crateGeo = new RoundedBoxGeometry(1.25, 1.25, 1.25, 3, 0.08);
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2 + 0.3;
+      const dist = 11 + (i % 3) * 4.5;
+      const isEnergon = i % 2 === 0;
+      const crateMesh = new THREE.Mesh(
+        crateGeo,
+        isEnergon ? mats.cyanGlow : mats.amberGlow
+      );
+      crateMesh.position.set(Math.cos(angle) * dist, 0.625, Math.sin(angle) * dist);
+      crateMesh.castShadow = true;
+      crateMesh.receiveShadow = true;
+      scene.add(crateMesh);
+
+      // 金属外框装饰
+      const frame = new THREE.Mesh(
+        new THREE.BoxGeometry(1.3, 1.3, 1.3),
+        new THREE.MeshStandardMaterial({
+          color: 0x263238,
+          metalness: 0.8,
+          roughness: 0.25,
+          wireframe: true,
+        })
+      );
+      crateMesh.add(frame);
+
+      physicsCrates.push({
+        mesh: crateMesh,
+        vel: new THREE.Vector3(),
+        angVel: new THREE.Vector3(),
+        radius: 0.85,
+      });
+    }
+
+    // 能量脉冲子弹池 & 漂移烟雾/能量粒子池
+    const projectiles = [];
+    const particles = [];
+    const particleGeo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+
+    function spawnBurstParticles(origin, count = 16, colorHex = 0x00e5ff, speedScale = 1) {
+      for (let i = 0; i < count; i++) {
+        const pMat = new THREE.MeshBasicMaterial({
+          color: colorHex,
+          transparent: true,
+          opacity: 0.92,
+        });
+        const mesh = new THREE.Mesh(particleGeo, pMat);
+        mesh.position.copy(origin);
+        const theta = Math.random() * Math.PI * 2;
+        const up = 1.5 + Math.random() * 4.2;
+        const spd = (1.5 + Math.random() * 4.5) * speedScale;
+        scene.add(mesh);
+        particles.push({
+          mesh,
+          vel: new THREE.Vector3(Math.cos(theta) * spd, up, Math.sin(theta) * spd),
+          life: 0,
+          maxLife: 0.45 + Math.random() * 0.45,
+        });
+      }
+    }
+
+    // ============================================================================
+    // 7. 核心五阶段机械变形运动学与姿态控制器 (4.5 秒丝滑变形)
+    // ============================================================================
+    const state = {
+      morph: 0.0,               // 0.0 = 重卡形态, 1.0 = 人形机甲形态
+      targetMorph: 0.0,         // 目标形态
+      isTransforming: false,
+      transformDuration: 4.5,   // 4.5 秒（严格在 5 秒内）
+      lastStageIndex: -1,
+      matrixOpen: false,        // K键：开启/闭合胸腔领导模块
+      weaponMode: 0,            // 0 = 收起, 1 = 离子脉冲步枪, 2 = 高能能量战斧
+      attackAnim: 0,            // 射击/挥砍动画计时
+      cameraMode: 0,            // 0 = 自由环绕跟随, 1 = 追尾驾驶/越肩视角
+
+      // 物理移动与操控状态
+      pos: new THREE.Vector3(0, 0, 0),
+      heading: 0,
+      speed: 0,
+      steerAngle: 0,
+      wheelRotation: 0,
+      walkPhase: 0,
+      verticalY: 0,
+      verticalVel: 0,
+      pitchTilt: 0,
+      rollTilt: 0,
+      shockwaveTime: 0,
+    };
+
+    const STAGE_NAMES = [
+      '[1/5] 底盘解锁 · 悬挂抬升 · 油箱收折',
+      '[2/5] 车架拆分 · 后桥翻转展开双腿',
+      '[3/5] 腰部180°回旋 · 双臂与排气管展开',
+      '[4/5] 领导模块充能 · 胸甲复位 · 头部升起',
+      '[5/5] 战斗姿态锁定 · 光学镜片点亮',
+    ];
+
+    function updateRigKinematics(t, dt, elapsedTime) {
+      const p = optimus.parts;
+
+      // 分段局部进度 (0.0 -> 1.0)，让变形具有真实的机械先后逻辑而非简单同时插值
+      const sUnlock = smoothstep(0.0, 0.24, t);     // 阶段1：底盘抬升与前格栅解锁
+      const sLegs   = smoothstep(0.14, 0.56, t);    // 阶段2：水平后车架向下90°折展为双腿
+      const sWaist  = smoothstep(0.36, 0.72, t);    // 阶段3：经典腰部旋转与双臂从车头后侧展开
+      const sArms   = smoothstep(0.42, 0.84, t);    // 阶段3-4：肘部伸展、拳头滑出
+      const sHead   = smoothstep(0.68, 0.96, t);    // 阶段4-5：车顶盖开启、擎天柱头部翻转升起
+
+      // 变形中途胸窗自动短暂微启，展示内部闪耀的领导模块
+      const autoMatrixFlash = Math.sin(smoothstep(0.58, 0.92, t) * Math.PI);
+      const matrixOpenAmount = Math.max(autoMatrixFlash * 0.72, state.matrixOpen ? 1.0 : 0.0);
+
+      // 行走步态周期 (仅在人形形态下生效)
+      const walkWeight = smoothstep(0.82, 1.0, t) * clamp(Math.abs(state.speed) / 6.5, 0, 1.25);
+      const wSin = Math.sin(state.walkPhase);
+      const wCos = Math.cos(state.walkPhase);
+
+      // 1. 躯干/车头主舱位置与旋转
+      // 卡车态：(0, 1.88, 0.95)；变形中段先抬高后退；人形态：(0, 4.18, 0.0)
+      const torsoLiftArc = Math.sin(sLegs * Math.PI) * 0.32;
+      p.torsoGroup.position.set(
+        0,
+        lerp(1.88, 4.18, easeInOutCubic(sLegs)) + torsoLiftArc + Math.abs(wSin) * 0.09 * walkWeight,
+        lerp(0.95, 0.0, easeInOutCubic(sLegs))
+      );
+      // 腰部回旋视觉表现 + 步行呼吸微倾
+      const waistSpinAngle = Math.sin(sWaist * Math.PI) * 0.45;
+      p.torsoGroup.rotation.set(
+        lerp(0.0, 0.04, sLegs) + Math.abs(wCos) * 0.04 * walkWeight,
+        waistSpinAngle - wSin * 0.08 * walkWeight,
+        wCos * 0.03 * walkWeight
+      );
+
+      // 2. 胸口挡风玻璃对开门与领导模块闪光
+      const baseChestV = lerp(0.0, 0.11, sHead);
+      const openAngle = baseChestV + matrixOpenAmount * 0.85;
+      p.chestDoorL.rotation.y = -openAngle;
+      p.chestDoorR.rotation.y = openAngle;
+
+      p.matrixCore.rotation.y = elapsedTime * 2.4;
+      p.matrixCore.rotation.z = elapsedTime * 1.5;
+      p.matrixLight.intensity = 0.4 + matrixOpenAmount * 4.5;
+
+      // 3. 散热格栅与前保险杠收折
+      // 卡车态位于车头正前下方；人形态收折嵌入腹部核心与前腰甲
+      p.grilleGroup.position.set(
+        0,
+        lerp(-0.42, -0.64, sUnlock),
+        lerp(0.84, 0.56, sWaist)
+      );
+      p.grilleGroup.rotation.x = lerp(0, -0.08, sWaist);
+
+      p.bumperGroup.position.set(
+        0,
+        lerp(-1.02, -1.16, sLegs),
+        lerp(0.96, 0.36, sLegs)
+      );
+      const bumperScale = lerp(1.0, 0.78, sLegs);
+      p.bumperGroup.scale.set(bumperScale, 1.0, bumperScale);
+
+      // 4. 车顶盖与擎天柱头部升起
+      p.roofHatch.position.set(0, lerp(0.78, 0.65, sHead), lerp(0.02, -0.68, sHead));
+      p.roofHatch.rotation.x = lerp(0, -Math.PI * 0.55, sHead);
+
+      p.headGroup.position.set(0, lerp(0.22, 1.22, easeInOutCubic(sHead)), lerp(-0.08, 0.06, sHead));
+      p.headGroup.rotation.set(
+        lerp(Math.PI * 0.85, 0, easeInOutCubic(sHead)),
+        state.steerAngle * 0.35 * sHead,
+        0
+      );
+      const headScale = lerp(0.68, 1.0, sHead);
+      p.headGroup.scale.setScalar(headScale);
+
+      // 5. 左右双臂总成与肩部镀铬排气管
+      // 卡车态：双臂向后贴合在红车头后侧壁 (x=±0.86, y=1.88, z=-0.05)，前臂向前平折藏入车底，排气管竖立在车头后角
+      // 人形态：双肩横向展开至 (x=±1.56, y=4.48, z=0.0)，前臂垂下并随步伐摆动
+      const armOutArc = Math.sin(sWaist * Math.PI) * 0.38;
+      [
+        { arm: p.armL, side: 1, swing: -wSin },
+        { arm: p.armR, side: -1, swing: wSin },
+      ].forEach(({ arm, side, swing }) => {
+        arm.shoulderGroup.position.set(
+          side * (lerp(0.86, 1.56, easeInOutCubic(sWaist)) + armOutArc),
+          lerp(1.88, 4.48, easeInOutCubic(sLegs)) + Math.abs(wSin) * 0.07 * walkWeight,
+          lerp(-0.06, 0.0, easeInOutCubic(sWaist))
+        );
+
+        // 右手武器瞄准或挥砍姿态叠加
+        let aimPitch = 0;
+        let aimRoll = 0;
+        let elbowBend = lerp(-Math.PI * 0.52, -0.26, easeInOutCubic(sArms));
+
+        if (side === -1 && t > 0.88 && state.weaponMode > 0) {
+          if (state.weaponMode === 1) {
+            // 离子脉冲步枪举枪姿态 + 后坐力
+            aimPitch = -0.85 - Math.sin(state.attackAnim * Math.PI) * 0.28;
+            elbowBend = -0.68;
+          } else if (state.weaponMode === 2) {
+            // 能量战斧蓄力劈砍姿态
+            const slash = Math.sin(state.attackAnim * Math.PI);
+            aimPitch = -0.55 + slash * 1.45;
+            aimRoll = -0.25 + slash * 0.45;
+            elbowBend = -0.45;
+          }
+        }
+
+        arm.shoulderGroup.rotation.set(
+          swing * 0.48 * walkWeight + aimPitch,
+          lerp(side * 0.04, 0, sWaist),
+          side * lerp(0.0, 0.06, sArms) + aimRoll
+        );
+
+        arm.elbowPivot.rotation.x = elbowBend - Math.max(0, swing) * 0.25 * walkWeight;
+
+        // 蓝色拳头从手腕舱滑出
+        const handScale = clamp(smoothstep(0.55, 0.92, t), 0.01, 1.0);
+        // 若开启能量战斧，则右手拳头缩回手腕以发射战斧光刃
+        const hideForAxe = side === -1 && state.weaponMode === 2 && t > 0.85 ? 0.01 : handScale;
+        arm.handGroup.scale.setScalar(hideForAxe);
+      });
+
+      // 武器显隐与缩放过渡
+      const showBlaster = t > 0.85 && state.weaponMode === 1;
+      p.blasterGroup.visible = showBlaster;
+      p.blasterGroup.scale.setScalar(lerp(p.blasterGroup.scale.x, showBlaster ? 1.0 : 0.001, 0.22));
+
+      const showAxe = t > 0.85 && state.weaponMode === 2;
+      p.axeGroup.visible = showAxe;
+      p.axeGroup.scale.setScalar(lerp(p.axeGroup.scale.x, showAxe ? 1.0 : 0.001, 0.22));
+
+      // 6. 腰部骨盆与前转向轮
+      p.waistGroup.position.set(
+        0,
+        lerp(0.92, 3.04, easeInOutCubic(sLegs)) + Math.abs(wSin) * 0.06 * walkWeight,
+        lerp(0.08, 0.0, easeInOutCubic(sLegs))
+      );
+      p.waistGroup.rotation.y = -waistSpinAngle * 0.6 + wSin * 0.06 * walkWeight;
+
+      // 前轮：卡车态位于车头两侧轮拱 (x=±1.18, y=0.58, z=1.32) 接地旋转；人形态收纳于腰侧裙甲
+      [
+        { wheel: p.frontWheelL, side: 1 },
+        { wheel: p.frontWheelR, side: -1 },
+      ].forEach(({ wheel, side }) => {
+        wheel.position.set(
+          side * lerp(1.18, 0.92, easeInOutCubic(sWaist)),
+          lerp(0.58, 3.08, easeInOutCubic(sLegs)),
+          lerp(1.32, -0.44, easeInOutCubic(sLegs))
+        );
+        wheel.rotation.set(
+          0,
+          state.steerAngle * (1 - sLegs) + side * lerp(0, 0.52, sWaist),
+          side * lerp(0, -0.28, sWaist)
+        );
+        wheel.userData.spinGroup.rotation.x = state.wheelRotation;
+      });
+
+      // 7. 左右双腿 + 后四轮 + 镀铬圆筒油箱
+      // 卡车态 (t=0)：双腿在 y=0.58 处向后水平伸展 (hipPitch = -Math.PI/2)，构成重卡后半车架！
+      //               此时小腿外侧挂载的 4 个后轮中心正好位于 y=0.58 (与地面 y=0 完美相切)！
+      // 人形态 (t=1)：髋部升至 y=2.84，双腿向下垂直站立 (hipPitch = 0)，双脚稳稳踩在 y=0 地面！
+      [
+        { leg: p.legL, side: 1, stepPhase: state.walkPhase },
+        { leg: p.legR, side: -1, stepPhase: state.walkPhase + Math.PI },
+      ].forEach(({ leg, side, stepPhase }) => {
+        const legSin = Math.sin(stepPhase);
+        const legCos = Math.cos(stepPhase);
+        const lift = Math.max(0, legCos) * walkWeight;
+
+        leg.hipGroup.position.set(
+          side * lerp(0.52, 0.62, easeInOutCubic(sLegs)),
+          lerp(0.58, 2.84, easeInOutCubic(sLegs)) + Math.abs(wSin) * 0.05 * walkWeight,
+          lerp(-0.18, 0.0, easeInOutCubic(sLegs))
+        );
+
+        const baseHipPitch = lerp(-Math.PI / 2, 0, easeInOutCubic(sLegs));
+        const walkHipSwing = legSin * 0.52 * walkWeight;
+        leg.hipGroup.rotation.set(baseHipPitch + walkHipSwing, 0, 0);
+
+        // 变形中途膝盖微曲再蹬直，行走时自然屈膝抬腿
+        const transformKneeArc = Math.sin(sLegs * Math.PI) * 0.35;
+        const walkKneeBend = lift * 0.68;
+        leg.kneeGroup.rotation.x = transformKneeArc + walkKneeBend;
+
+        // 脚踝：卡车态向后折平构成车尾保险杠；人形态放平踩地
+        leg.ankleGroup.rotation.x = lerp(Math.PI * 0.48, 0, easeInOutCubic(sLegs)) - walkHipSwing * 0.45;
+
+        // 镀铬油箱：卡车态位于车门下方前侧；人形态滑移至小腿外侧上方
+        leg.fuelTank.position.set(
+          side * 0.56,
+          lerp(0.32, -0.35, sUnlock),
+          lerp(0.28, -0.1, sUnlock)
+        );
+
+        // 小腿外侧挂载的后四轮 (卡车态下随 hipGroup 旋转 -90° 后，恰好平贴地面滚动)
+        leg.midWheel.position.set(
+          side * lerp(0.66, 0.56, sLegs),
+          lerp(-0.12, -0.52, sLegs),
+          lerp(-0.08, -0.18, sLegs)
+        );
+        leg.rearWheel.position.set(
+          side * lerp(0.66, 0.56, sLegs),
+          lerp(-1.26, -1.16, sLegs),
+          lerp(-0.08, -0.18, sLegs)
+        );
+
+        leg.midWheel.userData.spinGroup.rotation.x = state.wheelRotation;
+        leg.rearWheel.userData.spinGroup.rotation.x = state.wheelRotation;
+      });
+
+      // 8. 整体底盘悬挂俯仰、侧倾与跳跃高度
+      optimus.chassis.position.y = state.verticalY;
+      optimus.chassis.rotation.x = state.pitchTilt;
+      optimus.chassis.rotation.z = state.rollTilt;
+    }
+
+    // 初始化姿态
+    updateRigKinematics(0, 0.016, 0);
+
+    // ============================================================================
+    // 8. 交互控制与键盘/触控/UI 事件绑定
+    // ============================================================================
+    const keys = {};
+    const modeDot = document.getElementById('mode-dot');
+    const modeTitle = document.getElementById('mode-title');
+    const speedVal = document.getElementById('speed-val');
+    const morphVal = document.getElementById('morph-val');
+    const transformBanner = document.getElementById('transform-banner');
+    const transformStageText = document.getElementById('transform-stage-text');
+    const transformTimerText = document.getElementById('transform-timer-text');
+    const transformBarFill = document.getElementById('transform-bar-fill');
+    const weaponNameEl = document.getElementById('weapon-name');
+    const attackLabelEl = document.getElementById('attack-label');
+    const camModeNameEl = document.getElementById('cam-mode-name');
+    const btnSound = document.getElementById('btn-sound');
+    const btnMatrix = document.getElementById('btn-matrix');
+    const btnCamera = document.getElementById('btn-camera');
+
+    function triggerTransformation() {
+      sound.init();
+      state.targetMorph = state.targetMorph < 0.5 ? 1.0 : 0.0;
+      state.isTransforming = true;
+      state.lastStageIndex = -1;
+      transformBanner.classList.add('active');
+
+      // 变形瞬间释放能量火花粒子
+      const sparkPos = state.pos.clone().add(new THREE.Vector3(0, 2.2, 0));
+      spawnBurstParticles(sparkPos, 18, 0x00e5ff, 0.9);
+    }
+
+    function cycleWeaponMode() {
+      sound.init();
+      if (state.morph < 0.7 && state.targetMorph < 0.5) {
+        triggerTransformation();
+        state.weaponMode = 1;
+      } else {
+        state.weaponMode = (state.weaponMode + 1) % 3;
+      }
+      const names = ['收起', '离子脉冲步枪', '高能能量战斧'];
+      weaponNameEl.textContent = names[state.weaponMode];
+      sound.playTransformStep(2, true);
+    }
+
+    function triggerAttackOrHorn() {
+      sound.init();
+      if (state.morph < 0.5) {
+        // 卡车形态：鸣响重卡气喇叭 + 车灯爆闪冲击
+        sound.playHorn();
+        mats.headlightGlow.emissiveIntensity = 6.5;
+        setTimeout(() => {
+          mats.headlightGlow.emissiveIntensity = 2.2;
+        }, 380);
+        return;
+      }
+
+      // 人形形态：若未装备武器则自动切换出离子脉冲步枪
+      if (state.weaponMode === 0) {
+        state.weaponMode = 1;
+        weaponNameEl.textContent = '离子脉冲步枪';
+      }
+
+      state.attackAnim = 1.0;
+      sound.playWeapon(state.weaponMode === 2);
+
+      const forward = new THREE.Vector3(Math.sin(state.heading), 0, Math.cos(state.heading));
+      const right = new THREE.Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
+
+      if (state.weaponMode === 1) {
+        // 发射青色离子脉冲弹
+        const muzzlePos = state.pos
+          .clone()
+          .add(new THREE.Vector3(0, 3.85, 0))
+          .addScaledVector(right, -1.55)
+          .addScaledVector(forward, 1.85);
+
+        const boltGeo = new THREE.CylinderGeometry(0.11, 0.11, 1.35, 10);
+        boltGeo.rotateX(Math.PI / 2);
+        const boltMesh = new THREE.Mesh(boltGeo, mats.cyanGlow);
+        boltMesh.position.copy(muzzlePos);
+        boltMesh.rotation.y = state.heading;
+        scene.add(boltMesh);
+
+        projectiles.push({
+          mesh: boltMesh,
+          vel: forward.clone().multiplyScalar(38),
+          life: 0,
+        });
+
+        spawnBurstParticles(muzzlePos, 8, 0x00e5ff, 0.65);
+      } else if (state.weaponMode === 2) {
+        // 能量战斧近战冲击波：击飞前方扇形区域内的物理方块
+        const axeHitCenter = state.pos
+          .clone()
+          .add(new THREE.Vector3(0, 2.5, 0))
+          .addScaledVector(forward, 2.4);
+        spawnBurstParticles(axeHitCenter, 22, 0xffaa00, 1.2);
+
+        physicsCrates.forEach((c) => {
+          const toCrate = c.mesh.position.clone().sub(state.pos);
+          if (toCrate.length() < 5.5) {
+            c.vel.addScaledVector(forward, 16).add(new THREE.Vector3(0, 7.5, 0));
+            c.angVel.set(Math.random() * 8, Math.random() * 8, Math.random() * 8);
+          }
+        });
+      }
+    }
+
+    function toggleMatrixChest() {
+      sound.init();
+      state.matrixOpen = !state.matrixOpen;
+      btnMatrix.classList.toggle('active-toggle', state.matrixOpen);
+      sound.playTransformStep(3, state.matrixOpen);
+    }
+
+    function toggleCameraMode() {
+      state.cameraMode = (state.cameraMode + 1) % 2;
+      camModeNameEl.textContent = state.cameraMode === 0 ? '自由跟随' : '追尾锁定';
+      btnCamera.classList.toggle('active-toggle', state.cameraMode === 0);
+    }
+
+    window.addEventListener('keydown', (e) => {
+      keys[e.code] = true;
+      if (e.repeat) return;
+
+      if (e.code === 'KeyT') {
+        triggerTransformation();
+      } else if (e.code === 'KeyJ') {
+        cycleWeaponMode();
+      } else if (e.code === 'KeyF' || e.code === 'KeyH') {
+        triggerAttackOrHorn();
+      } else if (e.code === 'KeyK') {
+        toggleMatrixChest();
+      } else if (e.code === 'KeyC') {
+        toggleCameraMode();
+      } else if (e.code === 'Space') {
+        // 人形形态下按空格触发腾空跳跃
+        if (state.morph > 0.75 && state.verticalY <= 0.01) {
+          state.verticalVel = 9.2;
+          sound.playFootstep();
+          spawnBurstParticles(state.pos.clone().add(new THREE.Vector3(0, 0.1, 0)), 12, 0x90caf9, 0.7);
+        }
+      }
+    });
+
+    window.addEventListener('keyup', (e) => {
+      keys[e.code] = false;
+    });
+
+    // 绑定底部 UI 按钮
+    document.getElementById('btn-transform').addEventListener('click', triggerTransformation);
+    document.getElementById('btn-weapon').addEventListener('click', cycleWeaponMode);
+    document.getElementById('btn-attack').addEventListener('click', triggerAttackOrHorn);
+    btnMatrix.addEventListener('click', toggleMatrixChest);
+    btnCamera.addEventListener('click', toggleCameraMode);
+
+    btnSound.addEventListener('click', () => {
+      sound.enabled = !sound.enabled;
+      btnSound.textContent = sound.enabled ? '🔊 音效' : '🔇 静音';
+      btnSound.classList.toggle('active-toggle', sound.enabled);
+    });
+
+    // 移动端虚拟方向键绑定
+    document.querySelectorAll('.touch-btn').forEach((btn) => {
+      const code = btn.getAttribute('data-key');
+      const press = (ev) => {
+        ev.preventDefault();
+        sound.init();
+        keys[code] = true;
+      };
+      const release = (ev) => {
+        ev.preventDefault();
+        keys[code] = false;
+      };
+      btn.addEventListener('touchstart', press, { passive: false });
+      btn.addEventListener('touchend', release, { passive: false });
+      btn.addEventListener('touchcancel', release, { passive: false });
+      btn.addEventListener('mousedown', press);
+      btn.addEventListener('mouseup', release);
+      btn.addEventListener('mouseleave', release);
+    });
+
+    // 窗口自适应
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // ============================================================================
+    // 9. 主循环：变形动画推进、双形态运动物理、碰撞反馈与相机跟随
+    // ============================================================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsedTime = clock.getElapsedTime();
+
+      // --------------------------------------------------------------------------
+      // A. 更新 4.5 秒五阶段机械变形进度
+      // --------------------------------------------------------------------------
+      if (state.isTransforming) {
+        const dir = state.targetMorph > state.morph ? 1 : -1;
+        state.morph = clamp(state.morph + (dir * dt) / state.transformDuration, 0, 1);
+
+        // 计算当前处于第几阶段 (0 ~ 4)，触发对应的机械变形音效与文字提示
+        const progress = dir > 0 ? state.morph : 1 - state.morph;
+        const stageIdx = Math.min(4, Math.floor(progress * 5));
+        if (stageIdx !== state.lastStageIndex) {
+          state.lastStageIndex = stageIdx;
+          sound.playTransformStep(stageIdx, dir > 0);
+          transformStageText.textContent = STAGE_NAMES[stageIdx];
+
+          // 阶段切换时释放少量机械火花
+          const midPos = state.pos.clone().add(new THREE.Vector3(0, 1.5 + state.morph * 2.0, 0));
+          spawnBurstParticles(midPos, 7, stageIdx === 3 ? 0xffaa00 : 0x00e5ff, 0.65);
+        }
+
+        const secElapsed = (progress * state.transformDuration).toFixed(1);
+        transformTimerText.textContent = `${secElapsed}s / ${state.transformDuration.toFixed(1)}s`;
+        transformBarFill.style.width = `${(progress * 100).toFixed(1)}%`;
+
+        // 变形完成瞬间：触发落地冲击波光环与状态栏切换
+        if (Math.abs(state.morph - state.targetMorph) < 0.0001) {
+          state.morph = state.targetMorph;
+          state.isTransforming = false;
+          state.shockwaveTime = 1.0;
+          shockwaveRing.position.set(state.pos.x, 0.04, state.pos.z);
+          sound.playFootstep();
+
+          setTimeout(() => {
+            if (!state.isTransforming) transformBanner.classList.remove('active');
+          }, 650);
+        }
+      }
+
+      // 更新顶部 HUD 指示器
+      morphVal.textContent = `${Math.round(state.morph * 100)}%`;
+      if (state.morph < 0.25) {
+        modeTitle.textContent = '重型卡车形态';
+        modeDot.style.background = '#ffaa00';
+        modeDot.style.boxShadow = '0 0 10px #ffaa00';
+        attackLabelEl.textContent = '鸣笛 / 远光';
+      } else if (state.morph > 0.75) {
+        modeTitle.textContent = '擎天柱人形形态';
+        modeDot.style.background = '#00e5ff';
+        modeDot.style.boxShadow = '0 0 10px #00e5ff';
+        attackLabelEl.textContent = state.weaponMode === 2 ? '挥砍战斧' : '发射脉冲炮';
+      } else {
+        modeTitle.textContent = '机械变形重构中...';
+        modeDot.style.background = '#ff3d47';
+        modeDot.style.boxShadow = '0 0 12px #ff3d47';
+      }
+
+      // --------------------------------------------------------------------------
+      // B. 卡车行驶 (WASD) 与 人形机甲行走 (WASD) 操控物理
+      // --------------------------------------------------------------------------
+      const forwardInput = (keys['KeyW'] || keys['ArrowUp'] ? 1 : 0) - (keys['KeyS'] || keys['ArrowDown'] ? 1 : 0);
+      const turnInput = (keys['KeyA'] || keys['ArrowLeft'] ? 1 : 0) - (keys['KeyD'] || keys['ArrowRight'] ? 1 : 0);
+      const isBoost = keys['ShiftLeft'] || keys['ShiftRight'];
+      const isBrake = keys['Space'];
+
+      const prevPos = state.pos.clone();
+
+      if (state.morph < 0.5) {
+        // 【卡车形态物理】：逼真加速惯性、前轮转向角、刹车点头、氮气尾焰与漂移
+        const maxTruckSpeed = isBoost ? 24.0 : 15.5;
+        const accel = isBoost ? 26.0 : 16.5;
+
+        if (forwardInput !== 0) {
+          state.speed += forwardInput * accel * dt;
+        } else {
+          state.speed *= Math.pow(0.18, dt);
+        }
+
+        if (isBrake) {
+          state.speed *= Math.pow(0.02, dt);
+          if (Math.abs(state.speed) > 4.5 && Math.random() < 0.45) {
+            spawnBurstParticles(state.pos.clone().add(new THREE.Vector3(0, 0.2, -1.8)), 2, 0xcfd8dc, 0.35);
+          }
+        }
+
+        state.speed = clamp(state.speed, -10.0, maxTruckSpeed);
+
+        // 前轮转向角插值
+        const targetSteer = turnInput * 0.46;
+        state.steerAngle = lerp(state.steerAngle, targetSteer, 10 * dt);
+
+        // 车辆航向随车速与前轮转角平滑旋转
+        const turnFactor = clamp(state.speed / 4.5, -1.2, 1.2);
+        state.heading += state.steerAngle * turnFactor * 2.25 * dt;
+
+        // 车轮滚动角与悬挂俯仰/侧倾手感
+        state.wheelRotation += (state.speed / 0.58) * dt;
+        const targetPitch = clamp(-forwardInput * 0.038 + (isBrake && Math.abs(state.speed) > 2 ? 0.055 : 0), -0.07, 0.07);
+        const targetRoll = clamp(-state.steerAngle * (state.speed / 16) * 0.09, -0.08, 0.08);
+        state.pitchTilt = lerp(state.pitchTilt, targetPitch, 8 * dt);
+        state.rollTilt = lerp(state.rollTilt, targetRoll, 8 * dt);
+
+        // Shift 氮气加速时，车顶双镀铬排气管喷出青蓝等离子尾焰粒子
+        if (isBoost && Math.abs(state.speed) > 4 && Math.random() < 0.6) {
+          const rightVec = new THREE.Vector3(Math.cos(state.heading), 0, -Math.sin(state.heading));
+          [-1.25, 1.25].forEach((offsetX) => {
+            const exhaustPos = state.pos
+              .clone()
+              .add(new THREE.Vector3(0, 3.25, 0))
+              .addScaledVector(rightVec, offsetX);
+            spawnBurstParticles(exhaustPos, 1, 0x00e5ff, 0.3);
+          });
+        }
+      } else {
+        // 【人形形态物理】：灵活机甲转向、稳健大步幅行走与疾跑、脚步震动音效
+        const maxWalkSpeed = isBoost ? 13.5 : 8.2;
+        const targetSpeed = forwardInput * maxWalkSpeed;
+        state.speed = lerp(state.speed, targetSpeed, 9.5 * dt);
+
+        // 人形形态支持原地转向与行进间转向
+        state.heading += turnInput * 2.45 * dt;
+        state.steerAngle = lerp(state.steerAngle, turnInput * 0.35, 8 * dt);
+
+        state.pitchTilt = lerp(state.pitchTilt, forwardInput * 0.045, 8 * dt);
+        state.rollTilt = lerp(state.rollTilt, -turnInput * 0.035, 8 * dt);
+
+        if (Math.abs(state.speed) > 0.35) {
+          const prevSin = Math.sin(state.walkPhase);
+          state.walkPhase += state.speed * 1.18 * dt;
+          const currSin = Math.sin(state.walkPhase);
+          // 左右脚落地点触发机甲沉重脚步声
+          if ((prevSin < 0 && currSin >= 0) || (prevSin > 0 && currSin <= 0)) {
+            if (state.verticalY <= 0.05) {
+              sound.playFootstep();
+            }
+          }
+        } else {
+          // 停止行走时平滑归零步态相位
+          state.walkPhase = lerp(state.walkPhase, Math.round(state.walkPhase / Math.PI) * Math.PI, 7 * dt);
+        }
+      }
+
+      // 跳跃重力积分
+      if (state.verticalY > 0 || state.verticalVel > 0) {
+        state.verticalY += state.verticalVel * dt;
+        state.verticalVel -= 24.0 * dt;
+        if (state.verticalY <= 0) {
+          state.verticalY = 0;
+          state.verticalVel = 0;
+          state.shockwaveTime = 0.85;
+          shockwaveRing.position.set(state.pos.x, 0.04, state.pos.z);
+          sound.playFootstep();
+        }
+      }
+
+      // 攻击动作衰减
+      if (state.attackAnim > 0) {
+        state.attackAnim = Math.max(0, state.attackAnim - dt * 3.2);
+      }
+
+      // 位移更新与场地边界约束
+      state.pos.x += Math.sin(state.heading) * state.speed * dt;
+      state.pos.z += Math.cos(state.heading) * state.speed * dt;
+      const distFromOrigin = Math.hypot(state.pos.x, state.pos.z);
+      if (distFromOrigin > 95) {
+        state.pos.multiplyScalar(95 / distFromOrigin);
+      }
+
+      optimus.root.position.copy(state.pos);
+      optimus.root.rotation.y = state.heading;
+
+      // 更新速度表读数 (换算为直观的 km/h 显示)
+      speedVal.textContent = (Math.abs(state.speed) * 4.2).toFixed(1);
+
+      // 更新机械骨骼运动学
+      updateRigKinematics(state.morph, dt, elapsedTime);
+
+      // --------------------------------------------------------------------------
+      // C. 物理能量块碰撞、子弹飞行与粒子更新
+      // --------------------------------------------------------------------------
+      const charRadius = 1.65;
+      physicsCrates.forEach((c) => {
+        // 与擎天柱本体碰撞弹开
+        const dx = c.mesh.position.x - state.pos.x;
+        const dz = c.mesh.position.z - state.pos.z;
+        const dist = Math.hypot(dx, dz);
+        const minDist = charRadius + c.radius;
+
+        if (dist < minDist && dist > 0.001 && state.verticalY < 1.5) {
+          const nx = dx / dist;
+          const nz = dz / dist;
+          const push = (minDist - dist) * 1.1;
+          c.mesh.position.x += nx * push;
+          c.mesh.position.z += nz * push;
+
+          const impactSpeed = Math.max(4.5, Math.abs(state.speed) * 1.15);
+          c.vel.x += nx * impactSpeed;
+          c.vel.z += nz * impactSpeed;
+          c.vel.y = Math.min(8.5, impactSpeed * 0.42);
+          c.angVel.set((Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6, (Math.random() - 0.5) * 6);
+          sound.playFootstep();
+        }
+
+        // 物理块速度与地面弹跳积分
+        c.mesh.position.addScaledVector(c.vel, dt);
+        c.vel.x *= Math.pow(0.15, dt);
+        c.vel.z *= Math.pow(0.15, dt);
+        if (c.mesh.position.y > 0.625 || c.vel.y > 0) {
+          c.vel.y -= 20.0 * dt;
+          if (c.mesh.position.y <= 0.625) {
+            c.mesh.position.y = 0.625;
+            c.vel.y = -c.vel.y * 0.35;
+            if (Math.abs(c.vel.y) < 0.8) c.vel.y = 0;
+          }
+        }
+        c.mesh.rotation.x += c.angVel.x * dt;
+        c.mesh.rotation.y += c.angVel.y * dt;
+        c.mesh.rotation.z += c.angVel.z * dt;
+        c.angVel.multiplyScalar(Math.pow(0.12, dt));
+      });
+
+      // 更新离子脉冲子弹飞行与命中检测
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const b = projectiles[i];
+        b.life += dt;
+        b.mesh.position.addScaledVector(b.vel, dt);
+
+        let hit = false;
+        for (let j = 0; j < physicsCrates.length; j++) {
+          const c = physicsCrates[j];
+          if (b.mesh.position.distanceTo(c.mesh.position) < 1.35) {
+            c.vel.addScaledVector(b.vel.clone().normalize(), 18).add(new THREE.Vector3(0, 6.5, 0));
+            c.angVel.set(Math.random() * 9, Math.random() * 9, Math.random() * 9);
+            spawnBurstParticles(b.mesh.position, 14, 0x00e5ff, 1.1);
+            sound.playFootstep();
+            hit = true;
+            break;
+          }
+        }
+
+        if (hit || b.life > 1.8) {
+          scene.remove(b.mesh);
+          b.mesh.geometry.dispose();
+          projectiles.splice(i, 1);
+        }
+      }
+
+      // 更新粒子消散
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.life += dt;
+        pt.mesh.position.addScaledVector(pt.vel, dt);
+        pt.vel.y -= 9.8 * dt;
+        pt.mesh.rotation.x += 5 * dt;
+        pt.mesh.rotation.y += 5 * dt;
+        pt.mesh.material.opacity = 1 - pt.life / pt.maxLife;
+        if (pt.life >= pt.maxLife) {
+          scene.remove(pt.mesh);
+          pt.mesh.material.dispose();
+          particles.splice(i, 1);
+        }
+      }
+
+      // 落地冲击波光环动画
+      if (state.shockwaveTime > 0) {
+        state.shockwaveTime = Math.max(0, state.shockwaveTime - dt * 1.8);
+        const s = 1 + (1 - state.shockwaveTime) * 6.5;
+        shockwaveRing.scale.setScalar(s);
+        shockwaveMat.opacity = state.shockwaveTime * 0.65;
+      }
+
+      // --------------------------------------------------------------------------
+      // D. 相机平滑跟随与 OrbitControls 协同
+      // --------------------------------------------------------------------------
+      const moveDelta = state.pos.clone().sub(prevPos);
+      camera.position.add(moveDelta);
+
+      const targetCenterY = lerp(1.65, 3.05, state.morph) + state.verticalY * 0.5;
+      const desiredTarget = new THREE.Vector3(state.pos.x, targetCenterY, state.pos.z);
+      controls.target.lerp(desiredTarget, 10 * dt);
+
+      // 若开启“追尾锁定视角”，相机自动柔和转向角色正后上方
+      if (state.cameraMode === 1) {
+        const camDist = lerp(9.2, 11.2, state.morph);
+        const camHeight = lerp(4.0, 5.6, state.morph);
+        const idealCamPos = new THREE.Vector3(
+          state.pos.x - Math.sin(state.heading) * camDist,
+          state.pos.y + camHeight,
+          state.pos.z - Math.cos(state.heading) * camDist
+        );
+        camera.position.lerp(idealCamPos, 4.5 * dt);
+      }
+
+      // 阴影相机跟随角色以始终保持高清晰度阴影
+      sunLight.position.set(state.pos.x + 24, 38, state.pos.z + 26);
+      sunLight.target.position.copy(state.pos);
+      sunLight.target.updateMatrixWorld();
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+  </script>
+
+  <script src="../prompt-panel.js" data-id="optimus-web"></script>
+</body>
+</html>
