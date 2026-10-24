@@ -1,6 +1,10 @@
 (function () {
   'use strict';
 
+  var _promptPanelScript = document.currentScript;
+  var _promptPanelSrc = (_promptPanelScript && _promptPanelScript.src) ||
+    (document.querySelector('script[src*="prompt-panel.js"]') && document.querySelector('script[src*="prompt-panel.js"]').src) || '';
+
   // --- Embed mode support ---
   var isEmbedMode = false;
   try {
@@ -12,6 +16,11 @@
   }
 
   if (isEmbedMode) {
+    try {
+      var _demoUrl = _promptPanelSrc ? new URL('demo-mode.js', _promptPanelSrc).href : '../demo-mode.js';
+      import(_demoUrl).catch(function () {});
+    } catch (e) {}
+
     document.documentElement.classList.add('pp-embed-hide');
 
     var embedStyle = document.createElement('style');

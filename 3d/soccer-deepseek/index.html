@@ -464,6 +464,7 @@ const ball = new THREE.Mesh(
 ball.castShadow = true;
 ball.position.set(-13.4, BALL_R, 0);
 scene.add(ball);
+window.__sceneDemo = Object.assign(window.__sceneDemo || {}, { follow: ball });
 
 /* ========================= 庆祝粒子 ========================= */
 const PCOUNT = 420;

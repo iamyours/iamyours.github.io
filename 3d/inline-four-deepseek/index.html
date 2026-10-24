@@ -1056,6 +1056,7 @@ for (let i = 0; i < 4; i++) {
    ================================================================== */
 let explodeProgress = 0;       // 0 = 合拢, 1 = 爆炸
 let explodeTarget = 0;
+window.__sceneDemo = Object.assign(window.__sceneDemo || {}, { explode: (on) => { explodeTarget = on ? 1 : 0; } });
 
 const btn = document.getElementById('explode-btn');
 btn.addEventListener('click', () => {

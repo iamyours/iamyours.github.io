@@ -521,6 +521,7 @@ function addBox(parent, w, h, d, x, y, z, color) {
 
 const trainGroup = new THREE.Group();
 scene.add(trainGroup);
+window.__sceneDemo = Object.assign(window.__sceneDemo || {}, { follow: trainGroup });
 
 const C_DARK = 0x2c2c36;
 const C_BLACK = 0x1c1c24;
