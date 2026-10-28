@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title data-i18n="about.pageTitle">关于本站 · 团子去旅行</title>
+  <meta name="description" content="关于 iamyours.github.io：浏览器里的放置游戏《团子去旅行》、锦鲤池，以及用同一提示词对比多个 AI 模型所生成 three.js 场景的 3D 作品馆。" data-i18n-attr="content:about.metaDescription" />
+  <link rel="canonical" href="https://iamyours.github.io/about/" />
+  <link rel="stylesheet" href="/site/site.css" />
+  <link rel="stylesheet" href="/site/footer.css" />
+  <script src="/site/i18n/i18n.js"></script>
+  <script src="/site/i18n/zh.js"></script>
+  <script src="/site/i18n/en.js"></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="/"><span aria-hidden="true">🍡</span> <span data-i18n="site.brand">团子去旅行</span></a>
+      <nav class="site-nav" aria-label="主导航" data-i18n-attr="aria-label:site.nav.aria">
+        <a href="/" data-i18n="site.nav.home">首页</a>
+        <a href="/3d/" data-i18n="site.nav.gallery">3D 作品</a>
+        <a href="/about/" aria-current="page" data-i18n="footer.about">关于</a>
+      </nav>
+      <span data-i18n-switch="btn-topbar"></span>
+    </header>
+
+    <main class="page-main prose" id="main-content">
+      <h1 data-i18n="about.heading">关于本站</h1>
+      <p class="lead" data-i18n="about.lead">这里是我（iamyours）的个人小站：一个可以慢慢玩的像素放置游戏，以及一个把不同 AI 模型放进同一道题里比较的 3D 作品馆。</p>
+
+      <section class="card">
+        <h2 data-i18n="about.gameTitle">一个放在浏览器里的温馨放置小游戏</h2>
+        <p data-i18n="about.gameP1">《团子去旅行》（Dango's Journey）是本站的首页。主角是一只叫小团的团子，它住在一间小屋里，会种菜、逛商店、出门旅行，还会寄回照片和信。游戏没有紧张的倒计时，也没有必须完成的任务，更像是一个可以随时打开、看看小团最近在做什么的小角落。</p>
+        <p data-i18n="about.gameP2">游戏进度只保存在浏览器的 localStorage 里。这里没有账号系统，也没有服务器端存档，所以换设备或清理浏览器数据后，进度不会自动同步。游戏里有一个可选、需要你主动选择才会播放的激励广告；不选择时不会播放。</p>
+        <p data-i18n-html="about.gameP3">同样的像素风格也延续到了 <a href="/koi/">锦鲤池页面</a>。它和首页游戏一样，是一个安静的、可以随时来看看的小场景。</p>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="about.galleryTitle">用同一道题，比较不同的 AI 模型</h2>
+        <p data-i18n="about.galleryP1">/3d/ 是一个 3D 作品馆，目前收录 26 个可以交互的 three.js 场景。每个场景都有一条文字提示词，同一条提示词会分别交给多个模型生成：Gemini（通过 Antigravity CLI）、Gemini 网页版 4 Argon、Gemini 网页版 3.8 Flash、DeepSeek V4.1 Flash（通过 ModelScope API），以及 Claude Opus 5.5。</p>
+        <p data-i18n-html="about.galleryP2">同一个场景的不同版本可以在 <a href="/3d/compare/">/3d/compare/</a> 并排运行，自由旋转、缩放和全屏查看；也可以按分类进入 <a href="/3d/collection/">/3d/collection/</a> 连续播放。每个场景的提示词原文都放在 3d/prompts/*.txt 里，页面中也能直接展开查看和复制。</p>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="about.whyTitle">为什么要做这个对比</h2>
+        <p data-i18n="about.whyP1">AI 生成 three.js 场景已经能做出第一眼很惊艳的 demo，但把多个版本放在一起，差异就会显现出来：同样的提示词，有的模型更擅长搭出合理的几何结构，有的更擅长镜头运动、材质光照、交互说明或代码组织；有的第一眼漂亮，实际运行却更卡；有的细节丰富，却偏离了原题。这些差异很难只看宣传图或单条视频看出来。</p>
+        <p data-i18n="about.whyP2">并排运行能把它们放到同一个屏幕、同一个视角下比较，也方便观察每个版本在鼠标拖拽、按钮点击和不同窗口尺寸下的真实表现。这不是严谨的学术 benchmark，而是一份持续更新的非正式观察笔记：记录同一个具体任务上，不同模型到底交出了什么样的作品。</p>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="about.madeTitle">内容是怎么做出来的</h2>
+        <p data-i18n="about.madeP1">这些页面是 AI 辅助制作的。提示词由我编写或收集，然后交给上面列出的模型生成场景，再把可运行的 HTML 和 JavaScript 作为静态页面放进仓库。整个站点没有构建步骤，直接由 GitHub Pages 提供静态文件。</p>
+        <p data-i18n="about.madeP2">模型输出不会原样上线。我会逐页检查能否正常加载、交互是否可用、移动端和桌面端的布局是否正常，必要时做一些集成和修正。提示词按原样公开，方便你复现或比较；页面和说明里也会标注参与生成的模型名称与版本。</p>
+        <p data-i18n="about.madeP3">AI 生成的代码和画面可能有错误、遗漏或不准确之处。这个站点的目的不是证明哪个模型「最强」，而是记录它们在同一个具体任务上的实际表现，也希望对学习 three.js、提示词写作和 AI 辅助开发的人有一点参考价值。</p>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="about.otherTitle">其他项目</h2>
+        <p data-i18n-html="about.otherP1">同一域名下还有两个由独立仓库维护的姐妹项目：<a href="/ai-image-gallery/">AI 图片馆</a> 和 <a href="/ai-video-gallery/">AI 视频馆</a>。它们不在本站仓库里，内容和更新节奏也各自独立。</p>
+      </section>
+
+      <section class="card">
+        <h2 data-i18n="about.githubTitle">代码与反馈</h2>
+        <p data-i18n-html="about.githubP1">本站的页面文件托管在 GitHub：<a href="https://github.com/iamyours/iamyours.github.io">iamyours/iamyours.github.io</a>。页面都是普通的 HTML、CSS 和 JavaScript，可以直接在浏览器里查看源码。</p>
+        <p data-i18n-html="about.githubP2">发现问题、想指出某个场景的不足，或者有改进建议，欢迎到 <a href="https://github.com/iamyours/iamyours.github.io/issues">GitHub Issues</a> 留言；也可以访问我的 <a href="https://github.com/iamyours">GitHub 主页</a>。本站不公布电子邮箱。</p>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <nav class="site-footer-links" aria-label="页脚导航" data-i18n-attr="aria-label:footer.nav">
+        <a href="/about/" data-i18n="footer.about">关于</a>
+        <a href="/contact/" data-i18n="footer.contact">联系</a>
+        <a href="/privacy/" data-i18n="footer.privacy">隐私政策</a>
+        <a href="/terms/" data-i18n="footer.terms">使用条款</a>
+        <a href="https://github.com/iamyours" target="_blank" rel="noopener noreferrer" data-i18n="footer.github">GitHub</a>
+      </nav>
+      <span class="site-footer-copy" data-i18n="footer.copyright">© 2026 iamyours</span>
+    </footer>
+  </div>
+
+  <script src="/site/footer.js"></script>
+</body>
+</html>

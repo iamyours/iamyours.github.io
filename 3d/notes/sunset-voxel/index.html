@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title data-i18n="notes.sunset-voxel.pageTitle">永恒日落 · 体素世界 · 场景说明 · 3D 作品</title>
+  <meta name="description" content="永恒日落 · 体素世界：程序生成的 96×96 体素海岸，一轮低悬海面的橙色落日在晚霞中缓慢下沉。它测试模型能否用体素/实例化搭出地形与水面，并用 shader、雾和辉光把「永恒日落」的气氛做出来，同时保持可环顾的相机。" data-i18n-attr="content:notes.sunset-voxel.metaDescription" />
+  <link rel="canonical" href="https://iamyours.github.io/3d/notes/sunset-voxel/" />
+  <link rel="stylesheet" href="/site/site.css" />
+  <link rel="stylesheet" href="/site/footer.css" />
+  <link rel="stylesheet" href="/3d/notes/notes.css" />
+</head>
+<body>
+  <div class="site-shell notes-shell">
+<header class="topbar">
+  <a class="brand" href="/"><span aria-hidden="true">🍡</span> <span data-i18n="notes.brand">团子去旅行</span></a>
+  <nav class="site-nav" aria-label="主导航" data-i18n-attr="aria-label:notes.nav.aria">
+    <a href="/3d/" data-i18n="notes.nav.gallery">3D 作品</a>
+    <a href="/3d/notes/" aria-current="page" data-i18n="notes.nav.index">场景说明</a>
+  </nav>
+  <span data-i18n-switch="btn-topbar"></span>
+</header>
+
+    <main class="page-main prose notes-main" id="main-content">
+      <h1 data-i18n="notes.sunset-voxel.title">永恒日落 · 体素世界</h1>
+      <p class="lead" data-i18n="notes.sunset-voxel.intro">程序生成的 96×96 体素海岸，一轮低悬海面的橙色落日在晚霞中缓慢下沉。它测试模型能否用体素/实例化搭出地形与水面，并用 shader、雾和辉光把「永恒日落」的气氛做出来，同时保持可环顾的相机。</p>
+      <p class="notes-badges"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></p>
+      <figure class="notes-thumb">
+        <img src="/3d/thumbs/sunset-voxel.jpg" alt="永恒日落 · 体素世界 — 3D 场景缩略图" loading="lazy" width="640" height="360" data-i18n-attr="alt:notes.sunset-voxel.thumbAlt" />
+      </figure>
+
+      <section class="notes-section" id="prompt">
+        <h2 data-i18n="notes.promptHeading">原始提示词</h2>
+        <p class="notes-section-note" data-i18n="notes.promptNote">下面是从提示词文件中原样复制的正文。同一场景的各版本使用同一份提示词；为避免重复，这里只完整展示一次。</p>
+        <div class="prompt-file-row"><span class="prompt-file-label" data-i18n="notes.promptFile">提示词文件</span> <a class="prompt-file" href="/3d/prompts/sunset-voxel.txt">3d/prompts/sunset-voxel.txt</a></div>
+        <pre class="prompt-block">用 three.js 做一个简化版 Minecraft 风格的体素世界「永恒日落」（单文件，适合网页展示）。
+世界是程序生成的体素地形（用自写的简单噪声函数，约 96×96 范围，用 InstancedMesh 或合并几何体保证性能），要有大海、沙滩海岸线、草地山丘和方块树林。
+画面是重点：永恒的日落——太阳是一颗清晰的橙色圆日，低悬在海面上；天空用 Shader 做完整的晚霞渐变（朝阳一侧金色、背阳一侧粉紫）；海面有一条通向地平线的金色日光路反射；薄雾（Fog）、长长的阴影和 UnrealBloomPass 辉光。打开第一眼就要被落日震住。
+交互：默认是 OrbitControls 的缓慢自动环绕俯瞰视角（autoRotate），可以拖动和缩放；另外提供一个按钮「滑翔模式」，切换为摄像机沿着海岸线自动平滑飞行的电影镜头，再按一次回到环绕视角。不需要破坏/放置方块和物品栏。
+
+【通用技术要求】
+- 输出一个可直接在现代浏览器打开的完整单文件 HTML，写入当前目录的 index.html。页面语言 zh-CN，标题用中文。
+- 使用 Three.js r160，通过 importmap 从 CDN 固定版本加载：&quot;three&quot;: &quot;https://unpkg.com/three@0.160.0/build/three.module.js&quot;，&quot;three/addons/&quot;: &quot;https://unpkg.com/three@0.160.0/examples/jsm/&quot;。除此之外不引用任何外部资源。
+- 所有几何体、材质、贴图都用代码程序化生成（可用 Canvas/Shader 生成贴图），不要加载 glb/gltf/obj/fbx、图片或 SVG。
+- 使用 OrbitControls 支持拖动旋转、滚轮/双指缩放（第一人称玩法的场景除外，按场景说明）。
+- 画布全屏、响应式适配窗口大小变化和手机屏幕，devicePixelRatio 最多取 2，目标稳定 60FPS。
+- 页面左上角放一个固定的链接「← 返回 3D 作品」，href=&quot;../&quot;，半透明奶油色圆角小按钮样式。
+- 在 &lt;/body&gt; 前加上这一行（原样保留，用于展示提示词）：&lt;script src=&quot;../prompt-panel.js&quot; data-id=&quot;sunset-voxel&quot;&gt;&lt;/script&gt;
+- 控制台不能有报错。不要问我任何问题，直接构建。</pre>
+        
+      <p class="notes-section-note" data-i18n="notes.promptSame">各版本的提示词文件只差用于展示提示词的 data-id 行和生成方式说明，场景描述正文相同。</p>
+      </section>
+
+      <section class="notes-section" id="versions">
+        <h2 data-i18n="notes.versionsHeading">版本对比</h2>
+        <p class="notes-section-note" data-i18n="notes.versionsLead">文件大小与行数来自该版本的单文件 index.html；技术标签由简单正则从源码中检测，只表示代码里出现了这类 API，不代表实现质量。</p>
+        <div class="table-scroll">
+          <table class="versions-table">
+            <thead>
+              <tr>
+                <th data-i18n="notes.table.model">模型</th>
+                <th data-i18n="notes.table.scene">在线场景</th>
+                <th data-i18n="notes.table.size">大小</th>
+                <th data-i18n="notes.table.lines">行数</th>
+                <th data-i18n="notes.table.techniques">检测到的 three.js 技术</th>
+              </tr>
+            </thead>
+            <tbody>
+          <tr>
+            <td class="model-cell" data-label="模型" data-label-en="Model"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><br /><a class="prompt-inline" href="/3d/prompts/sunset-voxel.txt" data-i18n="notes.table.prompt">提示词</a></td>
+            <td data-label="在线场景" data-label-en="Live scene"><a class="scene-live-link" href="/3d/sunset-voxel/" data-i18n="notes.table.open">打开 ↗</a></td>
+            <td class="num-cell" data-label="大小" data-label-en="Size">56.4 KB</td>
+            <td class="num-cell" data-label="行数" data-label-en="Lines">1,547</td>
+            <td class="tech-cell" data-label="检测到的 three.js 技术" data-label-en="Detected three.js techniques"><span class="tech-tag">OrbitControls</span><span class="tech-tag">Shadow maps</span><span class="tech-tag">InstancedMesh</span><span class="tech-tag">ShaderMaterial / GLSL</span><span class="tech-tag">Post-processing / bloom</span><span class="tech-tag">Particles / points</span><span class="tech-tag">Sky / fog</span></td>
+          </tr>
+          <tr>
+            <td class="model-cell" data-label="模型" data-label-en="Model"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><br /><a class="prompt-inline" href="/3d/prompts/sunset-voxel-web.txt" data-i18n="notes.table.prompt">提示词</a></td>
+            <td data-label="在线场景" data-label-en="Live scene"><a class="scene-live-link" href="/3d/sunset-voxel-web/" data-i18n="notes.table.open">打开 ↗</a></td>
+            <td class="num-cell" data-label="大小" data-label-en="Size">41.5 KB</td>
+            <td class="num-cell" data-label="行数" data-label-en="Lines">1,168</td>
+            <td class="tech-cell" data-label="检测到的 three.js 技术" data-label-en="Detected three.js techniques"><span class="tech-tag">OrbitControls</span><span class="tech-tag">Shadow maps</span><span class="tech-tag">InstancedMesh</span><span class="tech-tag">ShaderMaterial / GLSL</span><span class="tech-tag">Post-processing / bloom</span><span class="tech-tag">Particles / points</span><span class="tech-tag">Sky / fog</span></td>
+          </tr>
+          <tr>
+            <td class="model-cell" data-label="模型" data-label-en="Model"><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><br /><a class="prompt-inline" href="/3d/prompts/sunset-voxel-deepseek.txt" data-i18n="notes.table.prompt">提示词</a></td>
+            <td data-label="在线场景" data-label-en="Live scene"><a class="scene-live-link" href="/3d/sunset-voxel-deepseek/" data-i18n="notes.table.open">打开 ↗</a></td>
+            <td class="num-cell" data-label="大小" data-label-en="Size">26.1 KB</td>
+            <td class="num-cell" data-label="行数" data-label-en="Lines">838</td>
+            <td class="tech-cell" data-label="检测到的 three.js 技术" data-label-en="Detected three.js techniques"><span class="tech-tag">OrbitControls</span><span class="tech-tag">Shadow maps</span><span class="tech-tag">ShaderMaterial / GLSL</span><span class="tech-tag">Post-processing / bloom</span><span class="tech-tag">Sky / fog</span><span class="tech-tag">Water / reflections</span></td>
+          </tr>
+          <tr>
+            <td class="model-cell" data-label="模型" data-label-en="Model"><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span><br /><a class="prompt-inline" href="/3d/prompts/sunset-voxel-kiro-opus.txt" data-i18n="notes.table.prompt">提示词</a></td>
+            <td data-label="在线场景" data-label-en="Live scene"><a class="scene-live-link" href="/3d/sunset-voxel-kiro-opus/" data-i18n="notes.table.open">打开 ↗</a></td>
+            <td class="num-cell" data-label="大小" data-label-en="Size">34.3 KB</td>
+            <td class="num-cell" data-label="行数" data-label-en="Lines">796</td>
+            <td class="tech-cell" data-label="检测到的 three.js 技术" data-label-en="Detected three.js techniques"><span class="tech-tag">OrbitControls</span><span class="tech-tag">Shadow maps</span><span class="tech-tag">ShaderMaterial / GLSL</span><span class="tech-tag">Post-processing / bloom</span><span class="tech-tag">Sky / fog</span><span class="tech-tag">Water / reflections</span></td>
+          </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="notes-section" id="comparison">
+        <h2 data-i18n="notes.comparisonHeading">对比观察</h2>
+        <p class="notes-section-note" data-i18n="notes.comparisonNote">以下记录来自逐版阅读源码，只描述代码中能观察到的结构、动画与交互差异，不对模型作笼统排名。</p>
+        <p data-i18n="notes.sunset-voxel.comparison">CLI 版用 2 个 InstancedMesh 和 6 个 BoxGeometry 搭地形，靠 shader 处理水面和天空，并加了滑翔模式按钮。Web 版把地形、水、云和植被拆成 7 层 InstancedMesh，是四版里实例化最细的，还提供 96×96 群岛的滑翔视角。DeepSeek 版只有 3 个 Mesh，地形和水面主要靠 shader 与后处理，几何最轻。Opus 5.5 版 6 个 Mesh、8 处阴影相关调用，画面更依赖阴影和 bloom，滑翔模式与前两者一致。DeepSeek 把地形和水面压进少量 geometry，再用雾把远处海岸线吃掉；Web 版则用独立的实例化层分别控制陆地、水、云和植被的密度，因此远景的体素颗粒更清楚。</p>
+      </section>
+
+      <section class="notes-section" id="how-made">
+        <h2 data-i18n="notes.howHeading">这个场景是怎么做出来的</h2>
+        <p data-i18n-html="notes.howP1">同一条提示词被分别交给下列模型。提示词要求生成一个可直接在现代浏览器打开的单文件 HTML，three.js 通过 CDN 的 import map 固定版本加载，几何体、材质和贴图全部由代码程序化生成，不能使用外部模型或图片。</p>
+        <p data-i18n="notes.howP2">生成结果作为静态页面发布在 GitHub Pages 上，没有构建步骤，也没有后端。页面里的尺寸、行数和技术标签是生成后从源码统计的；提示词原文公开在 3d/prompts/ 下，方便对照或复现。</p>
+        <p data-i18n="notes.howP3">发布前会检查页面能否加载、交互是否可用、移动端布局是否正常，必要时做站点层面的集成修正；场景内容本身由模型生成。下面列出每个版本使用时的模型说明。</p>
+        <ul class="model-notes">
+        <li><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span> <span data-i18n="notes.model.cli.note">Gemini 通过 Antigravity CLI 生成。</span></li>
+        <li><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span> <span data-i18n="notes.model.web.note">同样的提示词，在 Gemini 网页上用 4 Argon（思考：高）生成。</span></li>
+        <li><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span> <span data-i18n="notes.model.deepseek.note">同样的提示词，直接调用 ModelScope API 上的 DeepSeek-V4.1-Flash 生成。</span></li>
+        <li><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span> <span data-i18n="notes.model.kiro-opus.note">同一提示词，用 Claude Opus 5.5 生成。</span></li>
+        </ul>
+      </section>
+
+      <section class="notes-section" id="links">
+        <h2 data-i18n="notes.linksHeading">继续浏览</h2>
+        <nav class="notes-live-links" aria-label="相关链接" data-i18n-attr="aria-label:notes.linksAria">
+          <a class="btn" href="/3d/compare/?id=sunset-voxel" data-i18n="notes.link.compare">⚖️ 对比全部版本</a>
+          <a class="btn btn-secondary" href="/3d/" data-i18n="notes.link.gallery">← 返回 3D 作品</a>
+          <a class="btn btn-secondary" href="/3d/notes/" data-i18n="notes.link.index">所有场景说明</a>
+        </nav>
+      </section>
+    </main>
+
+<footer class="site-footer">
+  <nav class="site-footer-links" aria-label="页脚导航" data-i18n-attr="aria-label:footer.nav">
+    <a href="/about/" data-i18n="footer.about">关于</a>
+    <a href="/contact/" data-i18n="footer.contact">联系</a>
+    <a href="/privacy/" data-i18n="footer.privacy">隐私政策</a>
+    <a href="/terms/" data-i18n="footer.terms">使用条款</a>
+    <a href="https://github.com/iamyours" target="_blank" rel="noopener noreferrer" data-i18n="footer.github">GitHub</a>
+  </nav>
+  <span class="site-footer-copy" data-i18n="footer.copyright">© 2026 iamyours</span>
+</footer>
+  </div>
+
+  <script src="/3d/i18n/i18n.js"></script>
+  <script src="/3d/i18n/zh.js"></script>
+  <script src="/3d/i18n/en.js"></script>
+  <script src="/3d/notes/i18n/zh.js"></script>
+  <script src="/3d/notes/i18n/en.js"></script>
+  <script src="/site/footer.js"></script>
+</body>
+</html>

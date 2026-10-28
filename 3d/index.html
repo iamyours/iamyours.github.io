@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
   <title data-i18n="gallery.pageTitle">🧊 3D 作品 · 团子去旅行</title>
   <script src="i18n/i18n.js"></script><script src="i18n/zh.js"></script><script src="i18n/en.js"></script>
   <style>
@@ -489,6 +490,181 @@
         min-height: 0;
       }
     }
+
+    /* Shared site footer (same markup/CSS as /site/footer.css) */
+    .site-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 18px;
+      flex-wrap: wrap;
+      padding: 12px 22px;
+      background-color: var(--bg-cream);
+      border-top: 2px solid var(--ink);
+      color: var(--ink);
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 1.5;
+    }
+
+    .site-footer-links {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 4px 14px;
+    }
+
+    .site-footer a {
+      color: inherit;
+      text-decoration: none;
+      border-bottom: 2px solid transparent;
+      transition: border-color 0.15s ease;
+    }
+
+    .site-footer a:hover {
+      border-bottom-color: currentColor;
+    }
+
+    .site-footer a:focus-visible {
+      outline: 2px solid var(--ink);
+      outline-offset: 2px;
+      border-radius: 3px;
+    }
+
+    .site-footer-copy {
+      font-weight: 600;
+      opacity: 0.75;
+      white-space: nowrap;
+    }
+
+    @media (max-width: 600px) {
+      .site-footer {
+        padding: 10px 14px;
+        justify-content: center;
+        text-align: center;
+      }
+
+      .site-footer-links {
+        justify-content: center;
+        gap: 4px 12px;
+      }
+    }
+
+    /* Crawlable gallery introduction + static scene-notes links */
+    .gallery-about {
+      margin: 0 0 24px;
+      padding: 16px 18px;
+      background-color: var(--bg-card);
+      border: 2px solid var(--ink);
+      border-radius: 16px;
+      box-shadow: 0 3px 0 rgba(58, 46, 36, 0.12);
+      font-size: 14px;
+      line-height: 1.7;
+    }
+
+    .gallery-about h2 {
+      margin: 0 0 8px;
+      font-size: 19px;
+      line-height: 1.35;
+      font-weight: 800;
+    }
+
+    .gallery-about p {
+      margin: 0 0 10px;
+    }
+
+    .gallery-about p:last-child {
+      margin-bottom: 0;
+    }
+
+    .gallery-about a {
+      color: inherit;
+      font-weight: 800;
+      text-decoration: underline;
+      text-decoration-thickness: 2px;
+      text-underline-offset: 2px;
+    }
+
+    .gallery-about a:hover {
+      background-color: var(--highlight);
+    }
+
+    .notes-links {
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1.5px dashed rgba(58, 46, 36, 0.35);
+    }
+
+    .notes-links summary {
+      cursor: pointer;
+      font-size: 13.5px;
+      font-weight: 800;
+    }
+
+    .notes-links summary:hover {
+      text-decoration: underline;
+    }
+
+    .notes-links-body {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+      gap: 10px 18px;
+      margin-top: 12px;
+    }
+
+    .notes-links-group h3 {
+      margin: 0 0 5px;
+      font-size: 13px;
+      font-weight: 800;
+      opacity: 0.75;
+    }
+
+    .notes-links-group ul {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3px 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .notes-links-group li {
+      font-size: 12.5px;
+      line-height: 1.45;
+    }
+
+    .gallery-notes-all {
+      margin-top: 12px;
+      font-size: 13.5px;
+    }
+
+    .scene-notes-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 12px;
+      font-weight: 800;
+      color: var(--ink);
+      text-decoration: none;
+      opacity: 0.8;
+      white-space: nowrap;
+    }
+
+    .scene-notes-link:hover {
+      opacity: 1;
+      text-decoration: underline;
+    }
+
+    @media (max-width: 600px) {
+      .gallery-about {
+        padding: 13px 14px;
+        font-size: 13.5px;
+      }
+
+      .gallery-about h2 {
+        font-size: 17px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -501,13 +677,86 @@
 
     <main class="gallery-main">
       <p class="intro-banner" data-i18n-html="gallery.intro">
-        每个场景一张卡片，同一提示词由不同模型生成的版本点「<b>对比全部版本</b>」并排实时运行、每个版本可单独全屏；四个合集可「<b>▶ 播放合集</b>」连续播放；Gemini 网页版（4 Argon / 3.8 Flash）会陆续补上。
+        每个场景一张卡片，同一提示词由不同模型生成的版本点「<b>对比全部版本</b>」并排实时运行、每个版本可单独全屏；五个合集可「<b>▶ 播放合集</b>」连续播放；Gemini 网页版（4 Argon / 3.8 Flash）会陆续补上。
       </p>
+
+      <section class="gallery-about" aria-labelledby="gallery-about-title">
+        <h2 id="gallery-about-title" data-i18n="gallery.aboutTitle">关于这个 3D 作品馆</h2>
+        <p data-i18n-html="gallery.aboutHtml">这里收录了 26 个可以实时运行的 three.js 场景。每个场景都有一条相同的文字提示词，分别交给 Gemini（Antigravity CLI）、Gemini 网页版 4 Argon / 3.8 Flash、DeepSeek V4.1 Flash 和 Claude Opus 5.5 等模型生成，再把结果并排放在一起，方便观察同一个任务上不同模型的取舍。点开任一场景的 <a href="compare/">「对比全部版本」</a>，可以同时运行多个版本，拖动旋转、滚轮缩放，也能单独全屏；按分类进入 <a href="collection/">「播放合集」</a>，则会按顺序连续播放该分类下的场景。页面按经典场景、体素世界、机械与载具、星球与宇宙、新场景五类整理，每个分类都有独立的合集入口。每个场景的提示词原文都公开在 3d/prompts/ 里，页面上也能展开查看和复制。所有场景都是模型生成的单文件 HTML，three.js 通过 CDN 的 import map 加载，没有构建步骤，也没有后端。想了解每个场景具体做了什么、各版本有哪些差别，可以打开下面的<a href="notes/">场景说明页</a>。</p>
+        <details class="notes-links">
+          <summary data-i18n="gallery.notesSummary">按分类浏览每个场景的说明页</summary>
+          <div class="notes-links-body">
+            <div class="notes-links-group">
+              <h3 data-i18n="gallery.notesCat.classic">经典场景</h3>
+              <ul>
+                <li><a href="notes/pelican/" data-i18n="gallery.notesScene.pelican">鹈鹕骑自行车</a></li>
+                <li><a href="notes/midautumn/" data-i18n="gallery.notesScene.midautumn">中秋月夜水榭</a></li>
+                <li><a href="notes/jet-engine/" data-i18n="gallery.notesScene.jet-engine">交互式喷气发动机</a></li>
+                <li><a href="notes/temple/" data-i18n="gallery.notesScene.temple">天坛祈年殿</a></li>
+                <li><a href="notes/sunset-voxel/" data-i18n="gallery.notesScene.sunset-voxel">永恒日落 · 体素世界</a></li>
+              </ul>
+            </div>
+            <div class="notes-links-group">
+              <h3 data-i18n="gallery.notesCat.voxel">体素世界</h3>
+              <ul>
+                <li><a href="notes/sakura-pagoda/" data-i18n="gallery.notesScene.sakura-pagoda">樱花宝塔</a></li>
+                <li><a href="notes/soccer/" data-i18n="gallery.notesScene.soccer">体素足球</a></li>
+                <li><a href="notes/peashooter/" data-i18n="gallery.notesScene.peashooter">豌豆射手挂件</a></li>
+                <li><a href="notes/ship-bottle/" data-i18n="gallery.notesScene.ship-bottle">瓶中船</a></li>
+                <li><a href="notes/kingdom/" data-i18n="gallery.notesScene.kingdom">体素王国</a></li>
+                <li><a href="notes/jp-garden/" data-i18n="gallery.notesScene.jp-garden">日式庭园 · 飞龙</a></li>
+                <li><a href="notes/steam-train/" data-i18n="gallery.notesScene.steam-train">夕阳蒸汽火车</a></li>
+                <li><a href="notes/f1-car/" data-i18n="gallery.notesScene.f1-car">体素 F1 赛车</a></li>
+              </ul>
+            </div>
+            <div class="notes-links-group">
+              <h3 data-i18n="gallery.notesCat.machines">机械与载具</h3>
+              <ul>
+                <li><a href="notes/optimus/" data-i18n="gallery.notesScene.optimus">擎天柱变形</a></li>
+                <li><a href="notes/lego-ferrari/" data-i18n="gallery.notesScene.lego-ferrari">法拉利拆解教学</a></li>
+                <li><a href="notes/skyraider/" data-i18n="gallery.notesScene.skyraider">A-1H 天袭者</a></li>
+                <li><a href="notes/inline-four/" data-i18n="gallery.notesScene.inline-four">直列四缸发动机</a></li>
+                <li><a href="notes/raptor/" data-i18n="gallery.notesScene.raptor">猛禽发动机</a></li>
+                <li><a href="notes/steam-engine/" data-i18n="gallery.notesScene.steam-engine">蒸汽机原型</a></li>
+                <li><a href="notes/starship/" data-i18n="gallery.notesScene.starship">星舰展示</a></li>
+              </ul>
+            </div>
+            <div class="notes-links-group">
+              <h3 data-i18n="gallery.notesCat.space">星球与宇宙</h3>
+              <ul>
+                <li><a href="notes/earth/" data-i18n="gallery.notesScene.earth">精细地球</a></li>
+                <li><a href="notes/black-hole/" data-i18n="gallery.notesScene.black-hole">黑洞引力透镜</a></li>
+                <li><a href="notes/floating-islands/" data-i18n="gallery.notesScene.floating-islands">浮空岛世界</a></li>
+                <li><a href="notes/cartoon-planet/" data-i18n="gallery.notesScene.cartoon-planet">卡通星球</a></li>
+              </ul>
+            </div>
+            <div class="notes-links-group">
+              <h3 data-i18n="gallery.notesCat.opus-new">新场景 · Opus 5.5</h3>
+              <ul>
+                <li><a href="notes/sky-arc-train/" data-i18n="gallery.notesScene.sky-arc-train">云海之上 · 星轨蒸汽列车</a></li>
+                <li><a href="notes/ice-rink/" data-i18n="gallery.notesScene.ice-rink">像素冰球场</a></li>
+              </ul>
+            </div>
+          </div>
+        </details>
+        <p class="gallery-notes-all"><a href="notes/" data-i18n="gallery.notesLink">查看全部场景说明 →</a></p>
+      </section>
 
       <nav class="cat-nav" id="cat-nav" aria-label="分类导航" data-i18n-attr="aria-label:gallery.catNavAria"></nav>
 
       <div id="category-sections"></div>
     </main>
+
+    <footer class="site-footer">
+      <nav class="site-footer-links" aria-label="页脚导航" data-i18n-attr="aria-label:footer.nav">
+        <a href="/about/" data-i18n="footer.about">关于</a>
+        <a href="/contact/" data-i18n="footer.contact">联系</a>
+        <a href="/privacy/" data-i18n="footer.privacy">隐私政策</a>
+        <a href="/terms/" data-i18n="footer.terms">使用条款</a>
+        <a href="https://github.com/iamyours" target="_blank" rel="noopener noreferrer" data-i18n="footer.github">GitHub</a>
+      </nav>
+      <span class="site-footer-copy" data-i18n="footer.copyright">© 2026 iamyours</span>
+    </footer>
   </div>
 
   <script src="catalog.js"></script>
@@ -801,6 +1050,13 @@
         body.appendChild(head);
         body.appendChild(descEl);
         body.appendChild(badgesEl);
+
+        const notesLink = document.createElement('a');
+        notesLink.className = 'scene-notes-link';
+        notesLink.href = 'notes/' + scene.id + '/';
+        notesLink.textContent = '📝 ' + I18N.t('gallery.cardNotes');
+        body.appendChild(notesLink);
+
         body.appendChild(actionsEl);
         body.appendChild(promptSection);
 
