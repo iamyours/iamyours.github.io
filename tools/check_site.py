@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+import xml.etree.ElementTree as ET
 from html.parser import HTMLParser
 from pathlib import Path
 
@@ -41,6 +42,8 @@ THREE_D_PAGES = [
 
 SITE_DICTS = ["site/i18n/zh.js", "site/i18n/en.js"]
 THREE_D_DICTS = ["3d/i18n/zh.js", "3d/i18n/en.js"]
+NOTES_DICTS = ["3d/notes/i18n/zh.js", "3d/notes/i18n/en.js"]
+BASE_URL = "https://iamyours.github.io"
 
 
 class PageParser(HTMLParser):
@@ -149,10 +152,73 @@ def check_page(path: Path, expected_canonical: str | None) -> list[str]:
     return errors
 
 
+def load_scene_ids() -> list[str]:
+    """Scene ids from window.GALLERY_CATEGORIES in 3d/catalog.js."""
+    text = (ROOT / "3d" / "catalog.js").read_text(encoding="utf-8")
+    match = re.search(r"window\.GALLERY_CATEGORIES\s*=\s*", text)
+    if not match:
+        raise SystemExit("Could not find window.GALLERY_CATEGORIES in 3d/catalog.js")
+    start = match.end()
+    while start < len(text) and text[start].isspace():
+        start += 1
+    categories, _ = json.JSONDecoder().raw_decode(text[start:])
+    ids: list[str] = []
+    seen: set[str] = set()
+    for category in categories:
+        for scene in category.get("scenes", []):
+            scene_id = scene.get("id")
+            if scene_id and scene_id not in seen:
+                seen.add(scene_id)
+                ids.append(scene_id)
+    return ids
+
+
+def check_parity(paths: list[str], label: str) -> list[str]:
+    zh_path, en_path = paths
+    zh = parse_dict(ROOT / zh_path)
+    en = parse_dict(ROOT / en_path)
+    errors: list[str] = []
+    if zh != en:
+        missing_en = sorted(zh - en)
+        missing_zh = sorted(en - zh)
+        if missing_en:
+            errors.append(f"{label}: keys only in zh: {', '.join(missing_en)}")
+        if missing_zh:
+            errors.append(f"{label}: keys only in en: {', '.join(missing_zh)}")
+    return errors
+
+
+def check_sitemap() -> list[str]:
+    """Every <loc> in sitemap.xml must map to an existing static file."""
+    errors: list[str] = []
+    try:
+        tree = ET.parse(ROOT / "sitemap.xml")
+    except ET.ParseError as exc:
+        return [f"sitemap.xml: cannot parse: {exc}"]
+    ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+    urls = [loc.text or "" for loc in tree.getroot().findall("sm:url/sm:loc", ns)]
+    for url in urls:
+        if not url.startswith(BASE_URL + "/"):
+            errors.append(f"sitemap.xml: URL outside the site: {url}")
+            continue
+        rel = url[len(BASE_URL):].lstrip("/")
+        target = ROOT / rel
+        if rel == "" or url.endswith("/"):
+            target = target / "index.html"
+        if not target.is_file():
+            errors.append(f"sitemap.xml: {url} has no file at {target.relative_to(ROOT)}")
+    return errors
+
+
 def main() -> int:
     errors: list[str] = []
     site_keys = {dict_path: parse_dict(ROOT / dict_path) for dict_path in SITE_DICTS}
     three_d_keys = {dict_path: parse_dict(ROOT / dict_path) for dict_path in THREE_D_DICTS}
+    notes_keys = {dict_path: parse_dict(ROOT / dict_path) for dict_path in NOTES_DICTS}
+
+    errors.extend(check_parity(SITE_DICTS, "site/i18n"))
+    errors.extend(check_parity(THREE_D_DICTS, "3d/i18n"))
+    errors.extend(check_parity(NOTES_DICTS, "3d/notes/i18n"))
 
     parsed_pages: dict[str, PageParser] = {}
     for rel, canonical in NEW_PAGES.items():
@@ -185,6 +251,25 @@ def main() -> int:
             if missing:
                 errors.append(f"{rel}: missing from {dict_path}: {', '.join(missing)}")
 
+    # Generated scene-notes pages (index + one per scene id).
+    notes_pages = {"3d/notes/index.html": BASE_URL + "/3d/notes/"}
+    for scene_id in load_scene_ids():
+        notes_pages[f"3d/notes/{scene_id}/index.html"] = f"{BASE_URL}/3d/notes/{scene_id}/"
+    all_notes_keys = set().union(*notes_keys.values(), *three_d_keys.values())
+    for rel, canonical in notes_pages.items():
+        path = ROOT / rel
+        page_errors = check_page(path, canonical)
+        for message in page_errors:
+            errors.append(f"{rel}: {message}")
+        parser = PageParser()
+        parser.feed(path.read_text(encoding="utf-8"))
+        parsed_pages[rel] = parser
+        missing = sorted(parser.keys - all_notes_keys)
+        if missing:
+            errors.append(f"{rel}: missing from 3d/notes/i18n: {', '.join(missing)}")
+
+    errors.extend(check_sitemap())
+
     # The prompt panel's inline link row.
     panel = (ROOT / "3d/prompt-panel.js").read_text(encoding="utf-8")
     panel_keys = set(re.findall(r"tr\('([^']+)'", panel))
@@ -207,6 +292,7 @@ def main() -> int:
     print(f"Checked {len(parsed_pages)} pages and {total_keys} i18n key uses.")
     print(f"site/i18n: {len(site_keys[SITE_DICTS[0]])} zh keys, {len(site_keys[SITE_DICTS[1]])} en keys")
     print(f"3d/i18n:   {len(three_d_keys[THREE_D_DICTS[0]])} zh keys, {len(three_d_keys[THREE_D_DICTS[1]])} en keys")
+    print(f"notes/i18n: {len(notes_keys[NOTES_DICTS[0]])} zh keys, {len(notes_keys[NOTES_DICTS[1]])} en keys")
 
     if errors:
         print("\nFAILED:")

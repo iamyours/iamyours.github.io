@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
   <title data-i18n="compare.pageTitle">版本对比 · 3D 作品</title>
   <script src="../i18n/i18n.js"></script><script src="../i18n/zh.js"></script><script src="../i18n/en.js"></script>
   <style>
@@ -745,6 +746,10 @@
       <h1 class="topbar-title" id="bar-title">版本对比</h1>
     </div>
     <div class="topbar-actions">
+      <a class="btn btn-topbar" id="notes-link" href="#" aria-label="场景说明" title="场景说明" data-i18n-attr="aria-label:compare.notes;title:compare.notes">
+        <span class="btn-icon">📝</span>
+        <span class="btn-text" data-i18n="compare.notes">场景说明</span>
+      </a>
       <button type="button" class="btn btn-topbar" id="open-prompt-btn" aria-label="提示词" title="提示词" data-i18n-attr="aria-label:compare.prompt;title:compare.prompt">
         <span class="btn-icon">📜</span>
         <span class="btn-text" data-i18n="compare.prompt">提示词</span>
@@ -819,7 +824,7 @@
       const CATS = window.GALLERY_CATEGORIES || [];
 
       const params = new URLSearchParams(location.search);
-      const sid = params.get('s');
+      const sid = params.get('s') || params.get('id');
       let catId = params.get('c');
 
       // 查找场景与分类
@@ -850,6 +855,7 @@
       const playLink = document.getElementById('play-collection');
       const sourceLink = document.getElementById('source-link');
       const openPromptBtn = document.getElementById('open-prompt-btn');
+      const notesLink = document.getElementById('notes-link');
       const container = document.getElementById('scene-container');
 
       // 提示词抽屉相关 DOM
@@ -865,6 +871,7 @@
         backLink.href = '../';
         playLink.style.display = 'none';
         openPromptBtn.style.display = 'none';
+        notesLink.style.display = 'none';
         sourceLink.style.display = 'none';
         barTitle.textContent = I18N.t('compare.title');
         container.innerHTML =
@@ -895,6 +902,7 @@
       }
       updateTitles();
       backLink.href = '../#cat-' + encodeURIComponent(catId);
+      notesLink.href = '../notes/' + encodeURIComponent(scene.id) + '/';
       playLink.href = '../collection/?c=' + encodeURIComponent(catId) + '&s=' + encodeURIComponent(scene.id);
 
       if (scene.source) {

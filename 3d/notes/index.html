@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" href="data:," />
+  <title data-i18n="notes.index.pageTitle">场景说明 · 3D 作品 · 团子去旅行</title>
+  <meta name="description" content="26 个 three.js 场景的说明页：每个场景的原始提示词、各 AI 模型版本的代码规模、检测到的 three.js 技术，以及逐版阅读源码后记录的差异。" data-i18n-attr="content:notes.index.metaDescription" />
+  <link rel="canonical" href="https://iamyours.github.io/3d/notes/" />
+  <link rel="stylesheet" href="/site/site.css" />
+  <link rel="stylesheet" href="/site/footer.css" />
+  <link rel="stylesheet" href="/3d/notes/notes.css" />
+</head>
+<body>
+  <div class="site-shell notes-shell">
+<header class="topbar">
+  <a class="brand" href="/"><span aria-hidden="true">🍡</span> <span data-i18n="notes.brand">团子去旅行</span></a>
+  <nav class="site-nav" aria-label="主导航" data-i18n-attr="aria-label:notes.nav.aria">
+    <a href="/3d/" data-i18n="notes.nav.gallery">3D 作品</a>
+    <a href="/3d/notes/" aria-current="page" data-i18n="notes.nav.index">场景说明</a>
+  </nav>
+  <span data-i18n-switch="btn-topbar"></span>
+</header>
+
+    <main class="page-main prose notes-main" id="main-content">
+      <h1 data-i18n="notes.index.heading">场景说明</h1>
+      <p class="lead" data-i18n="notes.index.lead">这里为 3D 作品馆里的 26 个场景各准备了一页说明：它想画什么、提示词原文是什么、每个模型版本用了哪些技术，以及逐版阅读源码后看到的差别。</p>
+      <p data-i18n="notes.index.p1">这些页面不是宣传文案，而是阅读源码后的记录。版本表里的文件大小、行数和技术标签由 tools/gen_notes.py 直接从每个 3d/&lt;id&gt;&lt;suffix&gt;/index.html 统计；对比观察则由人工逐版浏览结构、动画、灯光和交互后写成。同一个场景的不同版本使用同一份提示词，因此差异主要来自模型如何理解任务、如何组织几何体与交互，而不是需求本身。</p>
+      <p data-i18n="notes.index.p2">想看实时效果，可以从任意说明页进入「对比全部版本」，或回到 3D 作品馆按分类播放合集。每个场景的提示词都公开在 3d/prompts/ 下，可以复制后自己复现。</p>
+      <p class="notes-index-links"><a class="btn" href="/3d/" data-i18n="notes.link.gallery">← 返回 3D 作品</a></p>
+
+      <section class="notes-cat" id="cat-classic">
+        <h2><span aria-hidden="true">⭐</span> <span data-i18n="notes.cat.classic.title">经典场景</span></h2>
+        <p class="notes-cat-desc" data-i18n="notes.cat.classic.desc">最早的五个场景：同一提示词分别交给 CLI、网页版、DeepSeek 和 Opus 5.5 生成。</p>
+        <div class="notes-index-grid">
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/pelican/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/pelican.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/pelican/" data-i18n="notes.pelican.title">鹈鹕骑自行车</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.pelican.short">社区经典基准题：鹈鹕踩着脚踏沿环形小路骑行，腿、曲柄、车轮联动。</p>
+            <div class="scene-badges"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-opus" data-i18n="notes.model.opus.badge">Antigravity · Opus 5.5</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/pelican/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/midautumn/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/midautumn.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/midautumn/" data-i18n="notes.midautumn.title">中秋月夜水榭</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.midautumn.short">满月、金桂花雨、水榭倒影与灯笼暖光，一个静谧的中秋角落。</p>
+            <div class="scene-badges"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/midautumn/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/jet-engine/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/jet-engine.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/jet-engine/" data-i18n="notes.jet-engine.title">交互式喷气发动机</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.jet-engine.short">风扇与轴旋转，点「分解」看各级部件沿轴线展开，悬停查看作用。</p>
+            <div class="scene-badges"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/jet-engine/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/temple/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/temple.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/temple/" data-i18n="notes.temple.title">天坛祈年殿</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.temple.short">三重蓝色琉璃圆顶与汉白玉台基，可一键爆炸 / 重组。</p>
+            <div class="scene-badges"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/temple/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/sunset-voxel/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/sunset-voxel.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/sunset-voxel/" data-i18n="notes.sunset-voxel.title">永恒日落 · 体素世界</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.sunset-voxel.short">程序生成的方块海岸，一颗低悬海面的橙色落日。</p>
+            <div class="scene-badges"><span class="model-badge" data-i18n="notes.model.cli.badge">CLI 版</span><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/sunset-voxel/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        </div>
+      </section>
+      <section class="notes-cat" id="cat-voxel">
+        <h2><span aria-hidden="true">🧱</span> <span data-i18n="notes.cat.voxel.title">体素世界</span></h2>
+        <p class="notes-cat-desc" data-i18n="notes.cat.voxel.desc">一块块彩色方块拼出来的小世界。</p>
+        <div class="notes-index-grid">
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/sakura-pagoda/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/sakura-pagoda-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/sakura-pagoda/" data-i18n="notes.sakura-pagoda.title">樱花宝塔</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.sakura-pagoda.short">樱花庭园里的多层宝塔，彩色体素拼出的春日小景。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/sakura-pagoda/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/soccer/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/soccer-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/soccer/" data-i18n="notes.soccer.title">体素足球</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.soccer.short">方块球员带球连过两名后卫破门，进球后放庆祝粒子。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/soccer/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/peashooter/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/peashooter-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/peashooter/" data-i18n="notes.peashooter.title">豌豆射手挂件</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.peashooter.short">植物大战僵尸里的豌豆射手体素挂件，可以和它互动。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/peashooter/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/ship-bottle/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/ship-bottle-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/ship-bottle/" data-i18n="notes.ship-bottle.title">瓶中船</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.ship-bottle.short">玻璃瓶里的小船在波浪中航行，整个场景都装在瓶子里。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/ship-bottle/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/kingdom/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/kingdom-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/kingdom/" data-i18n="notes.kingdom.title">体素王国</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.kingdom.short">中央是带护城河的城堡，四周是村庄与田野。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/kingdom/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/jp-garden/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/jp-garden-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/jp-garden/" data-i18n="notes.jp-garden.title">日式庭园 · 飞龙</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.jp-garden.short">宝塔、小村民和盘旋的飞龙，还有可以互动的小细节。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/jp-garden/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/steam-train/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/steam-train-deepseek.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/steam-train/" data-i18n="notes.steam-train.title">夕阳蒸汽火车</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.steam-train.short">体素蒸汽火车在日落时分穿过河谷。</p>
+            <div class="scene-badges"><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/steam-train/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/f1-car/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/f1-car-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/f1-car/" data-i18n="notes.f1-car.title">体素 F1 赛车</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.f1-car.short">体素风格的梅赛德斯 AMG F1 赛车。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-flash" data-i18n="notes.model.flash.badge">Gemini 网页版（3.8 Flash）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/f1-car/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        </div>
+      </section>
+      <section class="notes-cat" id="cat-machines">
+        <h2><span aria-hidden="true">⚙️</span> <span data-i18n="notes.cat.machines.title">机械与载具</span></h2>
+        <p class="notes-cat-desc" data-i18n="notes.cat.machines.desc">会动、能拆、可以操控的机器。</p>
+        <div class="notes-index-grid">
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/optimus/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/optimus-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/optimus/" data-i18n="notes.optimus.title">擎天柱变形</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.optimus.short">按 T 在卡车头和人形之间变形，WASD 操控行驶和行走。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/optimus/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/lego-ferrari/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/lego-ferrari-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/lego-ferrari/" data-i18n="notes.lego-ferrari.title">法拉利拆解教学</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.lego-ferrari.short">类似 JigSpace 的交互教学展示，拆开看法拉利的核心部件。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/lego-ferrari/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/skyraider/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/skyraider-deepseek.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/skyraider/" data-i18n="notes.skyraider.title">A-1H 天袭者</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.skyraider.short">道格拉斯 A-1H 天袭者螺旋桨攻击机。</p>
+            <div class="scene-badges"><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/skyraider/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/inline-four/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/inline-four-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/inline-four/" data-i18n="notes.inline-four.title">直列四缸发动机</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.inline-four.short">活塞、曲轴、凸轮联动，按点火顺序点火，可一键分解。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-flash" data-i18n="notes.model.flash.badge">Gemini 网页版（3.8 Flash）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/inline-four/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/raptor/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/raptor-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/raptor/" data-i18n="notes.raptor.title">猛禽发动机</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.raptor.short">SpaceX 猛禽（Raptor）火箭发动机，白色背景。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/raptor/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/steam-engine/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/steam-engine-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/steam-engine/" data-i18n="notes.steam-engine.title">蒸汽机原型</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.steam-engine.short">一台能运转的蒸汽机原型。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/steam-engine/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/starship/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/starship-deepseek.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/starship/" data-i18n="notes.starship.title">星舰展示</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.starship.short">SpaceX 星舰的 3D 展示。</p>
+            <div class="scene-badges"><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/starship/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        </div>
+      </section>
+      <section class="notes-cat" id="cat-space">
+        <h2><span aria-hidden="true">🪐</span> <span data-i18n="notes.cat.space.title">星球与宇宙</span></h2>
+        <p class="notes-cat-desc" data-i18n="notes.cat.space.desc">地球、黑洞、浮空岛和一颗热闹的卡通星球。</p>
+        <div class="notes-index-grid">
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/earth/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/earth-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/earth/" data-i18n="notes.earth.title">精细地球</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.earth.short">一颗尽量精细好看的 3D 地球。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-flash" data-i18n="notes.model.flash.badge">Gemini 网页版（3.8 Flash）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/earth/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/black-hole/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/black-hole-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/black-hole/" data-i18n="notes.black-hole.title">黑洞引力透镜</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.black-hole.short">卡冈图雅式黑洞：引力透镜、吸积盘和环绕的等离子体。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-flash" data-i18n="notes.model.flash.badge">Gemini 网页版（3.8 Flash）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/black-hole/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/floating-islands/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/floating-islands-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/floating-islands/" data-i18n="notes.floating-islands.title">浮空岛世界</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.floating-islands.short">黄金时刻的浮空岛、瀑布、遗迹与飞艇，WASD 自由飞行。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-flash" data-i18n="notes.model.flash.badge">Gemini 网页版（3.8 Flash）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/floating-islands/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/cartoon-planet/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/cartoon-planet-web.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/cartoon-planet/" data-i18n="notes.cartoon-planet.title">卡通星球</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.cartoon-planet.short">漫画风小星球，云、山、城市，车和飞机在上面跑。</p>
+            <div class="scene-badges"><span class="model-badge is-web" data-i18n="notes.model.web.badge">Gemini 网页版（4 Argon）</span><span class="model-badge is-flash" data-i18n="notes.model.flash.badge">Gemini 网页版（3.8 Flash）</span><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/cartoon-planet/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        </div>
+      </section>
+      <section class="notes-cat" id="cat-opus-new">
+        <h2><span aria-hidden="true">🎬</span> <span data-i18n="notes.cat.opus-new.title">新场景 · Opus 5.5</span></h2>
+        <p class="notes-cat-desc" data-i18n="notes.cat.opus-new.desc">两条新写的长提示词：一镜到底的云海列车和像素风冰球场，主要由 Claude Opus 5.5 生成，云海列车另有 DeepSeek 版。</p>
+        <div class="notes-index-grid">
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/sky-arc-train/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/sky-arc-train-deepseek.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/sky-arc-train/" data-i18n="notes.sky-arc-train.title">云海之上 · 星轨蒸汽列车</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.sky-arc-train.short">蒸汽列车沿 C 形圆弧轨道驶过云海上的维多利亚玻璃车站，25 秒一镜到底循环运镜，可拖动自由观察。</p>
+            <div class="scene-badges"><span class="model-badge is-deepseek" data-i18n="notes.model.deepseek.badge">DeepSeek V4.1 Flash</span><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/sky-arc-train/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        <article class="notes-card">
+          <a class="notes-card-thumb" href="/3d/notes/ice-rink/" tabindex="-1" aria-hidden="true"><img src="/3d/thumbs/ice-rink-kiro-opus.jpg" alt="" loading="lazy" width="320" height="180" /></a>
+          <div class="notes-card-body">
+            <h3><a href="/3d/notes/ice-rink/" data-i18n="notes.ice-rink.title">像素冰球场</a></h3>
+            <p class="notes-card-desc" data-i18n="notes.ice-rink.short">浮空的户外冰场，以像素画风格实时渲染：2 对 2 冰球比赛、浇冰车整冰、昼夜与飘雪切换。</p>
+            <div class="scene-badges"><span class="model-badge is-kiro" data-i18n="notes.model.kiro-opus.badge">Opus 5.5</span></div>
+            <a class="notes-card-link" href="/3d/notes/ice-rink/" data-i18n="notes.index.readNotes">阅读说明 →</a>
+          </div>
+        </article>
+        </div>
+      </section>
+    </main>
+
+<footer class="site-footer">
+  <nav class="site-footer-links" aria-label="页脚导航" data-i18n-attr="aria-label:footer.nav">
+    <a href="/about/" data-i18n="footer.about">关于</a>
+    <a href="/contact/" data-i18n="footer.contact">联系</a>
+    <a href="/privacy/" data-i18n="footer.privacy">隐私政策</a>
+    <a href="/terms/" data-i18n="footer.terms">使用条款</a>
+    <a href="https://github.com/iamyours" target="_blank" rel="noopener noreferrer" data-i18n="footer.github">GitHub</a>
+  </nav>
+  <span class="site-footer-copy" data-i18n="footer.copyright">© 2026 iamyours</span>
+</footer>
+  </div>
+
+  <script src="/3d/i18n/i18n.js"></script>
+  <script src="/3d/i18n/zh.js"></script>
+  <script src="/3d/i18n/en.js"></script>
+  <script src="/3d/notes/i18n/zh.js"></script>
+  <script src="/3d/notes/i18n/en.js"></script>
+  <script src="/site/footer.js"></script>
+</body>
+</html>
