@@ -91,5 +91,15 @@ I18N.add('en', {
   "pp.loading": "Loading prompt…",
   "pp.noId": "Prompt ID (data-id) not configured.",
   "pp.title": "Prompt for this scene",
-  "pp.toggle": "📜 Prompt"
+  "pp.toggle": "📜 Prompt",
+  "pp.about": "About",
+  "pp.privacy": "Privacy",
+  "pp.terms": "Terms",
+  "footer.nav": "Footer navigation",
+  "footer.about": "About",
+  "footer.contact": "Contact",
+  "footer.privacy": "Privacy",
+  "footer.terms": "Terms",
+  "footer.github": "GitHub",
+  "footer.copyright": "© 2026 iamyours"
 });

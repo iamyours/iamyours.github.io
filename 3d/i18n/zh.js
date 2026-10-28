@@ -88,5 +88,15 @@ I18N.add('zh', {
   "pp.loading": "正在加载提示词…",
   "pp.noId": "未配置提示词 ID（data-id）。",
   "pp.title": "生成这个场景的提示词",
-  "pp.toggle": "📜 提示词"
+  "pp.toggle": "📜 提示词",
+  "pp.about": "关于",
+  "pp.privacy": "隐私",
+  "pp.terms": "条款",
+  "footer.nav": "页脚导航",
+  "footer.about": "关于",
+  "footer.contact": "联系",
+  "footer.privacy": "隐私政策",
+  "footer.terms": "使用条款",
+  "footer.github": "GitHub",
+  "footer.copyright": "© 2026 iamyours"
 });
