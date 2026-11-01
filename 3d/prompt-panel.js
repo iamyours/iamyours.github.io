@@ -162,6 +162,7 @@
   var elCloseBtn = null;
   var elToggleBtn = null;
   var elPre = null;
+  var elPromptLinks = [];
   var copyTimer = null;
 
   function tr(key, fallbackZh) {
@@ -202,6 +203,10 @@
         } else if (noIdList.indexOf(curPre) !== -1) {
           elPre.textContent = tr('pp.noId', '未配置提示词 ID（data-id）。');
         }
+      }
+
+      for (var pl = 0; pl < elPromptLinks.length; pl++) {
+        elPromptLinks[pl].el.textContent = tr(elPromptLinks[pl].key, elPromptLinks[pl].fallback);
       }
 
       var isEn = Boolean(window.I18N && window.I18N.lang === 'en');
@@ -484,6 +489,38 @@
       '  user-select: text;',
       '  -webkit-user-select: text;',
       '}',
+      '.pp-links {',
+      '  pointer-events: auto;',
+      '  display: flex;',
+      '  align-items: center;',
+      '  justify-content: flex-end;',
+      '  flex-wrap: wrap;',
+      '  padding: 0 4px;',
+      '  color: #3a2e24;',
+      '  font-size: 11.5px;',
+      '  font-weight: 700;',
+      '  line-height: 1.3;',
+      '}',
+      '.pp-links a {',
+      '  color: inherit;',
+      '  text-decoration: none;',
+      '  border-bottom: 1.5px solid transparent;',
+      '}',
+      '.pp-links a:hover {',
+      '  border-bottom-color: currentColor;',
+      '}',
+      '.pp-links a:focus-visible {',
+      '  outline: 2px solid #3a2e24;',
+      '  outline-offset: 1px;',
+      '  border-radius: 3px;',
+      '}',
+      '.pp-links a + a::before {',
+      '  content: "·";',
+      '  display: inline-block;',
+      '  margin: 0 6px;',
+      '  opacity: 0.45;',
+      '  font-weight: 400;',
+      '}',
       '@media (max-width: 480px) {',
       '  .pp-root {',
       '    right: 12px;',
@@ -584,6 +621,29 @@
 
     root.appendChild(panel);
     root.appendChild(toggleBtn);
+
+    // Site links live inside the prompt-panel widget and are deliberately
+    // omitted in embed mode so compare/collection tiles show only the scene.
+    if (!isEmbedMode) {
+      var links = document.createElement('div');
+      links.className = 'pp-links';
+      var linkDefs = [
+        { href: '/about/', key: 'pp.about', fallback: '关于' },
+        { href: '/privacy/', key: 'pp.privacy', fallback: '隐私' },
+        { href: '/terms/', key: 'pp.terms', fallback: '条款' }
+      ];
+      for (var ld = 0; ld < linkDefs.length; ld++) {
+        var link = document.createElement('a');
+        link.href = linkDefs[ld].href;
+        link.setAttribute('data-i18n', linkDefs[ld].key);
+        link.textContent = tr(linkDefs[ld].key, linkDefs[ld].fallback);
+        links.appendChild(link);
+        elPromptLinks.push({ el: link, key: linkDefs[ld].key, fallback: linkDefs[ld].fallback });
+      }
+      root.appendChild(links);
+      stopCanvasPropagation(links);
+    }
+
     document.body.appendChild(root);
 
     elPanel = panel;

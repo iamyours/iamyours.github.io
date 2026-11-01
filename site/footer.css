@@ -1,0 +1,81 @@
+/* Shared footer for iamyours.github.io.
+   This file is meant to be linked as-is, or pasted into a page's <style>
+   block when a page prefers inline styles. Colours match the cream/green
+   palette used by /3d/. */
+
+.site-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 18px;
+  flex-wrap: wrap;
+  padding: 12px 22px;
+  background-color: var(--bg-cream, #fbf4e2);
+  border-top: 2px solid var(--ink, #3a2e24);
+  color: var(--ink, #3a2e24);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.site-footer-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.site-footer a {
+  color: inherit;
+  text-decoration: none;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.15s ease, opacity 0.15s ease;
+}
+
+.site-footer a:hover {
+  border-bottom-color: currentColor;
+}
+
+.site-footer a:focus-visible {
+  outline: 2px solid var(--ink, #3a2e24);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+.site-footer-copy {
+  font-weight: 600;
+  opacity: 0.75;
+  white-space: nowrap;
+}
+
+/* Compact variant used by the full-screen 3D viewers. */
+.site-footer--compact {
+  justify-content: center;
+  padding: 3px 12px;
+  gap: 2px 10px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  border-top-width: 1.5px;
+}
+
+.site-footer--compact .site-footer-links {
+  gap: 2px 10px;
+}
+
+@media (max-width: 600px) {
+  .site-footer {
+    padding: 10px 14px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .site-footer-links {
+    justify-content: center;
+    gap: 4px 12px;
+  }
+
+  .site-footer--compact {
+    padding: 2px 8px;
+    font-size: 10.5px;
+  }
+}

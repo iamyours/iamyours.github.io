@@ -1,0 +1,262 @@
+{
+  "pelican": {
+    "intro": {
+      "zh": "一只鹈鹕沿着环形小路骑自行车：腿、脚踏、曲柄、链条和车轮需要协同运动，镜头跟随、速度切换和车铃则用来测试模型能否把动画、相机与交互接在一起。提示词还要求阳光、柔和阴影、低多边形树和远处云，因此它同时考验程序化建模与场景氛围。",
+      "en": "A pelican pedals a bicycle around a circular path, with legs, pedals, cranks, chain and wheels expected to move as one system. Follow camera, speed presets and a bell test whether the model can connect animation, camera and interaction, while the sunny low-poly park tests procedural modelling and soft shadows."
+    },
+    "comparison": {
+      "zh": "CLI 版最完整：除了镜头跟随，还做了侧面特写、动感追随、鸟瞰全景三种机位，以及悠闲/飞速/单脚滑行三档速度和车铃音效，腿部用两骨 IK 踩住踏板。Web 版把交互收回到鹈鹕本身，点击它会响铃并短暂加速，腿和翅膀同样用 IK 跟随曲柄。DeepSeek 版保留镜头跟随和完整的曲柄—脚踏—车轮联动，但只有 42 个 Mesh，没有速度或机位控制。Antigravity Opus 版换成速度滑杆，链条用 InstancedMesh 一节节铺出来。Opus 5.5 版最克制，只有跟随开关，植被和路面细节更多依赖 InstancedMesh。",
+      "en": "The CLI version is the most complete: follow camera plus side, action and overhead views, three speed presets, a bell and sound effects, with two-bone IK feet locked to the pedals. The web version moves interaction onto the bird itself—clicking the pelican rings the bell and briefly speeds it up—and also uses IK for legs and wings. DeepSeek keeps follow mode and the linked crank-pedal-wheel motion but has far fewer meshes (42 versus 83 in the CLI build) and no speed or camera controls. Antigravity Opus replaces the presets with a speed slider and builds the chain from an InstancedMesh. Opus 5.5 is the most restrained: a single follow toggle, with more of its detail pushed into instanced vegetation."
+    }
+  },
+  "midautumn": {
+    "intro": {
+      "zh": "中秋月夜的水榭、满月、桂花雨、灯笼暖光和水面倒影。场景主要考验模型如何用程序化几何、粒子与反射拼出安静的夜景氛围，以及如何在不过度堆模型的情况下控制水面、辉光和视角。",
+      "en": "A Mid-Autumn waterside pavilion under a full moon, with osmanthus petals, warm lanterns and reflections on the water. The scene tests procedural geometry, particles and reflections used to build a quiet night atmosphere, and how well a model controls water, bloom and camera without piling up meshes."
+    },
+    "comparison": {
+      "zh": "CLI 版提供亭榭全景、月饼茶席、玉兔伴月、桂雨清涟四个机位，并用 76 个 Mesh、3 个 InstancedMesh 和 UnrealBloom 把灯笼、月亮与水面分开处理。Web 版没有机位按钮，但堆到 67 个 Mesh 和 24 个 Group，月亮、水面和花瓣各有独立 shader 与反射。DeepSeek 版 52 个 Mesh，水面用 Reflector，桂花和灯笼更依赖实例化。Opus 5.5 版把大量效果压进 多组 shader 代码，几何体数量仍接近 web，但代码行数只有 1337 行，是四版里最偏 shader 的一版。水面用 Reflector 接收月亮的倒影，灯笼的暖光与月光形成冷暖对比；四版都没有把相机做成第一人称，观者始终在一个略高的斜角上。",
+      "en": "The CLI build offers four camera presets—pavilion overview, mooncake tea table, jade rabbit and osmanthus rain—and separates lanterns, moon and water using 76 meshes, three InstancedMesh groups and UnrealBloom. The web build has no camera buttons but grows to 67 meshes and 24 groups, giving the moon, water and petals their own shaders and reflections. DeepSeek uses 52 meshes, a Reflector for the water, and leans on instancing for blossoms and lanterns. Opus 5.5 compresses many effects into many shader effects; its mesh count is close to the web build, but at 1,337 lines it is the most shader-centric of the four. The water uses a Reflector to catch the moon, and the warm lanterns contrast with the cool moonlight; none of the four versions uses a first-person camera, so the viewer stays at a slightly elevated angle."
+    }
+  },
+  "jet-engine": {
+    "intro": {
+      "zh": "一台半剖的涡扇喷气发动机：风扇与双转子轴持续旋转，点「分解」可让各级部件沿轴线展开，悬停部件会显示名称与作用。它测试模型对机械层级、剖视结构、标注系统和实时 HUD 的组织能力。",
+      "en": "A cutaway turbofan engine with a spinning fan and twin spools; the explode button spreads the stages along the axis, and hovering a part reveals its name and function. It tests how a model organises mechanical hierarchy, cutaway geometry, labels and a live HUD."
+    },
+    "comparison": {
+      "zh": "CLI 版做得最重：20 个 Mesh、18 个 Group、一组 CSS2D 标注，HUD 实时显示 N1、N2 和 EGT，还有粒子尾焰与可拖动的转速条。Web 版用 21 个 Mesh 和 13 个 Group，把「分解」与「推力：巡航」做成两个控制，部件说明放在悬停提示里，没有独立 HUD。DeepSeek 版只有 2 个 Mesh 和 4 个 Cylinder，靠 CSS2D 标注和「分解」按钮撑起交互，结构明显更简。Opus 5.5 版几何体也不多，但加了 UnrealBloom 和三段式说明文字，视觉上更强调剖面的辉光。CLI 还把低压轴、高压轴和燃气温度做成常驻 HUD，Web 的 CSS2D 标注则跟着部件移动，DeepSeek 的标注更少但保留了完整的分解轴向。",
+      "en": "The CLI build is the heaviest: 20 meshes, 18 groups, a set of CSS2D labels, a HUD that reports N1, N2 and EGT live, plus particle exhaust and a draggable speed control. The web build uses 21 meshes and 13 groups, turns explode and cruise thrust into two separate controls, and puts part descriptions in hover tooltips instead of a persistent HUD. DeepSeek has only two meshes and four cylinders; CSS2D labels and the explode button carry the interaction, so the structure is visibly simpler. Opus 5.5 keeps the geometry small too, but adds UnrealBloom and a three-stage explanatory line, pushing the look toward a glowing cutaway. The CLI build keeps low-pressure spool, high-pressure spool and exhaust gas temperature in a permanent HUD; the web build's CSS2D labels travel with their parts, while DeepSeek uses fewer labels but keeps the full axial explode path."
+    }
+  },
+  "temple": {
+    "intro": {
+      "zh": "天坛祈年殿的三重蓝琉璃圆顶、汉白玉台基与二十八柱。场景要求纯代码搭出有明确营造层级的建筑，并能一键爆炸/重组；它测试模型的程序化建筑能力、实例化技巧和对中式屋顶曲线的处理。",
+      "en": "The Hall of Prayer for Good Harvests with its triple blue-glazed roofs, white marble terrace and 28 columns. The scene asks for a legible architectural hierarchy built entirely in code, with one-click explode/reassemble; it tests procedural architecture, instancing and handling of Chinese roof curves."
+    },
+    "comparison": {
+      "zh": "CLI 版把交互铺得最开：除了爆炸/重组和自动环绕，还有恢弘全景、仰视雄姿、飞檐斗拱、南向丹陛、俯瞰圆坛五个机位，并用 32 个 Mesh、18 个 Group 组织斗拱和栏杆。Web 版只有两个按钮，但用了大量 InstancedMesh，把望柱、栏板、斗拱和树全部实例化，爆炸时逐实例散开，几何密度最高。DeepSeek 版 11 个 Mesh，也走 InstancedMesh 路线，但斗拱和屋顶的层次更概括。Opus 5.5 版 27 个 Mesh，自动环绕默认开启，爆炸拆解分构件错峰展开，介于前两者之间。Web 版的爆炸状态还会显示从宝顶到台基的构件层级图例，方便把散开的部件对回原位置；CLI 版则把五个机位做成底部按钮条。",
+      "en": "The CLI build exposes the most controls: explode/reassemble and auto-orbit plus five camera presets—grand overview, looking up, eaves and brackets, southern stairway, and top-down over the circular altar—with 32 meshes and 18 groups organising brackets and railings. The web build has only two buttons but leans heavily on InstancedMesh for posts, panels, brackets and trees, and animates each instance separately during the explosion, giving the densest geometry. DeepSeek uses 11 meshes and also instancing, but its roof and bracket layers are more summarised. Opus 5.5 sits between them with 27 meshes, auto-orbit on by default, and staged explode animations grouped by building part. The web build also shows a layer legend from the gilt finial down to the terrace while exploded, helping map loose parts back to their positions; the CLI build puts its five camera presets in a bottom button row."
+    }
+  },
+  "sunset-voxel": {
+    "intro": {
+      "zh": "程序生成的 96×96 体素海岸，一轮低悬海面的橙色落日在晚霞中缓慢下沉。它测试模型能否用体素/实例化搭出地形与水面，并用 shader、雾和辉光把「永恒日落」的气氛做出来，同时保持可环顾的相机。",
+      "en": "A procedurally generated 96×96 voxel coastline under an orange sun hanging low over the sea. It tests voxel/instanced terrain and water, plus shaders, fog and bloom used to sustain an 'eternal sunset' mood while keeping the camera free to orbit."
+    },
+    "comparison": {
+      "zh": "CLI 版用 2 个 InstancedMesh 和 6 个 BoxGeometry 搭地形，靠 shader 处理水面和天空，并加了滑翔模式按钮。Web 版把地形、水、云和植被拆成 7 层 InstancedMesh，是四版里实例化最细的，还提供 96×96 群岛的滑翔视角。DeepSeek 版只有 3 个 Mesh，地形和水面主要靠 shader 与后处理，几何最轻。Opus 5.5 版 6 个 Mesh、8 处阴影相关调用，画面更依赖阴影和 bloom，滑翔模式与前两者一致。DeepSeek 把地形和水面压进少量 geometry，再用雾把远处海岸线吃掉；Web 版则用独立的实例化层分别控制陆地、水、云和植被的密度，因此远景的体素颗粒更清楚。",
+      "en": "The CLI build shapes the terrain with two InstancedMesh groups and six BoxGeometry calls, then uses shaders for water and sky, plus a glide-mode button. The web build splits terrain, water, clouds and vegetation into seven instanced layers—the finest instancing of the four—and offers a glide view over the 96×96 archipelago. DeepSeek uses only three meshes; terrain and water depend on shaders and post-processing, making it the lightest geometry. Opus 5.5 has six meshes and eight shadow-related calls, so it leans more on shadows and bloom, with the same glide-mode control. DeepSeek compresses terrain and water into a few geometries and lets fog swallow the distant coastline; the web build uses separate instanced layers for land, water, clouds and vegetation, so the voxel grain remains clearer in the distance."
+    }
+  },
+  "sakura-pagoda": {
+    "intro": {
+      "zh": "樱花庭园中的多层宝塔，彩色体素拼出春日小景，花瓣会飘落，池水与石桥构成可环顾的微缩世界。它测试模型对体素堆叠、植被与花瓣粒子、光照氛围和相机预设的组织。",
+      "en": "A multi-tiered pagoda in a cherry-blossom garden, built from colourful voxels with falling petals, a pond and a bridge. It tests voxel stacking, vegetation and petal particles, lighting moods and camera presets."
+    },
+    "comparison": {
+      "zh": "Web 版控制最丰富：春日晴空、落日余晖、月夜樱灯三种光照，加上全景、仰望古塔、太鼓桥与锦鲤、竹林茶席四个机位，以及自动环绕，共 8 个按钮；体素被拆成多个 InstancedMesh。Opus 5.5 版只保留夜景、起风和自动旋转三个按钮，但把花瓣、水面和灯笼压进 shader 与 bloom，画面更偏夜间氛围。DeepSeek 版没有任何按钮，用 InstancedMesh 处理结构与花瓣，视角完全交给 OrbitControls，是最安静的一版。Web 版的 8 个按钮中 3 个是光照、4 个是机位、1 个是自动环绕；Opus 5.5 的夜景会改变天空和雾的颜色，起风按钮则直接提高花瓣的水平速度。",
+      "en": "The web build has the richest controls: three lighting moods (spring noon, sunset, moonlit lanterns) and four camera presets—overview, looking up at the pagoda, the drum bridge and koi, and the bamboo tea seat—plus auto-orbit, eight buttons in all, with voxels split across several InstancedMesh groups. Opus 5.5 keeps only night, wind and auto-rotate, but pushes petals, water and lanterns into shaders and bloom for a stronger night mood. DeepSeek has no buttons at all, instanced structure and petals, and leaves the view entirely to OrbitControls—the quietest version. Of the web build's eight buttons, three are lighting moods, four are camera presets and one is auto-orbit; Opus 5.5's night mode changes the sky and fog colours, while the wind button directly increases the petals' horizontal speed."
+    }
+  },
+  "soccer": {
+    "intro": {
+      "zh": "方块前锋带球连过两名后卫，在禁区外起脚破门，进球后放庆祝粒子。场景把一段有明确时间线的足球动画压缩进循环，测试模型的角色动作、球体运动、镜头调度和进球反馈。",
+      "en": "A blocky striker dribbles past two defenders and scores from outside the box, followed by celebration particles. The scene compresses a timed football sequence into a loop, testing character motion, ball movement, camera direction and goal feedback."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版最轻，6 个 Mesh 加 1 个 InstancedMesh，没有 UI，动画自动循环，镜头固定在一个斜俯视机位，重点全在带球与射门的关键帧。Opus 5.5 版把比赛感做出来：镜头跟随开关、重新播放、慢动作提示和 GOAL 大字叠加，18 个 Mesh 与 5 个 InstancedMesh 支撑球员和观众。Web 版按钮更多，重新开球、慢镜回放、导播跟随三档，44 个 Mesh 和 40 个 BoxGeometry 把球场、球员和广告牌拆得更细。Opus 5.5 在进球后自动进入慢镜头并弹出 GOAL 字幕；Web 的慢镜按钮把时间步长降到 0.35 倍，重新开球会重置整段动画。",
+      "en": "DeepSeek is the lightest: six meshes plus one InstancedMesh, no UI, an auto-looping animation and a fixed three-quarter camera, with the work concentrated on the dribble-and-shot keyframes. Opus 5.5 adds a match feel—follow-camera toggle, replay, a slow-motion badge and a large GOAL overlay—with 18 meshes and five InstancedMesh groups for players and crowd. The web build has more controls (restart, slow replay, director-follow toggle) and 44 meshes including 40 BoxGeometry calls, giving the pitch, players and advertising boards more separate parts. Opus 5.5 automatically drops into slow motion at the goal and pops a GOAL caption; the web slow-motion button reduces the time step to 0.35x, and restart resets the whole sequence."
+    }
+  },
+  "peashooter": {
+    "intro": {
+      "zh": "植物大战僵尸里的豌豆射手被做成体素挂件，会瞄准附近的僵尸头并发射豌豆。场景测试模型如何把角色建模、瞄准/射击逻辑、命中反馈和挂件式小 UI 组合成一个可反复玩的小互动。",
+      "en": "A voxel Peashooter charm that aims at nearby zombie heads and fires peas. It tests how a model combines character modelling, aiming and shooting logic, hit feedback and a compact charm-like UI into a repeatable little interaction."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版最简：2 个 Mesh 加 2 个 InstancedMesh，没有按钮，点击屏幕就朝最近的僵尸头射击，右上角只记命中数。Opus 5.5 版把互动拆成自动射击开关、摇一摇和音效三个按钮，并显示击退僵尸与豌豆数量，8 个 Mesh 里包含更完整的头部和叶片。Web 版按钮最多，除了音效、发射、能量豆、摸叶片、换僵尸防具、晃动挂件，还能切换经典/寒冰/烈火三种豌豆，并用阳光数值把挂件做成一个小工作台。Web 版还把阳光数值、三种豌豆颜色和僵尸防具串成一条小循环，Opus 5.5 则用自动射击和音效把操作压到三个按钮。",
+      "en": "DeepSeek is the simplest: two meshes and two InstancedMesh groups, no buttons; clicking the screen fires at the nearest zombie head and the HUD only counts hits. Opus 5.5 splits interaction into auto-fire, shake and sound toggles, shows zombie and pea counters, and uses eight meshes for a more complete head and leaves. The web build has the most buttons—sound, fire, energy bean, leaf touch, zombie armour and charm shake—and adds classic, ice and fire pea variants, using a sunshine counter to turn the charm into a small workbench. The web build also ties the sunshine counter, three pea colours and zombie armour into a small loop, while Opus 5.5 reduces the controls to auto-fire, shake and sound."
+    }
+  },
+  "ship-bottle": {
+    "intro": {
+      "zh": "一只体素帆船被封在玻璃瓶里，随着程序化波浪起伏，瓶外还有漂流物和光源。场景测试模型对玻璃材质、波浪/浮力、瓶中尺度感和围绕瓶子的相机控制的理解。",
+      "en": "A voxel sailing ship sealed inside a glass bottle, rocking on procedural waves with floating objects and lights around it. It tests glass materials, wave and buoyancy behaviour, the sense of scale inside the bottle, and camera control around it."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 8 个 Mesh 和 3 个 InstancedMesh，靠一个 waveAt 函数让船和漂流物上下浮动，没有 UI，镜头只做环绕，是最纯粹的静态展示。Opus 5.5 版增加摇晃瓶子、投放漂流物和昼夜切换三个按钮，并用 4 个 InstancedMesh 与 bloom 处理瓶身反光和漂浮物。Web 版直接做成航海控制台：晴空/落日/暴雨/荧光星海四种天气，摇晃、巨浪、舷炮、海怪四类互动，四个机位和三条滑杆，浮力与波浪代码也最完整。Web 的四个机位分别是全景、船长甲板、灯塔和瓶口，三条滑杆控制风力、浪速和玻璃通透度。",
+      "en": "DeepSeek uses eight meshes and three InstancedMesh groups; a single waveAt function bobs the ship and floaters, there is no UI, and the camera only orbits—the most static presentation. Opus 5.5 adds shake, drop-a-floater and day/night buttons, with four instanced groups and bloom for the bottle reflections and drifting objects. The web build turns the scene into a sailing console: four weather moods (clear, sunset, storm, glowing star sea), shake, rogue wave, cannon and kraken interactions, four camera positions and three sliders, backed by the most complete buoyancy and wave code. Its four camera positions are overview, captain's deck, lighthouse and bottle mouth, and three sliders control wind, wave speed and glass transparency."
+    }
+  },
+  "kingdom": {
+    "intro": {
+      "zh": "带护城河的中央城堡，四周是村庄、田野、风车与海港，全部由彩色体素堆成。场景测试模型对大规模体素场景的规划、实例化性能、光照时间变化和多机位导览的组织。",
+      "en": "A moated central castle surrounded by villages, fields, windmills and a harbour, all built from coloured voxels. It tests planning at voxel-city scale, instancing performance, time-of-day lighting and multi-view navigation."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版把地形、建筑、水面和云分别塞进 4 个 InstancedMesh，没有 UI，镜头从一个固定斜角展示全城，代码只有 1025 行，走的是极简路线。Opus 5.5 版用 21 个 Mesh 和 shader 水面，只提供一个自动环绕开关，但城堡、桥梁和树木的独立构件更多。Web 版最像导览：六个机位（全景、城堡、集市、风车、魔塔、海港），三种时间（晴日、黄昏、星夜）和环绕开关，还加入 4 个 PointLight 与浮空水晶，代码 1776 行。Opus 5.5 的自动环绕默认开启，DeepSeek 则完全没有相机控制按钮，Web 的六个机位可以一键跳到城堡、集市、风车、魔塔或海港。",
+      "en": "DeepSeek packs terrain, buildings, water and clouds into four InstancedMesh groups with no UI; the camera shows the city from one fixed angle and the whole file is only 1,025 lines—a minimal approach. Opus 5.5 uses 21 meshes and a shader-driven moat, offers only an auto-orbit toggle, but models the castle, bridges and trees as more separate parts. The web build is the guided tour: six camera positions (overview, castle, market, windmill, floating tower, harbour), three times of day (clear, dusk, starry night) and an orbit toggle, plus four point lights and floating crystals, in 1,776 lines. Opus 5.5 starts with auto-orbit on, DeepSeek has no camera controls at all, and the web build's six presets jump straight to the castle, market, windmill, floating tower or harbour."
+    }
+  },
+  "jp-garden": {
+    "intro": {
+      "zh": "体素日式庭园：五重塔、樱花、锦鲤池、石灯笼和小村民，一条飞龙在庭园上空盘旋。场景测试模型如何把静态箱庭、可点击的小互动、昼夜/天气变化和飞行生物放在同一个画面里。",
+      "en": "A voxel Japanese garden with a five-storey pagoda, cherry trees, a koi pond, stone lanterns and villagers, while a dragon circles overhead. It tests how a model combines a static diorama, clickable details, day/night or weather changes and a flying creature in one scene."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 16 个 Mesh 和 3 个文字开关（夜晚、花瓣雨、复位），点击灯笼、樱花、龙、池塘或村民会触发不同反应，但没有音频。Opus 5.5 版把控制收成两个按钮（切换夜晚、召唤龙神），用 3 个 InstancedMesh 处理花瓣与植被，并加入音效和更密的点击标注。Web 版最完整：三种时间、追随瑞龙、漫天樱吹雪、撞钟、投喂锦鲤共 7 个按钮，4 个 InstancedMesh，多组 raycast 交互，还配了环境音。DeepSeek 的飞龙沿一条闭合 CatmullRom 曲线循环，点击它会临时加速；Web 和 Opus 5.5 则把龙、锦鲤、樱花和钟声拆成不同的点击目标。",
+      "en": "DeepSeek uses 16 meshes and three text toggles (night, petal rain, reset); clicking lanterns, cherry trees, the dragon, pond or villagers triggers different reactions, but there is no audio. Opus 5.5 reduces the controls to two buttons (toggle night, summon the dragon), uses three InstancedMesh groups for petals and vegetation, and adds sound plus denser click labels. The web build is the fullest: three times of day, follow-the-dragon, cherry-blossom blizzard, temple bell and koi feeding—seven buttons—with four instanced groups, several raycast interactions and ambient audio. DeepSeek's dragon follows a closed CatmullRom curve and speeds up when clicked, while the web and Opus 5.5 builds split dragon, koi, cherry trees and bell into separate click targets."
+    }
+  },
+  "steam-train": {
+    "intro": {
+      "zh": "体素蒸汽火车在日落时分穿过河谷，车头喷烟，轨道沿山体弯曲。场景测试模型对体素列车、轨道曲线、河谷地形和落日气氛的整体构图，以及列车动画与相机跟随的配合。",
+      "en": "A voxel steam train crosses a river valley at sunset, smoke trailing from the locomotive as the track curves along the hillside. It tests overall composition of train, curved track, valley terrain and sunset light, plus the coordination of train animation and camera follow."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 23 个 Mesh 和 4 个 InstancedMesh 搭出列车、河谷与植被，没有 UI，镜头固定在斜俯视位置，列车沿轨道自动行驶，是纯粹的循环动画。Opus 5.5 版换成 26 个 Mesh、2 个 InstancedMesh，增加「跟随火车」按钮和更明显的点光源/聚光灯，烟囱与车厢的体素拆分更细。两版都保留 OrbitControls 和滑翔式观察，但 Opus 5.5 的相机可以跟着车头走，DeepSeek 只能自己拖动找角度。Opus 5.5 的跟随按钮会把相机挂到车头前方，配合 SpotLight 让蒸汽和烟囱成为画面中心；DeepSeek 没有跟随控制，但轨道和河谷的体素层次更概括。",
+      "en": "DeepSeek builds the train, valley and vegetation from 23 meshes and four InstancedMesh groups, with no UI: the camera stays at a three-quarter angle while the train runs the track in a pure loop. Opus 5.5 uses 26 meshes and two instanced groups, adds a follow-the-train button and more visible point and spot lights, and splits the chimney and carriages into finer voxel parts. Both keep OrbitControls for free viewing, but Opus 5.5's camera can ride with the locomotive, while DeepSeek leaves you to drag your own viewpoint. Opus 5.5's follow button attaches the camera ahead of the locomotive, and a spot light makes the chimney and steam the centre of the frame; DeepSeek has no follow control, but its track and valley are more summarised."
+    }
+  },
+  "f1-car": {
+    "intro": {
+      "zh": "梅赛德斯-AMG 的体素 F1 赛车，从银黑涂装、轮胎配方到 DRS 尾翼和风洞气流都被做成可切换的展示。场景测试模型能否把一辆车拆成大量体素后，仍然组织出清晰的展厅 UI、机位和动态部件。",
+      "en": "A voxel Mercedes-AMG F1 car with switchable liveries, tyre compounds, DRS rear wing and wind-tunnel flow. It tests whether a model can break a car into many voxels and still organise a clear showroom UI, camera views and moving parts."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版只有 6 个 Mesh 和 2 个 BoxGeometry，没有按钮，靠 OrbitControls 看一辆概况式的体素车，是四版里最轻的。Opus 5.5 版用 2 个 InstancedMesh 堆出车身，提供启动引擎、DRS 开启、自动旋转三个按钮，但没有涂装或轮胎切换。Flash 版把展示做成 8 个按钮：高速/展台两种模式、赛道日光/夜赛霓虹、四个预设机位，并用 2 个 InstancedMesh 负责车轮与车身。Web 版最完整：14 个按钮覆盖极速巡航、DRS、风洞、拆解、三套轮胎、三套涂装和展厅/Halo/前翼/扩散器机位。Flash 的日光/夜赛会切换雾色与环境光，Opus 5.5 的 DRS 只开合尾翼襟翼，Web 的三套轮胎会改变胎壁颜色。",
+      "en": "DeepSeek has only six meshes and two BoxGeometry calls, no buttons, and a single OrbitControls view of a summarised voxel car—the lightest of the four. Opus 5.5 builds the body from two InstancedMesh groups and offers start-engine, DRS and auto-rotate buttons, but no livery or tyre changes. Flash turns the scene into an eight-button display: high-speed and showroom modes, daylight and night-race lighting, and four preset cameras, with two instanced groups for wheels and body. The web build is the fullest: fourteen buttons covering top-speed cruise, DRS, wind tunnel, exploded view, three tyre compounds, three liveries, and showroom/Halo/front-wing/diffuser cameras. Flash's day/night presets switch fog colour and environment light, Opus 5.5's DRS button only opens the rear-wing flap, and the web build's three tyre compounds change the sidewall colours."
+    }
+  },
+  "optimus": {
+    "intro": {
+      "zh": "红蓝灰配色的卡车头可以在行驶与变形之间切换，变形成人形后还能用 WASD 行走。场景测试模型对多部件机械变形、载具/人形两套运动逻辑和 HUD 状态反馈的组织能力。",
+      "en": "A red, blue and grey truck cab switches between driving and a robot form, then walks with WASD. It tests multi-part mechanical transformation, two sets of locomotion logic (vehicle and humanoid) and HUD state feedback."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版最简：5 个 Mesh 加 3 个 Cylinder，只有一个 T 变形按钮，卡车与人形共用少量部件，WASD 只负责平面移动。Opus 5.5 版扩到 18 个 Mesh 和 2 个 InstancedMesh，增加鸣笛按钮、音效和变形时的火花粒子，卡车/人形状态与速度显示更完整。Web 版把变形拆成 5 个阶段并实时显示进度，62 个 Mesh 支撑武器切换、领导模块、远光、音效和自由/跟随两种视角，是三版里唯一把变形过程当成一段可观看演出的版本。Web 的 5 个阶段从底盘解锁、悬挂抬升开始，HUD 会显示当前阶段和剩余时间；Opus 5.5 的变形更短，但鸣笛和火花让过程更有反馈。",
+      "en": "DeepSeek is the simplest: five meshes and three cylinders, one T-transform button, a truck and robot sharing a small set of parts, and WASD for flat movement. Opus 5.5 expands to 18 meshes and two InstancedMesh groups, adds a horn button, sound and spark particles during transformation, and shows truck/robot state and speed more fully. The web build splits the transformation into five stages with live progress; 62 meshes support weapon switching, the Matrix, high beams, sound and free/follow cameras, making it the only version that treats the transformation as a watchable sequence. The web build's five stages start with chassis unlock and suspension lift, and the HUD shows the current stage and remaining time; Opus 5.5's transformation is shorter, but the horn and sparks add feedback."
+    }
+  },
+  "lego-ferrari": {
+    "intro": {
+      "zh": "一辆法拉利超跑被做成可拆解的教学模型：车身、V12/V8 发动机、悬挂和空气动力学部件可以分层展开。场景测试模型对复杂机械装配、教学卡片、爆炸视图和实时工况模拟的综合能力。",
+      "en": "A Ferrari supercar presented as a disassemblable teaching model: body, V12/V8 engine, suspension and aero parts can be opened layer by layer. It tests complex mechanical assembly, teaching cards, exploded views and live operating-state simulation."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 24 个 Mesh 和 7 个按钮做 V12 教学：拆解视图、引擎运转、车轮转动、显示标注、重置视角和部件讲解卡，结构清楚但几何偏概括。Opus 5.5 版改成中置 V8，19 个按钮和三条滑杆覆盖目标车速、方向盘、爆炸度、透视、气流、尾翼、蝴蝶门、夜间、颠簸、慢动作、声浪、标注和紧急制动，交互密度最高。Web 版用 90 个 Mesh 做 LaFerrari V12，17 个按钮配合七步教学卡片、风洞流线和碳陶制动，是三版里最接近完整 JigSpace 式课件的版本。Opus 5.5 的 8 个气缸会按冲程分别高亮进气/压缩/做功/排气，Web 则用七步卡片把整车、空气动力学、单体壳和 V12 拆成课程。",
+      "en": "DeepSeek uses 24 meshes and seven buttons for a V12 lesson: exploded view, engine run, wheel spin, labels, reset and part cards—clear, but geometrically summarised. Opus 5.5 switches to a mid-engined V8 and packs in nineteen buttons plus three sliders for target speed, steering, explode amount, x-ray, airflow, active wing, butterfly doors, night, bumpy road, slow motion, engine sound, labels and emergency braking, giving it the highest interaction density. The web build uses 90 meshes for a LaFerrari V12, with seventeen buttons, seven teaching cards, wind-tunnel streamlines and carbon-ceramic braking—the closest to a full JigSpace-style lesson. Opus 5.5 highlights each of the eight cylinders by intake, compression, power or exhaust stroke, while the web build uses seven cards to turn body, aero, monocoque and V12 into a lesson."
+    }
+  },
+  "skyraider": {
+    "intro": {
+      "zh": "道格拉斯 A-1H 天袭者的螺旋桨攻击机，机翼、挂架、炸弹和起落架都程序化建模。场景测试模型对老式舰载机的比例、细节和可动画部件（螺旋桨、起落架、折叠翼）的把握。",
+      "en": "A Douglas A-1H Skyraider propeller attack aircraft, with wings, pylons, bombs and landing gear modelled procedurally. It tests proportion and detail on a classic carrier aircraft, plus animatable parts such as the propeller, landing gear and folding wings."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 32 个 Mesh 把机身、机翼、挂架和炸弹搭出来，螺旋桨持续旋转，但没有 UI，起落架和机翼也不能动，观众只能环绕观察。Opus 5.5 版增加到 55 个 Mesh，并把可动部件真正接上按钮：启动发动机、收起起落架、折叠机翼、自动环绕，机翼和起落架各有独立枢轴。两版都保留 OrbitControls，但 Opus 5.5 把静态模型变成了可演示的舰载机操作流程。Opus 5.5 的四个按钮集中在右上角面板，启动发动机后螺旋桨加速，收起起落架和折叠机翼各有独立动画；DeepSeek 只让螺旋桨匀速转，机身和挂架更概括。",
+      "en": "DeepSeek uses 32 meshes for the fuselage, wings, pylons and bombs; the propeller spins continuously, but there is no UI and neither the gear nor the wings move, so the viewer can only orbit. Opus 5.5 grows to 55 meshes and wires the movable parts to buttons: start engine, retract gear, fold wings and auto-orbit, with separate pivots for the wing folds and landing gear. Both keep OrbitControls, but Opus 5.5 turns a static model into a short carrier-aircraft demonstration. Opus 5.5's four buttons sit in a top-right panel; starting the engine spins up the propeller, while gear retraction and wing folding have separate animations. DeepSeek only turns the propeller at a constant rate and summarises the airframe and pylons."
+    }
+  },
+  "inline-four": {
+    "intro": {
+      "zh": "直列四缸 DOHC 发动机的活塞、曲轴、凸轮和气门按点火顺序 1-3-4-2 联动，可以悬停识别部件并一键分解。场景测试模型对机械传动关系、透明/爆炸视图和部件说明系统的实现。",
+      "en": "An inline-four DOHC engine whose pistons, crankshaft, cams and valves move in firing order 1-3-4-2, with hover identification and one-click exploded views. It tests mechanical linkage, transparent/exploded presentations and part-description systems."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 3 个 Mesh 加 19 个 BoxGeometry、4 个 RoundedBoxGeometry 和 15 个 CylinderGeometry 搭发动机，CSS2D 标注和悬停高亮是主要交互，按钮只有「爆炸视图」，几何偏骨架化。Flash 版用 40 个 Mesh、20 个 Cylinder，三个按钮（零件炸开、暂停、透明缸体）加右侧零件说明面板，是最早把教学信息面板做完整的版本。Opus 5.5 版用 20 个 BoxGeometry 和 11 个 RoundedBoxGeometry 和 CSS2D 标注，增加透视与气流开关，点火顺序用四个高亮标签实时显示。Web 版 73 个 Mesh、39 个 Cylinder，悬停高亮、爆炸、暂停、缸体透视、转速滑杆齐全，部件数量和标注密度最高。Flash 的右侧面板会随悬停部件更新名称和功能，Web 的转速滑杆可以从 650 RPM 起调，Opus 5.5 的气流开关则用粒子显示进排气路径。",
+      "en": "DeepSeek builds the engine from three meshes plus 19 BoxGeometry, four RoundedBoxGeometry and 15 CylinderGeometry calls; CSS2D labels and hover highlighting carry the interaction, with only an exploded-view button, so the geometry stays skeletal. Flash uses 40 meshes and 20 cylinders, three buttons (explode, pause, transparent block) and a part-description panel, making it the first version with a complete teaching panel. Opus 5.5 uses 20 BoxGeometry and eleven RoundedBoxGeometry calls and CSS2D labels, adds x-ray and airflow toggles, and shows firing order with four live highlighted labels. The web build has 73 meshes and 39 cylinders, with hover highlighting, explode, pause, block x-ray and a speed slider, giving it the highest part and label density. Flash's side panel updates the part name and function on hover, the web build's speed slider starts at 650 RPM, and Opus 5.5's airflow toggle uses particles to show the intake and exhaust path."
+    }
+  },
+  "raptor": {
+    "intro": {
+      "zh": "SpaceX 猛禽火箭发动机的全流量分级燃烧循环模型，包含涡轮泵、主燃烧室、喷管和阀门管路。场景测试模型对复杂管路、发动机剖视、点火/矢量摆动等动态演示以及遥测 UI 的处理。",
+      "en": "A SpaceX Raptor engine built around its full-flow staged-combustion cycle, with turbopumps, main chamber, nozzle and plumbing. It tests complex pipework, cutaway presentation, dynamic demos such as ignition and gimbal, and telemetry UI."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版最轻：20 个 Mesh，没有 UI，靠 OrbitControls 展示一台静态猛禽，喷管和管路用基础几何体概括。Opus 5.5 版用 33 个 CylinderGeometry 和 5 个 Sphere 把管路做得更密，提供点火、爆炸视图、矢量摆动、自动旋转四个按钮和节流滑杆，是中等密度的可演示模型。Web 版 48 个 Mesh、19 个 Cylinder，九个按钮覆盖全推力点火、结构标注、自动环绕、喷管半剖、推进剂流向和四个机位，外加三条滑杆与实时遥测，是三版里最完整的试车台演示。Web 的遥测面板会同步显示主燃烧室压力、海平面推力、涡轮转速和真空比冲，Opus 5.5 的节流滑杆只控制推力百分比，DeepSeek 连点火按钮都没有。",
+      "en": "DeepSeek is the lightest: twenty meshes, no UI, OrbitControls only, and a static Raptor whose nozzle and plumbing are summarised with basic geometry. Opus 5.5 uses 33 CylinderGeometry calls and five spheres for denser plumbing, with ignition, exploded view, gimbal and auto-rotate buttons plus a throttle slider—a medium-density demonstrator. The web build has 48 meshes and 19 cylinders, nine buttons covering full-thrust ignition, structural labels, auto-orbit, nozzle cutaway, propellant flow and four camera views, plus three sliders and live telemetry—the most complete test-stand presentation of the three. The web telemetry panel reports chamber pressure, sea-level thrust, turbopump speed and vacuum Isp together; Opus 5.5's throttle slider only sets thrust percentage, and DeepSeek has no ignition button at all."
+    }
+  },
+  "steam-engine": {
+    "intro": {
+      "zh": "一台双作用卧式蒸汽机原型：活塞、连杆、曲柄、飞轮和滑阀配气机构按同一相位联动。场景测试模型对往复运动、剖面透视、转速/节气门控制和部件说明的表达。",
+      "en": "A double-acting horizontal steam engine prototype, with piston, connecting rod, crank, flywheel and slide valve moving in one phase. It tests reciprocating motion, cutaway views, speed/throttle control and part explanations."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 10 个 BoxGeometry 和 17 个 CylinderGeometry 搭出气缸、飞轮和连杆，只有一个曲轴转速滑杆，没有部件标签或剖面按钮，适合安静观察运动关系。Opus 5.5 版增加节气门滑杆和剖视、暂停、环绕三个按钮，用 9 个 Sphere 表示蒸汽腔，并给主要部件写了中文标签数据。Web 版最完整：92 个 Mesh 把锅炉、D 型滑阀、离心调速器、飞轮和管路拆开，两个滑杆控制节气门与炉火，九个按钮覆盖剖面、慢动作、标签、音效、汽笛和四个机位。Web 的部件标签可以点击聚焦到对应机位，汽笛按钮支持长按；Opus 5.5 的剖视会把气缸和汽室切开，DeepSeek 则始终显示完整外壳。",
+      "en": "DeepSeek builds the cylinder, flywheel and connecting rod from ten BoxGeometry and seventeen CylinderGeometry calls, with only a crankshaft-speed slider and no part labels or cutaway button—good for watching the motion quietly. Opus 5.5 adds a throttle slider and cutaway, pause and orbit buttons, uses nine spheres for steam volumes, and stores Chinese labels for the main parts. The web build is the fullest: 92 meshes separate the boiler, D-valve, centrifugal governor, flywheel and piping; two sliders control throttle and furnace; nine buttons cover cutaway, slow motion, labels, sound, whistle and four camera views. The web build's part labels can be clicked to focus the matching camera, and the whistle supports press-and-hold; Opus 5.5's cutaway opens the cylinder and steam chest, while DeepSeek always shows the complete casing."
+    }
+  },
+  "starship": {
+    "intro": {
+      "zh": "SpaceX 星舰与超重型助推器停在星港发射台上，包含格栅翼、发动机和发射塔。场景测试模型对大型航天器的比例、发射时序、部件标注和多机位展示的组织。",
+      "en": "SpaceX Starship and its Super Heavy booster on a starbase launch mount, with grid fins, engines and launch tower. It tests scale on a large vehicle, launch sequencing, part labels and multi-view presentation."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 11 个 Mesh 和 bloom 做出一枚简洁的星舰，没有 UI，镜头只做环绕，重点在箭体轮廓和夜色中的发光。Opus 5.5 版扩到 68 个 Mesh，加入发射倒计时/高度/速度遥测、八个按钮（点火发射、分解视图、部件标注、全景/发动机/栅格翼/星舰/发射塔机位）和 CSS2D 部件标注，是唯一把发射流程做成时间线的版本。两版都保留 OrbitControls，但 Opus 5.5 的展示更接近一个可操作的星港模型。Opus 5.5 的发射按钮会启动倒计时并更新高度/速度，分解视图把助推器和上级拆开，部件标注用 CSS2D 贴在箭体上；DeepSeek 的星舰更像一件静态展品。",
+      "en": "DeepSeek uses eleven meshes and bloom for a clean Starship, with no UI, an orbiting camera and the emphasis on the vehicle silhouette and its night glow. Opus 5.5 grows to 68 meshes and adds a launch countdown with altitude and speed telemetry, eight buttons (ignition, exploded view, part labels, overview/engine/grid-fin/Starship/tower cameras) and CSS2D part labels, making it the only version that turns the launch into a timeline. Both keep OrbitControls, but Opus 5.5 feels like an operable starbase model. Opus 5.5's launch button starts a countdown and updates altitude and speed; the exploded view separates booster and upper stage, and CSS2D labels pin part names to the vehicle. DeepSeek's Starship is closer to a static exhibit."
+    }
+  },
+  "earth": {
+    "intro": {
+      "zh": "一颗尽量精细的程序化地球：大陆、云层、城市灯光、大气散射和昼夜线都由代码生成。场景测试模型对大规模 shader、纹理烘焙、星球光照和图层控制的理解。",
+      "en": "A detailed procedural Earth whose continents, clouds, city lights, atmospheric scattering and day/night line are all generated in code. It tests large shader programs, texture baking, planetary lighting and layer controls."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 3 个 Mesh 和 多组 shader 处理地球、云层和星空，没有 UI，代码 995 行，是纯观赏型。Flash 版用 6 个 Mesh，把昼夜贴图、云层和大气拆成独立贴图与材质，也没有控制面板，但画面信息更密。Opus 5.5 版增加自转、云层、城市灯光、大气四个开关和太阳角度滑杆，并加 bloom，让昼夜过渡更可控。Web 版最完整：11 个按钮、5 条滑杆，四个氛围预设，动态云层、城市灯火、极光、航线、地标、卫星、地月伴行等图层都能单独开关，还支持双击城市聚焦，代码 1998 行。",
+      "en": "DeepSeek uses three meshes and several shader programs for Earth, clouds and stars, with no UI, in 995 lines—purely observational. Flash uses six meshes and splits the day/night map, clouds and atmosphere into separate textures and materials; it also has no control panel, but carries more visual information. Opus 5.5 adds toggles for rotation, clouds, city lights and atmosphere plus a sun-angle slider and bloom, making the terminator more controllable. The web build is the fullest: eleven buttons, five sliders, four atmosphere presets, and independent layers for dynamic clouds, city lights, aurora, routes, landmarks, satellites and the Moon, with double-click city focus, in 1,998 lines."
+    }
+  },
+  "black-hole": {
+    "intro": {
+      "zh": "卡冈图雅式黑洞：纯黑事件视界、锐利光子环、引力透镜扭曲的星空和旋转吸积盘。场景测试模型对全屏后处理 shader、粒子盘、多普勒增亮和参数化观测台的理解。",
+      "en": "A Gargantua-style black hole with a pure-black event horizon, a sharp photon ring, gravitationally lensed starfield and a rotating accretion disk. It tests full-screen post-processing shaders, particle disks, Doppler brightening and a parameterised observation console."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 6000 个粒子、透镜 ShaderPass 和 bloom，配四条滑杆和透镜开关，几何体只有 3 个 Mesh，重点全在 shader 与粒子。Flash 版把吸积盘拆成更多 Mesh 和 4000 个粒子，控制台更偏「观测状态」文字反馈，视觉上更强调盘面层次。Opus 5.5 版代码最短（597 行），只用 1 个 Mesh 和 4000 个粒子，把黑洞、盘和透镜压进少量 shader，是最精简的一版。Web 版 1208 行、1 个 Mesh、3200 个粒子，控制台附有大段引力透镜/多普勒说明和多个观测状态文案，信息量最大。Web 的控制台还会根据黑洞质量、亮度和透镜开关切换观测文案，Opus 5.5 的面板可以折叠，DeepSeek 和 Flash 则始终展开。",
+      "en": "DeepSeek uses 6,000 particles, a lensing ShaderPass and bloom, with four sliders and a lensing toggle; there are only three meshes, so the work sits in shaders and particles. Flash spreads the disk across more meshes and 4,000 particles, and its console leans on observation-status text, with more visible disk layering. Opus 5.5 is the shortest at 597 lines, using one mesh and 4,000 particles and compressing black hole, disk and lensing into a few shaders—the most minimal version. The web build is 1,208 lines with one mesh and 3,200 particles, and its console adds long explanations of lensing and Doppler beaming plus several observation states, carrying the most information. The web console changes its observation text with black-hole mass, brightness and lensing, Opus 5.5's panel can fold away, while DeepSeek and Flash keep their controls open."
+    }
+  },
+  "floating-islands": {
+    "intro": {
+      "zh": "黄金时刻的浮空岛群：瀑布、遗迹、飞艇和可自由飞行的相机。场景测试模型对大规模地形/植被、体积感云层、第一人称飞行控制和移动端摇杆的整合。",
+      "en": "Floating islands at golden hour, with waterfalls, ruins, airships and a free-flying camera. It tests large terrain and vegetation, volumetric clouds, first-person flight controls and mobile joystick integration."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 12 个 Mesh 和 3 个 Group 搭出岛群与瀑布，PC 端 WASD + 指针锁定，移动端有摇杆和升降按钮，但没有 bloom，云层主要靠 shader 雾。Flash 版 18 个 Mesh，增加体积云、水面反射和更明显的黄金时刻雾，移动端摇杆与触摸转视角分开。Opus 5.5 版 16 个 Mesh 加 3 个 InstancedMesh，把植被和云实例化，控制收成「升/降」两个按钮和左下摇杆，代码只有 796 行。Web 版 25 个 Mesh、大量阴影调用，瀑布、水面、云和植被最完整，并同时支持 PointerLock、拖拽和移动端摇杆。Web 的瀑布和水面层次最多，Opus 5.5 的云和植被用实例化减少 draw call，Flash 的雾最浓，DeepSeek 的远景最干净。",
+      "en": "DeepSeek uses twelve meshes and three groups for the islands and waterfalls, with WASD and pointer lock on desktop and a joystick plus up/down buttons on mobile; it has no bloom, and clouds come mainly from shader fog. Flash uses 18 meshes, adds volumetric clouds, water reflections and stronger golden-hour haze, and separates the mobile joystick from touch-look. Opus 5.5 has 16 meshes plus three InstancedMesh groups for vegetation and clouds, reduces the controls to up/down buttons and a left joystick, and is only 796 lines. The web build has 25 meshes and heavy shadow use, the most complete waterfalls, water, clouds and vegetation, and supports pointer lock, drag-look and a mobile joystick. The web build has the most layered waterfalls and water, Opus 5.5 uses instancing for clouds and vegetation to cut draw calls, Flash has the thickest haze, and DeepSeek keeps the cleanest distance."
+    }
+  },
+  "cartoon-planet": {
+    "intro": {
+      "zh": "漫画风的小星球：云、山、城市、汽车和飞机都贴在球面上绕行。场景测试模型对球形世界坐标、卡通描边/材质、多物体轨道动画和昼夜切换的处理。",
+      "en": "A comic-style mini planet with clouds, mountains, cities, cars and airplanes wrapped around its surface. It tests spherical world coordinates, toon outlines and materials, multi-object orbital animation and day/night switching."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版用 14 个 Mesh 和 1 个 InstancedMesh 搭出星球、城市和车辆，没有 UI，镜头固定环绕，所有物体按球面角度自动运行，是最轻的版本。Opus 5.5 版同样没有按钮，但用 6 个 InstancedMesh 做树冠、建筑和飞机尾迹，并用描边材质加强漫画感，32 个 Mesh 让城市更密。Flash 版增加自由视点、跟随小飞机、跟随小巴士、加速公转、昼夜切换五个按钮，32 个 Mesh 与 14 个 Group 把场景组织成可切换视角的微缩世界。Web 版 45 个 Mesh，四个按钮（全景、跟车、跟飞机、昼夜），但城市、道路、飞机和昼夜材质的细节最多。",
+      "en": "DeepSeek uses fourteen meshes and one InstancedMesh for the planet, cities and vehicles, with no UI, a fixed orbit camera and everything moving by spherical angle—the lightest version. Opus 5.5 also has no buttons, but uses six InstancedMesh groups for tree crowns, buildings and airplane trails, with outline materials for a stronger comic look and 32 meshes for a denser city. Flash adds five buttons (free view, follow plane, follow bus, speed up orbit, day/night) and organises the scene into 32 meshes and fourteen groups with switchable viewpoints. The web build has 45 meshes and four buttons (overview, follow car, follow plane, day/night), but the most detailed city, roads, aircraft and day/night materials."
+    }
+  },
+  "sky-arc-train": {
+    "intro": {
+      "zh": "云海之上的 C 形高架轨道、维多利亚玻璃车站和一列星轨蒸汽列车，25 秒一镜到底循环运镜。场景测试模型对长镜头调度、云海 shader、蒸汽/星轨粒子和复杂场景性能的控制。",
+      "en": "A C-shaped elevated track above a sea of clouds, a Victorian glass station and an astral steam train, with a 25-second continuous camera loop. It tests long-take camera direction, cloud shaders, steam and star-trail particles, and performance in a dense scene."
+    },
+    "comparison": {
+      "zh": "DeepSeek 版最重：41 个 Mesh、11 个 Group、3191 行、125 KB，把 25 秒拆成「云海启程 / 入站 / 归途」三个镜头，HUD 显示 01/03、镜头名和时间码，并提供自动运镜与重播按钮。Opus 5.5 版只有 9 个 Mesh、1051 行，同样有自动运镜和重播，但镜头段落只用左下角一行字幕提示，几何体更依赖 shader 和 5 个 PointLight 营造蒸汽与站台光。两版都保留 OrbitControls 供自由观察，DeepSeek 的细节量和粒子系统明显更多，Opus 5.5 则更精简、加载更轻。DeepSeek 的三个镜头各有独立构图，Opus 5.5 用一条平滑曲线把三段时间串起来，字幕在 7 秒、15 秒和 25 秒处切换。",
+      "en": "DeepSeek is the heaviest: 41 meshes, eleven groups, 3,191 lines and 125 KB, splitting the 25 seconds into three shots (cloud-sea departure, station arrival, return), with a HUD showing 01/03, shot name and timecode, plus auto-camera and replay buttons. Opus 5.5 has only nine meshes and 1,051 lines; it also offers auto-camera and replay, but marks the shot with a single caption in the lower-left and relies more on shaders and five point lights for steam and platform glow. Both keep OrbitControls for free viewing; DeepSeek carries far more detail and particles, while Opus 5.5 is leaner and lighter to load. DeepSeek's three shots each have their own composition, while Opus 5.5 runs one smooth curve through the three segments and changes its caption at 7, 15 and 25 seconds."
+    }
+  },
+  "ice-rink": {
+    "intro": {
+      "zh": "浮空的像素风户外冰场：2 对 2 冰球比赛、浇冰车整冰、昼夜与飘雪切换，全部以低分辨率渲染再放大成像素画。场景测试模型对自定义渲染管线、调色板、冰面反射、比赛 AI 和复杂 UI 的综合控制。",
+      "en": "A floating pixel-art outdoor ice rink with a 2v2 hockey game, a Zamboni resurfacing the ice, and day/night and snow toggles, all rendered at low resolution and upscaled into pixel art. It tests a custom render pipeline, palette mapping, ice reflections, game AI and a complex UI."
+    },
+    "comparison": {
+      "zh": "这个场景目前只有 Opus 5.5 一个版本，没有跨模型并排差异可记；它把渲染与玩法都压进一个 1382 行的 HTML。画面先渲到约 480×300 的离屏目标，再用深度描边、49 色 OKLab 调色板、Bayer 抖动和 texelFetch 放大成像素画；冰面用镜像场景做平面反射，磨损写进 RG DataTexture。玩法有 2 对 2 球员与守门员、传球/射门/扑救、界墙反弹、争球和进球庆祝，浇冰车会从车库开出擦掉划痕。UI 提供 Day/Dusk/Night、Snow Off/Light/Heavy、Resurface、Drop a puck、Pause、New game、左右转向、Pixel art/Raw 3D、像素大小滑杆和调色板/抖动/描边开关。整个页面约 83 KB，却同时包含比赛 AI、冰面磨损和可切换的像素/原始 3D 视图。",
+      "en": "This scene currently has only the Opus 5.5 version, so there is no cross-model comparison to record; what is notable is how much rendering and gameplay fit into one 1,382-line HTML file. The scene renders to an off-screen target of roughly 480×300, then applies depth outlines, a fixed 49-colour OKLab palette, optional Bayer dithering and texelFetch upscaling to produce pixel art. The ice uses a mirrored scene for planar reflections, while wear is written into an RG DataTexture. Gameplay includes 2v2 skaters and goalies, passing, shooting and saves, board bounces, face-offs and goal celebrations, and a Zamboni that drives out of its garage and erases the scratches. The UI offers Day/Dusk/Night, Snow Off/Light/Heavy, Resurface, Drop a puck, Pause, New game, turn left/right, Pixel art/Raw 3D, a pixel-size slider and palette/dither/outline toggles. The whole page is about 83 KB, yet it also contains the match AI, ice wear and a switchable pixel/raw-3D view."
+    }
+  }
+}
